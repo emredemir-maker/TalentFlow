@@ -38,6 +38,37 @@ service firebase.storage {
         && m.data.get('role', '') in roles;
     }
 
+    // ── Şirket durumu (K5) ──────────────────────────────────────────────────
+    // Firestore kurallarındaki tenantReadable / tenantOpenForWrites'ın aynısı:
+    // deneme bitince 14 gün salt okunur, sonra kapalı; askıdaki şirket kapalı.
+    // Şirket belgesi yoksa get() null döner → red (güvenli hata).
+    function tenantDoc(t) {
+      return firestore.get(/databases/(default)/documents/tenants/$(t));
+    }
+
+    function tenantReadable(t) {
+      let d = tenantDoc(t);
+      return d != null
+        && d.data.get('status', '') in ['trial', 'active', 'readonly']
+        && request.time < d.data.readUntil;
+    }
+
+    function tenantWritable(t) {
+      let d = tenantDoc(t);
+      return d != null
+        && d.data.get('status', '') in ['trial', 'active']
+        && request.time < d.data.writeUntil
+        && request.time < d.data.readUntil;
+    }
+
+    function canRead(t, roles) {
+      return hasRole(t, roles) && tenantReadable(t);
+    }
+
+    function canWrite(t, roles) {
+      return hasRole(t, roles) && tenantWritable(t);
+    }
+
     function allRoles() {
       return ['admin', 'recruiter', 'department_user', 'support'];
     }
@@ -56,9 +87,9 @@ service firebase.storage {
     // get: şirketin etkin üyesi. list: kapalı (uygulama klasör listelemiyor).
     // write: admin/recruiter, 20MB. Silme sunucuda (Admin SDK).
     match /tenants/{tenantId}/cvs/{allPaths=**} {
-      allow get:   if hasRole(tenantId, allRoles());
+      allow get:   if canRead(tenantId, allRoles());
       allow list:  if false;
-      allow write: if hasRole(tenantId, ['admin', 'recruiter'])
+      allow write: if canWrite(tenantId, ['admin', 'recruiter'])
                       && request.resource.size < 20 * 1024 * 1024;
     }
 
@@ -69,16 +100,17 @@ service firebase.storage {
       allow read:  if false;
       allow write: if request.auth != null
                       && request.auth.uid == userId
-                      && hasRole(tenantId, ['admin', 'recruiter', 'department_user'])
+                      && canWrite(tenantId, ['admin', 'recruiter', 'department_user'])
                       && request.resource.size < 200 * 1024 * 1024;
     }
 
     // ── Şirket logosu ───────────────────────────────────────────────────────
-    // Başvuru sayfası (anonim oturum) da gösterir → her oturum okur.
+    // Başvuru sayfası (anonim oturum) da gösterir → her oturum okur; kapanmış
+    // şirketin başvuru sayfası da kapalı olduğu için logo da kapanır.
     match /tenants/{tenantId}/branding/{filename} {
-      allow get:   if request.auth != null;
+      allow get:   if request.auth != null && tenantReadable(tenantId);
       allow list:  if false;
-      allow write: if hasRole(tenantId, ['admin'])
+      allow write: if canWrite(tenantId, ['admin'])
                       && request.resource.size < 10 * 1024 * 1024
                       && isSafeImageType();
     }

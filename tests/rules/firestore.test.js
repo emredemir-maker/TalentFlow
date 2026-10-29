@@ -468,6 +468,22 @@ describe('destek üyeliği (K11)', () => {
                 .doc(`${T('A')}/candidates/existing`)
                 .update({ note: 'x' })
         );
+        // Mülakatın korumasız alanları da (aday dalı) destek üyesine kapalı.
+        await allow(
+            dbFor('aSupport')
+                .collection(`${T('A')}/interviews`)
+                .get()
+        );
+        await deny(
+            dbFor('aSupport')
+                .doc(`${T('A')}/interviews/existing`)
+                .update({ transcript: ['x'] })
+        );
+        await deny(
+            dbFor('aSupport')
+                .doc(`${T('A')}/interviews/existing`)
+                .update({ status: 'completed' })
+        );
         await deny(
             dbFor('aSupportExpired')
                 .collection(`${T('A')}/candidates`)

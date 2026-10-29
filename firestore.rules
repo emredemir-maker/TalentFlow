@@ -266,8 +266,11 @@ service cloud.firestore {
         allow create: if canWrite(tenantId, writerRoles());
         // Aday (anonim) ve katılımcılar transkript/durum/sinyalleşme yazar;
         // değerlendirme alanlarına yalnız recruiter.
+        // Destek üyesi (K11) salt okunur: listeden öğrendiği oturumlara bu
+        // daldan da yazamasın diye açıkça dışarıda.
         allow update: if canWrite(tenantId, writerRoles()) ||
-          (anyAuth() && tenantOpenForWrites(tenantId) && !interviewProtectedTouched());
+          (anyAuth() && tenantOpenForWrites(tenantId) && !interviewProtectedTouched() &&
+            !hasRole(tenantId, ['support']));
         allow delete: if false;
       }
 

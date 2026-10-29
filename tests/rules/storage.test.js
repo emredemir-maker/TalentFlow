@@ -3,7 +3,7 @@
 // üyelikler tests/rules/matrix.js ile aynı.
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { createEnv, ctxFor, seed, seedFiles, allow, deny, BUCKET } from './helpers.js';
-import { IDENTITIES } from './matrix.js';
+import { IDENTITIES, TENANTS } from './matrix.js';
 
 let env;
 const MB = 1024 * 1024;
@@ -13,6 +13,8 @@ beforeAll(async () => {
     await env.clearStorage();
     await env.clearFirestore();
     const docs = {};
+    // Şirket belgeleri: Storage kuralları da şirket durumuna bakıyor (K5).
+    for (const [t, data] of Object.entries(TENANTS)) docs[`tenants/${t}`] = data;
     for (const [key, id] of Object.entries(IDENTITIES)) {
         for (const [t, m] of Object.entries(id.memberships || {})) {
             docs[`tenants/${t}/members/${key}`] = {
@@ -32,6 +34,13 @@ beforeAll(async () => {
         'tenants/B/cvs/b-1.pdf': 'application/pdf',
         'tenants/A/branding/logo.png': 'image/png',
         'tenants/A/bulk-imports/aRecruiter/a.zip': 'application/zip',
+        'tenants/C/cvs/c-1.pdf': 'application/pdf',
+        'tenants/C/branding/logo.png': 'image/png',
+        'tenants/D/cvs/d-1.pdf': 'application/pdf',
+        'tenants/D/branding/logo.png': 'image/png',
+        'tenants/E/cvs/e-1.pdf': 'application/pdf',
+        'tenants/F/cvs/f-1.pdf': 'application/pdf',
+        'tenants/Z/cvs/z-1.pdf': 'application/pdf',
         'avatars/aDept/a.png': 'image/png',
         'cvs/old.pdf': 'application/pdf',
         'branding/old.png': 'image/png',
@@ -129,6 +138,39 @@ describe('tenants/{t}/branding', () => {
         }
         // multi B'de admin: B'nin logosunu yazar.
         await allow(put('multi', 'tenants/B/branding/logo.png', 'image/png'));
+    });
+});
+
+describe('şirket durumu (K5)', () => {
+    // Firestore kurallarıyla aynı bant: C (yazma süresi geçmiş) ve F (readonly)
+    // okur, yazamaz; D (okuma süresi geçmiş) ve E (askıda) hiçbir şey yapamaz.
+    it('salt okunur şirket (C, F): CV okunur, CV/toplu/logo yazılamaz', async () => {
+        await allow(meta('cAdmin', 'tenants/C/cvs/c-1.pdf'));
+        await allow(meta('cRecruiter', 'tenants/C/cvs/c-1.pdf'));
+        await allow(meta('fAdmin', 'tenants/F/cvs/f-1.pdf'));
+        await allow(meta('anon', 'tenants/C/branding/logo.png'));
+        await deny(put('cAdmin', 'tenants/C/cvs/n.pdf', 'application/pdf'));
+        await deny(put('cRecruiter', 'tenants/C/cvs/n.pdf', 'application/pdf'));
+        await deny(put('fAdmin', 'tenants/F/cvs/n.pdf', 'application/pdf'));
+        await deny(put('cRecruiter', 'tenants/C/bulk-imports/cRecruiter/a.zip', 'application/zip'));
+        await deny(put('cAdmin', 'tenants/C/branding/new.png', 'image/png'));
+    });
+    it('kapalı (D) ve askıdaki (E) şirket: okuma da yazma da yok', async () => {
+        await deny(meta('dAdmin', 'tenants/D/cvs/d-1.pdf'));
+        await deny(meta('eAdmin', 'tenants/E/cvs/e-1.pdf'));
+        await deny(meta('anon', 'tenants/D/branding/logo.png'));
+        await deny(put('dAdmin', 'tenants/D/cvs/n.pdf', 'application/pdf'));
+        await deny(put('eAdmin', 'tenants/E/cvs/n.pdf', 'application/pdf'));
+        await deny(put('dAdmin', 'tenants/D/bulk-imports/dAdmin/a.zip', 'application/zip'));
+    });
+    it('şirket belgesi olmayan yol: üyelik olsa da red', async () => {
+        // aAdmin'in Z'de üyeliği yok; burada önemli olan şirket belgesinin
+        // yokluğunun da reddettiği — üyelik belgesi elle yazılır.
+        await seed(env, {
+            'tenants/Z/members/aAdmin': { role: 'admin', departments: [], status: 'active' },
+        });
+        await deny(meta('aAdmin', 'tenants/Z/cvs/z-1.pdf'));
+        await deny(put('aAdmin', 'tenants/Z/cvs/n.pdf', 'application/pdf'));
     });
 });
 

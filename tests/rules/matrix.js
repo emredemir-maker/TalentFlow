@@ -215,9 +215,16 @@ export const COLLECTIONS = {
     interviews: {
         path: 'interviews',
         doc: { candidateId: 'c', transcript: [] },
-        // Korumasız alan: aday tarafı (anonim dahil) yazar.
+        // Korumasız alan: aday tarafı (anonim dahil) yazar. Destek üyesi (K11)
+        // salt okunur: bu daldan da yazamaz.
         update: { transcript: ['merhaba'] },
-        ops: { get: EVERYONE, list: A_ALL, create: A_WRITERS, update: ANY_AUTH, delete: NONE },
+        ops: {
+            get: EVERYONE,
+            list: A_ALL,
+            create: A_WRITERS,
+            update: ANY_AUTH.filter((k) => k !== 'aSupport'),
+            delete: NONE,
+        },
     },
     integrationSecrets: {
         path: 'integrationSecrets',
