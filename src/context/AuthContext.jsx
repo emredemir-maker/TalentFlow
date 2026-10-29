@@ -37,7 +37,16 @@ const AuthContext = createContext(null);
 /** Hub adresi (giriş ve şirket yönetimi orada). */
 export const HUB_INN_URL = import.meta.env.VITE_HUB_INN_URL || 'https://agentinn-nyqpx.web.app';
 
-const LAST_TENANT_KEY = 'tf-active-tenant';
+export const LAST_TENANT_KEY = 'tf-active-tenant';
+
+/**
+ * Hatırlanan şirket seçimini unutur. Çıkışta ve şirket kapısı ekranında
+ * çağrılır: askıdaki/kapalı ya da üyeliği bitmiş bir şirket hatırlandıysa
+ * sonraki açılış yine aynı engel ekranına düşmesin.
+ */
+export function forgetRememberedTenant(store = typeof localStorage !== 'undefined' ? localStorage : null) {
+    if (store) writeStore(store, LAST_TENANT_KEY, null);
+}
 /** HubLaunchPage, Hub'ın gönderdiği şirketi buraya yazar (tek seferlik). */
 export const HUB_TENANT_KEY = 'tf-hub-tenant';
 
@@ -262,7 +271,14 @@ export function AuthProvider({ children }) {
 
     const logout = useCallback(() => {
         setActiveTenantId(null);
+        forgetRememberedTenant();
         return signOut(auth);
+    }, []);
+
+    /** Engel ekranından: hatırlanan seçimi unut, şirket seçimine dön. */
+    const resetTenantSelection = useCallback(() => {
+        forgetRememberedTenant();
+        window.location.assign('/panel');
     }, []);
 
     const anonymous = !!user?.isAnonymous;
@@ -320,11 +336,12 @@ export function AuthProvider({ children }) {
             tenantSuspended: access.suspended,
             membershipMissing: !!user && !anonymous && !!tenantId && member === null,
             selectTenant,
+            resetTenantSelection,
             loginWithHub,
             loginWithEmulatorPassword,
             logout,
         }),
-        [user, userProfile, role, userDepartments, anonymous, access, loading, error, tenants, tenantId, tenant, member, selectTenant, loginWithHub, loginWithEmulatorPassword, logout]
+        [user, userProfile, role, userDepartments, anonymous, access, loading, error, tenants, tenantId, tenant, member, selectTenant, resetTenantSelection, loginWithHub, loginWithEmulatorPassword, logout]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

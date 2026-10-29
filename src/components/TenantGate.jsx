@@ -20,9 +20,28 @@ function Shell({ title, children }) {
 }
 
 function Actions() {
-    const { logout } = useAuth();
+    const { logout, tenants, tenantId, selectTenant } = useAuth();
+    // Engel ekranı uygulamanın yerini aldığı için kenar menüdeki seçiciye
+    // ulaşılamaz: başka şirketi varsa buradan geçebilsin (seçim kaydedilir,
+    // engellenen şirket bir daha kendiliğinden açılmaz).
+    const others = (tenants || []).filter((t) => t.id !== tenantId);
     return (
         <div className="flex flex-col gap-2 pt-2">
+            {others.length > 0 && (
+                <div className="space-y-2 text-left">
+                    <p className="text-[12px] text-n500">Başka bir şirketle devam edin:</p>
+                    {others.map((t) => (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => selectTenant(t.id)}
+                            className="w-full tf-btn tf-btn-secondary justify-between"
+                        >
+                            <span>{t.name}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
             <a href={HUB_INN_URL} className="tf-btn tf-btn-primary justify-center">
                 Clyro Hub'a git
             </a>

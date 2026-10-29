@@ -15,7 +15,7 @@
 // yüzden eskiden kullanılan Firestore REST + web anahtarı yolu yerine Admin SDK.
 import { Router } from 'express';
 
-import { db } from '../config/firebaseAdmin.js';
+import { db, admin } from '../config/firebaseAdmin.js';
 import { loadPublicTenant } from '../middleware/auth.js';
 import { isValidDocId } from '../services/tenantPaths.js';
 import { childLogger } from '../services/logger.js';
@@ -85,7 +85,8 @@ router.post('/api/applications', async (req, res) => {
             aiSummary: str(aiSummary, 4000),
             status: 'new',
             kvkkConsent: true,
-            createdAt: new Date().toISOString(),
+            // Timestamp (istemci createdAt.seconds / toDate() bekliyor).
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
         if (parsedCandidate && typeof parsedCandidate === 'object') doc.parsedCandidate = parsedCandidate;
         if (aiScoreBreakdown && typeof aiScoreBreakdown === 'object') doc.aiScoreBreakdown = aiScoreBreakdown;

@@ -522,6 +522,8 @@ describe('herkese açık (aday) uçlar — bağlantıdaki şirket', () => {
         expect(ok.status).toBe(200);
         const saved = (await get(`tenants/B/applications/${ok.body.id}`)).data();
         expect(saved.positionTitle).toBe('B ilanı');
+        // createdAt Firestore Timestamp (istemci .seconds / toDate() kullanıyor).
+        expect(typeof saved.createdAt?.toMillis).toBe('function');
         expect((await db.collection('tenants/A/applications').get()).size).toBe(0);
     });
     it('salt okunur şirketin açık ilanı okunur ama başvuru yazılamaz (K5)', async () => {
