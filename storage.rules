@@ -1,84 +1,79 @@
 rules_version = '2';
+// ─────────────────────────────────────────────────────────────────────────────
+// Clyro Talent — çok şirketli Storage kuralları.
+// Tasarım: docs/coklu-sirket-plani.md §3.2. Testler: tests/rules/storage.test.js.
+//
+// Dosyalar `tenants/{tenantId}/…` altında; yetki Firestore'daki üyelik
+// belgesinden (tenants/{t}/members/{uid}) çapraz okumayla gelir. Jetondaki
+// `role` talebine bakılmaz (Auth Hub/CX ile ortak).
+//
+// İlk dağıtımda Firebase CLI, Storage hizmet hesabına Firestore okuma rolü
+// verilmesini ister (çapraz kural için; paylaşılan projede Emre onayıyla, tek
+// seferlik).
+//
+// Not: kayıttaki `getDownloadURL` jetonlu adresleri kuralları ATLAR; ayrım yalnız
+// adresi bilmeyenler için geçerli. Kural denetimli indirme PR 6'da.
+// ─────────────────────────────────────────────────────────────────────────────
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // ── Kimlik yardımcıları ───────────────────────────────────────────────────
-    //
-    // ANONİM OTURUM İÇ KULLANICI DEĞİLDİR. Uygulama aday tarafındaki herkese
-    // açık sayfalarda (/apply/, /live-interview/, /join/) otomatik olarak
-    // anonim oturum açıyor. Yani `request.auth != null` demek "personelden
-    // biri" değil, "başvuru sayfasını açmış herhangi biri" demek.
-    //
-    // Kayıt davet ya da izinli alan adı gerektirdiği için anonim olmayan her
-    // oturum iç kullanıcıya aittir.
+    // Anonim oturum aday sayfalarına ait; iç kullanıcı değildir.
     function isStrictAuth() {
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    // ── CV dosyaları ──────────────────────────────────────────────────────────
-    //
-    // ── BURADA NE VARDI ─────────────────────────────────────────────────────
-    // `allow read: if request.auth != null` yazıyordu ve bu iki ayrı kapıyı
-    // birden açıyordu:
-    //
-    //   1. ANONİM ERİŞİM — başvuru sayfasını açan herkes anonim token alıyor.
-    //      Aday olarak giren biri iç havuzdaki CV'lere erişebiliyordu.
-    //   2. LİSTELEME — Storage'da da `read` hem `get` hem `list` demek.
-    //      Yani klasörün tamamı dökülüp bütün CV'ler indirilebiliyordu.
-    //
-    // İkisi birlikte, ürünün en hassas verisini (ad, telefon, adres, tüm iş
-    // geçmişi) herkese açık hale getiriyordu. Aynı tuzağı firestore.rules'ta
-    // da bulmuştuk; orada kapatıldı, burada kalmış.
-    //
-    // ── ŞİMDİ ───────────────────────────────────────────────────────────────
-    // get   : yalnızca anonim OLMAYAN oturum (iç kullanıcı)
-    // list  : kapalı — uygulama hiçbir yerde klasör listelemiyor, dosyalara
-    //         kayıtta saklanan indirme adresiyle ulaşılıyor
-    // write : yalnızca iç kullanıcı. Başvuru formu Storage'a dosya YAZMIYOR;
-    //         CV metnini tarayıcıda çıkarıp gönderiyor, dolayısıyla anonim
-    //         yazma yetkisinin bir karşılığı yok.
-    match /cvs/{filename} {
-      allow get:   if isStrictAuth();
-      allow list:  if false;
-      allow write: if isStrictAuth()
-                      && request.resource.size < 20 * 1024 * 1024;
+    // Üyelik belgesi — tek firestore.get (belge yoksa null).
+    function membership(t) {
+      return firestore.get(/databases/(default)/documents/tenants/$(t)/members/$(request.auth.uid));
     }
 
-    // Alt klasörler (ileride kullanılırsa) — aynı kural.
-    match /cvs/{candidateId}/{allPaths=**} {
-      allow get:   if isStrictAuth();
-      allow list:  if false;
-      allow write: if isStrictAuth()
-                      && request.resource.size < 20 * 1024 * 1024;
+    // Etkin üye ve rolü listede. Destek üyeliği (K11) süreli.
+    function hasRole(t, roles) {
+      let m = membership(t);
+      return isStrictAuth()
+        && m != null
+        && m.data.get('status', '') == 'active'
+        && (m.data.get('expiresAt', null) == null || request.time < m.data.expiresAt)
+        && m.data.get('role', '') in roles;
     }
 
-    // ── Toplu içe aktarma kaynakları ─────────────────────────────────────────
-    // Tarayıcı ZIP/PDF/DOCX'i buraya yükler, API'ye yalnızca YOL gönderilir.
-    // Bu yol Hosting rewrite'ından geçmediği için ne 32MB gövde sınırı ne de
-    // 60 saniyelik kesme uygulanır (gerekçe: functions/services/bulkSources.js).
-    //
-    // Yolun içinde uid taşınması kasıtlı: yazma iznini burada, okuma/silme
-    // yetkisini sunucuda AYNI tek gerçek belirler (parseSources). Kullanıcı
-    // yalnızca kendi klasörüne yazar; sunucu da yolun kendisine ait olduğunu
-    // doğrulamadan hiçbir dosyayı açmaz.
-    //
-    // Okuma yok: dosyayı yalnızca Admin SDK (kuralları atlar) indirir. İçeride
-    // başkasının CV'si var, tarayıcıya açmanın bir sebebi yok.
-    match /bulk-imports/{userId}/{allPaths=**} {
-      allow read:   if false;
-      // isStrictAuth: anonim oturumun da bir uid'i var, dolayısıyla eski kural
-      // aday tarafındaki bir ziyaretçinin kendi klasörüne 200MB'a kadar dosya
-      // yüklemesine izin veriyordu. Okuma kapalı olduğu için veri sızıntısı
-      // değil ama depolama maliyeti üretmeye açık bir kapıydı.
-      allow write:  if isStrictAuth()
-                       && request.auth.uid == userId
-                       && request.resource.size < 200 * 1024 * 1024;
+    // ── Şirket durumu (K5) ──────────────────────────────────────────────────
+    // Firestore kurallarındaki tenantReadable / tenantOpenForWrites'ın aynısı:
+    // deneme bitince 14 gün salt okunur, sonra kapalı; askıdaki şirket kapalı.
+    // Şirket belgesi yoksa get() null döner → red (güvenli hata).
+    function tenantDoc(t) {
+      return firestore.get(/databases/(default)/documents/tenants/$(t));
     }
 
-    // Whitelist of safe raster image MIME types. Excludes image/svg+xml,
-    // which can carry inline JS and is therefore an XSS vector when the
-    // asset is later rendered as <img> on a same-origin domain.
+    function tenantReadable(t) {
+      let d = tenantDoc(t);
+      return d != null
+        && d.data.get('status', '') in ['trial', 'active', 'readonly']
+        && request.time < d.data.readUntil;
+    }
+
+    function tenantWritable(t) {
+      let d = tenantDoc(t);
+      return d != null
+        && d.data.get('status', '') in ['trial', 'active']
+        && request.time < d.data.writeUntil
+        && request.time < d.data.readUntil;
+    }
+
+    function canRead(t, roles) {
+      return hasRole(t, roles) && tenantReadable(t);
+    }
+
+    function canWrite(t, roles) {
+      return hasRole(t, roles) && tenantWritable(t);
+    }
+
+    function allRoles() {
+      return ['admin', 'recruiter', 'department_user', 'support'];
+    }
+
+    // SVG satır içi betik taşıyabilir; yalnız raster resimler.
     function isSafeImageType() {
       return request.resource.contentType in [
         'image/jpeg',
@@ -88,24 +83,39 @@ service firebase.storage {
       ];
     }
 
-    // ── Branding assets ───────────────────────────────────────────────────────
-    // BrandingSettingsPage uploads to: branding/logo_{timestamp}_{filename}
-    // Write: super_admin only (Custom Claim role OR Firestore role).
-    // Read:  any authenticated user.
-    // Okuma anonime de açık: başvuru ve giriş sayfaları logoyu oturum
-    // açılmadan gösteriyor. Listeleme yine de kapalı — dosya adlarını dökmenin
-    // hiçbir meşru kullanımı yok.
-    match /branding/{filename} {
-      allow get:   if request.auth != null;
+    // ── CV dosyaları ──────────────────────────────────────────────────────────
+    // get: şirketin etkin üyesi. list: kapalı (uygulama klasör listelemiyor).
+    // write: admin/recruiter, 20MB. Silme sunucuda (Admin SDK).
+    match /tenants/{tenantId}/cvs/{allPaths=**} {
+      allow get:   if canRead(tenantId, allRoles());
       allow list:  if false;
+      allow write: if canWrite(tenantId, ['admin', 'recruiter'])
+                      && request.resource.size < 20 * 1024 * 1024;
+    }
+
+    // ── Toplu içe aktarma kaynakları ─────────────────────────────────────────
+    // Kişi yalnız kendi klasörüne yazar; dosyayı yalnız sunucu açar
+    // (functions/services/bulkSources.js önek denetimi). Okuma kapalı.
+    match /tenants/{tenantId}/bulk-imports/{userId}/{allPaths=**} {
+      allow read:  if false;
       allow write: if request.auth != null
-                      && request.auth.token.role == 'super_admin'
+                      && request.auth.uid == userId
+                      && canWrite(tenantId, ['admin', 'recruiter', 'department_user'])
+                      && request.resource.size < 200 * 1024 * 1024;
+    }
+
+    // ── Şirket logosu ───────────────────────────────────────────────────────
+    // Başvuru sayfası (anonim oturum) da gösterir → her oturum okur; kapanmış
+    // şirketin başvuru sayfası da kapalı olduğu için logo da kapanır.
+    match /tenants/{tenantId}/branding/{filename} {
+      allow get:   if request.auth != null && tenantReadable(tenantId);
+      allow list:  if false;
+      allow write: if canWrite(tenantId, ['admin'])
                       && request.resource.size < 10 * 1024 * 1024
                       && isSafeImageType();
     }
 
-    // ── Profile / avatar images ───────────────────────────────────────────────
-    // Write: only the owner of the avatar slot
+    // ── Profil resmi — kişiye ait, şirketler arası ortak ────────────────────
     match /avatars/{userId}/{allPaths=**} {
       allow get:   if isStrictAuth();
       allow list:  if false;
@@ -115,7 +125,19 @@ service firebase.storage {
                       && isSafeImageType();
     }
 
-    // ── Default deny ──────────────────────────────────────────────────────────
+    // ── Eski ortak yollar — KAPALI (K10) ─────────────────────────────────────
+    // cvs/**, branding/**, bulk-imports/** veri taşınmadan silinecek (PR 8).
+    match /cvs/{allPaths=**} {
+      allow read, write: if false;
+    }
+    match /branding/{allPaths=**} {
+      allow read, write: if false;
+    }
+    match /bulk-imports/{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // ── Varsayılan red ──────────────────────────────────────────────────────
     match /{allPaths=**} {
       allow read, write: if false;
     }
