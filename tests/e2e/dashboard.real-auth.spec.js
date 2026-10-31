@@ -30,7 +30,7 @@ test.describe('Real-auth login + dashboard', () => {
         // Unauthenticated → router redirects to LoginPage. Wait for
         // the canonical right-panel heading instead of the URL because
         // App.jsx renders LoginPage *without* a router push.
-        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible({
+        await expect(page.getByRole('heading', { name: 'Hoş geldin' })).toBeVisible({
             timeout: 15_000,
         });
 
@@ -63,7 +63,7 @@ test.describe('Real-auth login + dashboard', () => {
         // page reload (token in IndexedDB). After a full reload, the
         // user shouldn't bounce back to LoginPage.
         await page.goto('/');
-        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible({
+        await expect(page.getByRole('heading', { name: 'Hoş geldin' })).toBeVisible({
             timeout: 15_000,
         });
         await page.locator('input[type="email"]').first().fill(TEST_USER.email);
@@ -80,6 +80,6 @@ test.describe('Real-auth login + dashboard', () => {
             timeout: 20_000,
         });
         // And the LoginPage heading should NOT be visible
-        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeHidden();
+        await expect(page.getByRole('heading', { name: 'Hoş geldin' })).toBeHidden();
     });
 });

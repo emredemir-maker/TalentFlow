@@ -31,10 +31,12 @@ test.describe('SPA boot & public routes', () => {
         await page.goto('/');
 
         // The router lands unauthenticated traffic on the login screen.
-        // Wait for the login marketing copy as the canonical "we mounted"
-        // signal — it's the first non-loader text that appears.
-        await expect(page.getByText('İşe Alımın')).toBeVisible({ timeout: 10_000 });
-        await expect(page.getByText(/Yapay Zeka Mimarı/)).toBeVisible();
+        // "Mount oldu" işareti olarak giriş formunun kalıcı öğelerine bakıyoruz
+        // (başlık + e-posta alanı); tanıtım metni değiştikçe test kırılmasın.
+        await expect(page.getByRole('heading', { name: 'Hoş geldin' })).toBeVisible({
+            timeout: 10_000,
+        });
+        await expect(page.locator('input[type="email"]').first()).toBeVisible();
 
         // No JS errors during boot
         expect(errors, errors.join('\n')).toHaveLength(0);
@@ -45,7 +47,7 @@ test.describe('SPA boot & public routes', () => {
 
         // Right-panel header confirms we're on the auth form, not a
         // redirect-loop or loader-stuck state.
-        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Hoş geldin' })).toBeVisible();
 
         // Email + password inputs present and interactive — typing should
         // succeed without errors. We don't submit (would hit Firebase).
@@ -91,7 +93,7 @@ test.describe('SPA boot & public routes', () => {
         await page.goto('/login');
 
         // The login form's right-panel heading must still render.
-        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Hoş geldin' })).toBeVisible();
 
         // No horizontal overflow — document width must not exceed the
         // viewport width. A few pixels of slop are tolerated for
