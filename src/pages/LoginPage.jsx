@@ -74,17 +74,18 @@ export default function LoginPage() {
         e.target.style.boxShadow = 'none';
     };
 
+    // Yalnız ürünün bugünkü yapısını anlatan sayılar (clyrolabs.com/talent ile aynı); ölçülmemiş hız ya da isabet oranı yazılmaz.
     const stats = [
-        { value: '3s', label: 'CV Analizi', icon: BarChart3 },
-        { value: '%90', label: 'Tahmin Skoru', icon: Brain },
-        { value: '24/7', label: 'Akıllı Asistan', icon: Clock },
+        { value: '5', label: 'Yetkinlik boyutu', icon: BarChart3 },
+        { value: '4', label: 'STAR başlığı', icon: Brain },
+        { value: '3', label: 'Rol', icon: Clock },
     ];
 
     const features = [
-        'Nöral CV Ayrıştırma ve Eşleştirme',
-        'Gerçek Zamanlı STAR Mülakat Analizi',
-        'Bias Korumalı AI Değerlendirme',
-        'Agentic İşe Alım İş Akışları',
+        'Aday ve pozisyon eşleştirme, puanın gerekçesiyle',
+        'STAR kanıtlarıyla yetkinlik değerlendirmesi',
+        'Zorunlu kriteri karşılamayan adayı işaretler; kararı ekip verir',
+        'Mülakatta önyargılı ifadeye uyarı',
     ];
 
     return (
@@ -129,7 +130,7 @@ export default function LoginPage() {
 
                 {/* Logo */}
                 <div style={{ position: 'relative', zIndex: 1 }}>
-                    <TalentInnLogo iconSize={46} showText={true} showSub={true} textSize="20px" onDark />
+                    <TalentInnLogo iconSize={46} showText={true} showSub={true} subtitle="İşe alım" textSize="20px" onDark />
                 </div>
 
                 {/* Hero Text */}
@@ -147,7 +148,7 @@ export default function LoginPage() {
                         width: 'fit-content',
                     }}>
                         <Sparkles size={12} />
-                        Gelişmiş Yetenek Kontrol Merkezi
+                        Aday takip uygulaması
                     </div>
 
                     {/* Main heading */}
@@ -159,14 +160,14 @@ export default function LoginPage() {
                         color: '#F8FAFC',
                         marginBottom: '20px',
                     }}>
-                        İşe Alımın <br />
+                        Doğru adayı <br />
                         <span style={{
                             backgroundImage: 'linear-gradient(90deg, #14B8A6, #0F766E)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text',
                         }}>
-                            Yapay Zeka Mimarı
+                            doğru pozisyonla buluştur.
                         </span>
                     </h1>
 
@@ -179,8 +180,8 @@ export default function LoginPage() {
                         marginBottom: '36px',
                         fontWeight: 500,
                     }}>
-                        Clyro Talent, sıradan bir aday takip sisteminden çok daha fazlasıdır. Veriyi stratejiye, adayları ise yetkinlik kanıtlarına dönüştüren uçtan uca bir{' '}
-                        <span style={{ color: '#F8FAFC', fontWeight: 700 }}>Yapay Zeka Ekosistemidir.</span>
+                        Clyro Talent adayları açık pozisyonlarla eşleştirir, mülakatı yetkinliklere göre değerlendirir ve her adayın nerede beklediğini gösterir.{' '}
+                        <span style={{ color: '#F8FAFC', fontWeight: 700 }}>Yapay zekâ önerir, kararı ekip verir.</span>
                     </p>
 
                     {/* Feature list — hidden on narrow screens to keep the form reachable */}
@@ -221,7 +222,7 @@ export default function LoginPage() {
 
                 {/* Footer note */}
                 <div style={{ position: 'relative', zIndex: 1, color: '#94A3B8', fontSize: '11px', letterSpacing: '1px', display: isNarrow ? 'none' : 'block' }}>
-                    © 2025 Clyro Talent · AI-Powered Talent Intelligence
+                    © 2026 Clyro Labs · Clyro Talent
                 </div>
             </div>
 
@@ -239,12 +240,12 @@ export default function LoginPage() {
                     {/* Header */}
                     <div style={{ marginBottom: '36px' }}>
                         <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.5px' }}>
-                            {mode === 'login' ? 'Hoş Geldiniz' : 'Hesap Oluşturun'}
+                            {mode === 'login' ? 'Hoş geldin' : 'Hesap oluştur'}
                         </h2>
                         <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.5' }}>
                             {mode === 'login'
-                                ? 'Platforma erişmek için bilgilerinizi girin.'
-                                : 'Davetiyenizle yeni hesabınızı oluşturun.'}
+                                ? 'Clyro Talent’a girmek için bilgilerini gir.'
+                                : 'Davetinle yeni hesabını oluştur.'}
                         </p>
                     </div>
 
@@ -481,7 +482,7 @@ export default function LoginPage() {
                             onMouseEnter={e => e.currentTarget.style.color = '#0F766E'}
                             onMouseLeave={e => e.currentTarget.style.color = '#64748B'}
                         >
-                            {mode === 'login' ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten üye misiniz? Giriş yapın'}
+                            {mode === 'login' ? 'Hesabın yok mu? Kayıt ol' : 'Zaten hesabın var mı? Giriş yap'}
                             <ArrowRight size={13} />
                         </button>
                     </div>

@@ -106,12 +106,11 @@ const YAPMADIKLARI = [
 ];
 
 const PRATIK = [
-    { baslik: 'Veri nerede', metin: 'Kendi Firebase projenizde. Aday verisi, CV\'ler ve görüşme kayıtları sizin hesabınızda kalıyor; ortak bir havuz yok.' },
-    { baslik: 'AI anahtarı', metin: 'Kendi Gemini anahtarınız. Faturayı siz görüyorsunuz.' },
-    { baslik: 'Maliyet', metin: 'Her AI çağrısının tokenı özelliğe göre ölçülüyor; hangi özelliğin ne yaktığı yönetim ekranında gün gün görünüyor.' },
+    { baslik: 'Veri nerede', metin: 'Clyro bulutunda. Clyro Talent bugün tek şirketli bir kurulumla çalışıyor; aday verisine erişim rollerle sınırlanıyor. Kullanımı erişim görüşmesinde birlikte planlıyoruz.' },
+    { baslik: 'Yapay zekâ kullanımı', metin: 'Her yapay zekâ çağrısı özelliğe göre ölçülüyor; hangi özelliğin ne kadar kullandığı yönetim ekranında gün gün görünüyor.' },
     { baslik: 'Fren', metin: 'Günlük token ve arama tavanı tanımlanabiliyor. Tavan dolduğunda yeni AI çağrısı başlamıyor.' },
-    { baslik: 'Roller', metin: 'Süper admin, işe alım uzmanı, departman kullanıcısı — sonuncusu yalnızca kendi departmanının adaylarını görüyor.' },
-    { baslik: 'Entegrasyon', metin: 'Google Workspace ve Microsoft 365 (takvim, e-posta), Google Takvim senkronu, PDF rapor, Excel dışa aktarım.' },
+    { baslik: 'Roller', metin: 'Yönetici, işe alımcı, departman kullanıcısı — sonuncusu yalnızca kendi departmanının adaylarını görüyor.' },
+    { baslik: 'Entegrasyon', metin: 'Google Takvim ve Microsoft (Outlook, Teams): mülakat planlanınca toplantı bağlantısı ve davet kendiliğinden oluşuyor. PDF rapor, Excel dışa aktarım.' },
 ];
 
 export default function TanitimPage() {
@@ -194,7 +193,7 @@ export default function TanitimPage() {
                         <h2 className="text-[1.5rem] font-semibold tracking-[-0.01em] m-0">Skor, kanıt oranıdır</h2>
                     </div>
                     <p className="text-[15px] text-n600 leading-relaxed m-0">
-                        Ekranda bir sayı görüyorsanız arkasında şu tablo duruyor. Her satır bir ilan maddesi, her hüküm
+                        Ekranda bir sayı görüyorsan arkasında şu tablo duruyor. Her satır bir ilan maddesi, her hüküm
                         bir alıntıya bağlı. Alıntı yoksa hüküm de yok — "karar verilemedi" geçerli ve sık bir sonuç.
                     </p>
 
@@ -294,9 +293,9 @@ export default function TanitimPage() {
                         işaretlenebiliyor.
                     </p>
                     <p className="text-[15px] text-n600 leading-relaxed m-0">
-                        Görüşmenin nerede yapıldığı önemli değil — Meet, Teams, telefon ya da yüz yüze. Görüşme bittiğinde
-                        sonuç elle giriliyor: transkript yapıştırılıyor, cevaplar sorulara dağıtılıyor, her cevap ilgili
-                        ilan maddesine bağlanıyor. Çıktı, alıntılarıyla birlikte indirilebilir bir PDF rapor.
+                        Mülakat canlı ya da yüz yüze yapılıyor. Görüşme yazıya dökülüyor, cevaplar sorulara dağıtılıyor,
+                        her cevap ilgili ilan maddesine bağlanıyor. Çıktı, alıntılarıyla birlikte indirilebilir bir PDF rapor.
+                        Kararı yine işe alım ekibi veriyor.
                     </p>
 
                     <Ekran
