@@ -411,7 +411,7 @@ export function filterCandidatesByDomain(position, candidates) {
 
 
 /**
- * Unified Otonom Matching Algorithm
+ * Unified Matching Algorithm
  * This logic is used for INITIAL matches. After AI analysis, results are overwritten by LLM.
  */
 export function calculateMatchScore(candidate, position, options = {}) {

@@ -1,13 +1,124 @@
-// Tek aday için derin (otonom) tarama çekirdeği — UI'sız, yeniden
-// kullanılabilir. Adaylar tablosundaki "Otonom Tarama" toplu aksiyonu bunu
-// kullanır. Kurallar SystemScanner.processOne ile AYNIDIR (kanıt kontrolü,
-// atanan pozisyonun bağlayıcılığı, akıllı top-5 sınırı, 0 puanın "en iyi"
-// sayılmaması, scoringStage kapısı) — birinde davranış değişirse diğerine de
-// uygulanmalı; uzun vadede SystemScanner'ın bu servise taşınması planlı.
+// Tek aday için detaylı analiz çekirdeği — UI'sız, yeniden kullanılabilir.
+// Adaylar tablosundaki "Detaylı analiz" toplu aksiyonu ve aday ekranındaki
+// "Detaylı analizi başlat" bunu kullanır. Pozisyon seçimi planDetailedAnalysis
+// ile yapılır; SystemScanner de aynı planı kullanır — biri değişirse diğeri de
+// değişmiş olur.
 import { analyzeCandidateMatch } from './geminiService';
 import { calculateMatchScore, filterPositionsByDomain, findBestPositionMatch } from './matchService';
 import { buildJobDescription, requirementsOf, requirementsFingerprint } from '../utils/positionRequirements';
 import { COVERAGE_SCHEMA } from '../utils/coverageDetail';
+
+// ── DETAYLI ANALİZ KOTASI ────────────────────────────────────────────────────
+//
+// Kota birimi: BİR aday–pozisyon karşılaştırması = 1 detaylı analiz. Bir
+// adayı 3 pozisyonla karşılaştırmak kotadan 3 düşer. Her karşılaştırma iki AI
+// çağrısıdır (kapsama + anlatım) ve sunucudaki kullanım ölçümünde (functions/
+// services/usage.js) `coverage` etiketi karşılaştırma başına TAM BİR kez
+// sayılır — gelecekteki kota o sayıyı okuyabilir.
+//
+// Varsayılan: aday YALNIZCA atandığı pozisyonla karşılaştırılır. "Diğer uygun
+// pozisyonlarla da karşılaştır" ayrı ve açık bir seçimdir. Eskiden her tarama
+// en uygun 5 pozisyonu + atanan pozisyonu (6'ya kadar karşılaştırma, 12 AI
+// çağrısı) kendiliğinden analiz ediyordu ve kullanıcı bunu göremiyordu.
+
+/** Akıllı sınır: "diğer pozisyonlar" seçiliyken AI'a giden en fazla pozisyon. */
+export const OTHER_POSITIONS_LIMIT = 5;
+
+/** Derin analiz için yeterli kanıt var mı? Boş girdi tek haneli skor üretir. */
+export function hasCvEvidence(candidate) {
+    const cvBody = `${candidate?.cvData || ''}${candidate?.cvText || ''}`.trim();
+    return cvBody.length >= 40 || (candidate?.experiences?.length > 0);
+}
+
+/** findBestPositionMatch kopya döndürür; kayda orijinal pozisyon gitsin. */
+function originalOf(match, positions) {
+    if (!match) return null;
+    return positions.find((p) => p === match || (p?.id != null && p.id === match.id)) || match;
+}
+
+/**
+ * Adayın ASIL pozisyonu: işe alım uzmanının atadığı (bağlayıcı); atama
+ * yoksa ön analizin eşleştirdiği (`matchedPositionTitle`), o da yoksa alanına
+ * uyan en iyi anahtar-kelime eşleşmesi. `allowUnrelatedFallback` ile alanına
+ * uyan pozisyon yokken en yakın açık pozisyona düşülür.
+ */
+export function primaryPositionFor(candidate, openPositions, options = {}) {
+    const { allowUnrelatedFallback = true, compatible } = options;
+    const open = (openPositions || []).filter(Boolean);
+    const assigned = candidate?.positionId ? open.find((p) => p.id === candidate.positionId) : null;
+    if (assigned) return assigned;
+    const compat = compatible || filterPositionsByDomain(candidate, open);
+    const matched = candidate?.matchedPositionTitle
+        ? compat.find((p) => p.title === candidate.matchedPositionTitle)
+        : null;
+    if (matched) return matched;
+    const best = originalOf(findBestPositionMatch(candidate, compat), compat) || compat[0] || null;
+    if (best) return best;
+    if (!allowUnrelatedFallback) return null;
+    return originalOf(findBestPositionMatch(candidate, open), open) || open[0] || null;
+}
+
+/**
+ * Bu aday HANGİ pozisyonlarla karşılaştırılacak? Dönen dizinin uzunluğu,
+ * işlemin kotadan düşeceği detaylı analiz sayısıdır.
+ *
+ * @param {object} candidate
+ * @param {Array} openPositions
+ * @param {{includeOtherPositions?: boolean, allowUnrelatedFallback?: boolean,
+ *   smartLimit?: boolean, targetPosition?: object|null}} [options]
+ *   - includeOtherPositions: atanan pozisyona ek olarak alanına uyan diğer
+ *     pozisyonlar (akıllı sınırla en iyi 5) — açık seçim, varsayılan kapalı
+ *   - targetPosition: yalnızca bu pozisyon (hedefli tarama)
+ * @returns {Array} pozisyonlar
+ */
+export function planDetailedAnalysis(candidate, openPositions, options = {}) {
+    const {
+        includeOtherPositions = false,
+        allowUnrelatedFallback = true,
+        smartLimit = true,
+        targetPosition = null,
+    } = options;
+    if (!hasCvEvidence(candidate)) return [];
+    if (targetPosition) return [targetPosition];
+
+    const open = (openPositions || []).filter(Boolean);
+    const compatible = filterPositionsByDomain(candidate, open);
+    const primary = primaryPositionFor(candidate, open, { allowUnrelatedFallback, compatible });
+    if (!includeOtherPositions) return primary ? [primary] : [];
+
+    // Ücretsiz anahtar-kelime skoruyla ön sıralama — yalnızca en iyi 5 AI'a.
+    // calculateMatchScore OBJE döndürür; .score alınmazsa sıralama NaN olur.
+    const ranked = smartLimit && compatible.length > OTHER_POSITIONS_LIMIT
+        ? [...compatible]
+            .map((p) => ({ p, s: calculateMatchScore(candidate, p)?.score || 0 }))
+            .sort((a, b) => b.s - a.s)
+            .slice(0, OTHER_POSITIONS_LIMIT)
+            .map((x) => x.p)
+        : compatible;
+    if (!primary) return ranked;
+    return ranked.some((p) => p === primary || (p?.id != null && p.id === primary.id))
+        ? ranked
+        : [primary, ...ranked];
+}
+
+/**
+ * Bir işlemin kaç detaylı analiz (kota birimi) kullanacağı. Arayüz bunu
+ * işlem başlamadan gösterir; ileride kota kontrolü de bu sayıyı kullanır.
+ */
+export function countDetailedComparisons(candidates, openPositions, options = {}) {
+    return (candidates || []).reduce(
+        (sum, c) => sum + planDetailedAnalysis(c, openPositions, options).length,
+        0
+    );
+}
+
+/** Arayüzdeki tek tip kota cümlesi. */
+export function detailedAnalysisUsageText(count) {
+    const n = Number(count) || 0;
+    return n === 0
+        ? 'Bu işlem detaylı analiz kullanmaz.'
+        : `Bu işlem ${n} detaylı analiz kullanır.`;
+}
 
 /**
  * Adayın analizinin BELİRLİ bir pozisyon için tazelenmesi gerekiyor mu?
@@ -31,12 +142,14 @@ function sanitizeForFirestore(value) {
 }
 
 /**
- * Adayı açık pozisyonlara karşı derinlemesine analiz eder.
+ * Adayın detaylı analizini çalıştırır. Varsayılan: YALNIZCA atandığı
+ * (yoksa ön analizin eşleştirdiği) pozisyon — 1 detaylı analiz.
  * @param {object} candidate
  * @param {Array} openPositions
- * @param {{allowUnrelatedFallback?: boolean}} [options] — uyumlu pozisyon
- *   yokken en yakın pozisyona düşülsün mü (toplu tarama: evet, tekil
- *   yeniden analiz: hayır)
+ * @param {{allowUnrelatedFallback?: boolean, includeOtherPositions?: boolean}} [options]
+ *   - allowUnrelatedFallback: uyumlu pozisyon yokken en yakın pozisyona
+ *     düşülsün mü (toplu tarama: evet, tekil yeniden analiz: hayır)
+ *   - includeOtherPositions: "Diğer uygun pozisyonlarla da karşılaştır"
  * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result'|'no_compatible_position'|'analysis_failed', updates?: object, failures?: Array<{position: string, message: string}>, aiCalls: number}>}
  *   - skipped_no_cv: CV gövdesi yok — skor çökertmek yerine atlandı (yeniden ayrıştırma gerekli)
  *   - analysis_failed: denenen TÜM pozisyonlarda AI çağrısı hata verdi
@@ -45,39 +158,23 @@ function sanitizeForFirestore(value) {
  *   - no_compatible_position: adayın domain'ine uygun açık pozisyon yok
  */
 export async function deepScanCandidate(candidate, openPositions, options = {}) {
-    const { allowUnrelatedFallback = true } = options;
+    const { allowUnrelatedFallback = true, includeOtherPositions = false } = options;
     // Kanıt kontrolü: boş girdiyle derin analiz tek haneli skor üretir
-    const cvBody = `${candidate.cvData || ''}${candidate.cvText || ''}`.trim();
-    const hasEvidence = cvBody.length >= 40 || (candidate.experiences?.length > 0);
-    if (!hasEvidence) return { status: 'skipped_no_cv', aiCalls: 0 };
+    if (!hasCvEvidence(candidate)) return { status: 'skipped_no_cv', aiCalls: 0 };
 
-    const compatible = filterPositionsByDomain(candidate, openPositions);
     const assignedPos = candidate.positionId
         ? openPositions.find((p) => p.id === candidate.positionId) || null
         : null;
 
-    // Akıllı sınır: >5 uyumlu pozisyonda ücretsiz anahtar-kelime skoruyla
-    // ön-sıralanıp yalnızca en iyi 5'i AI'a gönderilir
-    const ranked = compatible.length > 5
-        ? [...compatible]
-            .map((p) => ({ p, s: calculateMatchScore(candidate, p)?.score || 0 }))
-            .sort((a, b) => b.s - a.s)
-            .slice(0, 5)
-            .map((x) => x.p)
-        : compatible;
-    let positionsToAnalyze = ranked;
-    if (assignedPos && !positionsToAnalyze.some((p) => p?.id === assignedPos.id)) {
-        positionsToAnalyze = [assignedPos, ...positionsToAnalyze];
-    }
-    if (positionsToAnalyze.length === 0) {
-        // Toplu taramada bir aday hiç sonuçsuz kalmasın diye en yakın
-        // pozisyona düşülür. Tekil "yeniden analiz" akışında bu istenmez:
-        // domain'ine uygun pozisyon yokken rastgele bir ilana karşı analiz,
-        // adayın profiline yanıltıcı bir skor yazar (İK adayının "Project
-        // Manager"a %55 alması vakası).
-        if (!allowUnrelatedFallback) return { status: 'no_compatible_position', aiCalls: 0 };
-        positionsToAnalyze = [findBestPositionMatch(candidate, openPositions) || openPositions[0]].filter(Boolean);
-    }
+    // Uyumlu pozisyon yokken en yakın pozisyona düşmek toplu taramada bir
+    // aday sonuçsuz kalmasın diye var. Tekil akışta bu istenmez: domain'ine
+    // uygun pozisyon yokken rastgele bir ilana karşı analiz, adayın profiline
+    // yanıltıcı bir skor yazar (İK adayının "Project Manager"a %55 alması).
+    const positionsToAnalyze = planDetailedAnalysis(candidate, openPositions, {
+        includeOtherPositions,
+        allowUnrelatedFallback,
+    });
+    if (positionsToAnalyze.length === 0) return { status: 'no_compatible_position', aiCalls: 0 };
 
     const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
     let highestScore = -1;
@@ -178,8 +275,8 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
  * Adayı TEK bir pozisyona karşı yeniden analiz eder.
  *
  * Pozisyonun gereksinimleri değiştiğinde tüm havuzu `deepScanCandidate` ile
- * taramak gereksiz pahalıdır (aday başına 5'e kadar AI çağrısı); değişen
- * yalnızca o pozisyondur. Bu primitif aday başına TEK çağrı yapar ve
+ * taramak gereksiz pahalıdır; değişen yalnızca o pozisyondur. Bu primitif
+ * aday başına TEK karşılaştırma (1 detaylı analiz) yapar ve
  * `positionAnalyses[title]` kaydını tazeler.
  *
  * @param {object} candidate
@@ -191,9 +288,7 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
  */
 export async function rescanCandidateForPosition(candidate, position, options = {}) {
     const { previousTitle } = options;
-    const cvBody = `${candidate.cvData || ''}${candidate.cvText || ''}`.trim();
-    const hasEvidence = cvBody.length >= 40 || (candidate.experiences?.length > 0);
-    if (!hasEvidence) return { status: 'skipped_no_cv', aiCalls: 0 };
+    if (!hasCvEvidence(candidate)) return { status: 'skipped_no_cv', aiCalls: 0 };
     if (!position?.title) return { status: 'no_result', aiCalls: 0 };
 
     const jobDesc = buildJobDescription(position);

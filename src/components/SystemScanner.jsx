@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     RefreshCw, Play, Loader2, CheckCircle, Brain, Database,
@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { findBestPositionMatch, filterPositionsByDomain, calculateMatchScore } from '../services/matchService';
+import { findBestPositionMatch, filterPositionsByDomain } from '../services/matchService';
+import { planDetailedAnalysis, countDetailedComparisons, detailedAnalysisUsageText } from '../services/scanService';
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { buildJobDescription, requirementsOf, requirementsFingerprint } from '../utils/positionRequirements';
 import { COVERAGE_SCHEMA } from '../utils/coverageDetail';
@@ -64,7 +65,7 @@ const SCOPE_OPTIONS = [
     },
     {
         id: 'filtered',
-        label: 'Hedefli Tarama',
+        label: 'Hedefli Analiz',
         desc: 'Seçtiğiniz pozisyon için, ön uyum skoru belirlediğiniz eşiğin üzerindeki adayları detaylı analiz edin',
         icon: Target,
         color: 'text-emerald-400',
@@ -94,16 +95,20 @@ export default function SystemScanner() {
     const [minPreScore, setMinPreScore]           = useState(60);
     // Hedefli taramaya kimler dahil edilecek?
     //   'never_analyzed'   — hiç detaylı analizi olmayanlar (varsayılan):
-    //                        eski otonom taramadan geçmiş kayıtlar tekrar
+    //                        daha önce detaylı analizden geçmiş kayıtlar tekrar
     //                        analiz edilmez, kota yalnızca yeni adaylara gider
     //   'not_for_position' — seçilen pozisyon için analiz edilmemiş herkes
     //   'all'              — eşiği geçen herkes (yeniden analiz dahil)
     const [filteredInclusion, setFilteredInclusion] = useState('never_analyzed');
-    // Akıllı pozisyon sınırı: 'Tüm Adaylar'/'Seçili' kapsamlarında aday
-    // başına HER uyumlu pozisyonu AI'a göndermek yerine, ücretsiz
-    // anahtar-kelime ön sıralamasıyla en iyi 5 pozisyon seçilir ve yalnızca
-    // onlar detaylı analize girer. Bariz alakasız pozisyonlara AI çağrısı
-    // harcanmaz; analiz kalitesi (model + prompt) değişmez.
+    // "Diğer uygun pozisyonlarla da karşılaştır" — AÇIK seçim, varsayılan
+    // kapalı. Kapalıyken her aday YALNIZCA atandığı (yoksa ön analizin
+    // eşleştirdiği) pozisyonla karşılaştırılır: aday başına 1 detaylı analiz.
+    // Eskiden 'Tüm Adaylar'/'Seçili' kapsamları kendiliğinden en iyi 5 +
+    // atanan pozisyonu analiz ediyordu (aday başına 12'ye kadar AI çağrısı).
+    const [compareOthers, setCompareOthers] = useState(false);
+    // Akıllı pozisyon sınırı: diğer pozisyonlar seçiliyken HER uyumlu
+    // pozisyonu AI'a göndermek yerine, ücretsiz anahtar-kelime ön
+    // sıralamasıyla en iyi 5 pozisyon detaylı analize girer.
     const [smartPositionLimit, setSmartPositionLimit] = useState(true);
 
     // ── Process state ───────────────────────────────────────────────────────
@@ -148,14 +153,41 @@ export default function SystemScanner() {
         scanScope === 'filtered'   ? filteredQueue.length :
         selectedIds.size;
 
-    // ── Auto-scan on new position ───────────────────────────────────────────
-    const prevPositionsCount = useRef(0);
-    useEffect(() => {
-        if (positions.length > prevPositionsCount.current && prevPositionsCount.current > 0) {
-            setTimeout(() => handleScan('unanalyzed', new Set()), 1000);
-        }
-        prevPositionsCount.current = positions.length;
-    }, [positions.length]);
+    // Kapsama göre aday kuyruğu — hem onay penceresindeki sayım hem tarama
+    // AYNI kuyruğu kullanır; sayılan ile çalıştırılan ayrışmasın.
+    const buildQueue = (scope, ids) => {
+        if (scope === 'unanalyzed') return candidates.filter(c => !c.aiAnalysis?.starAnalysis);
+        if (scope === 'all') return [...candidates];
+        if (scope === 'filtered') return targetPosition ? filteredQueue : [];
+        return candidates.filter(c => ids.has(c.id));
+    };
+    // 'unanalyzed' kapsamında elle skorlanmış (ileri aşama) adaylar atlanır.
+    const shouldAnalyzeIn = (scope, candidate) => {
+        const forceAnalyze = scope !== 'unanalyzed';
+        const hasManualOverride = candidate.manualScore && candidate.scoringStage !== 'initial';
+        return forceAnalyze || !hasManualOverride;
+    };
+    const planOptionsFor = (scope) => ({
+        includeOtherPositions: compareOthers,
+        smartLimit: smartPositionLimit,
+        // SystemScanner alanına uymayan bir ilana kendiliğinden düşmez.
+        allowUnrelatedFallback: false,
+        targetPosition: scope === 'filtered' ? targetPosition : null,
+    });
+
+    // OTOMATİK TARAMA YOK. Eskiden yeni bir pozisyon açıldığında bu bileşen
+    // kendiliğinden 'Analiz Edilmemiş' taramasını başlatıyordu — kullanıcı
+    // hiçbir şeye basmadan havuzun tamamı için detaylı analiz yapılıyordu.
+    // Detaylı analiz artık yalnızca kullanıcı isteyince çalışır.
+
+    // Onay penceresinde gösterilen kota: kaç aday–pozisyon karşılaştırması.
+    const openPositionsForPlan = useMemo(() => positions.filter(p => p.status === 'open'), [positions]);
+    const plannedComparisons = useMemo(() => {
+        if (!showConfirm) return 0;
+        const queue = buildQueue(scanScope, selectedIds).filter(c => shouldAnalyzeIn(scanScope, c));
+        return countDetailedComparisons(queue, openPositionsForPlan, planOptionsFor(scanScope));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showConfirm, scanScope, selectedIds, candidates, openPositionsForPlan, compareOthers, smartPositionLimit, targetPositionId, minPreScore, filteredInclusion]);
 
     const handleStop = () => {
         setScanning(false);
@@ -191,28 +223,18 @@ export default function SystemScanner() {
             return;
         }
 
-        // Build the candidate queue based on scope
-        let queue;
-        if (scope === 'unanalyzed') {
-            queue = candidates.filter(c => !c.aiAnalysis?.starAnalysis);
-        } else if (scope === 'all') {
-            queue = [...candidates];
-        } else if (scope === 'filtered') {
-            if (!targetPosition) {
-                addNotification({ title: 'Pozisyon Seçilmedi', message: 'Hedefli tarama için önce bir pozisyon seçin.', type: 'info' });
-                return;
-            }
-            queue = filteredQueue;
-        } else {
-            queue = candidates.filter(c => ids.has(c.id));
+        if (scope === 'filtered' && !targetPosition) {
+            addNotification({ title: 'Pozisyon Seçilmedi', message: 'Hedefli analiz için önce bir pozisyon seçin.', type: 'info' });
+            return;
         }
+        const queue = buildQueue(scope, ids);
+        const planOptions = planOptionsFor(scope);
 
         if (queue.length === 0) {
-            addNotification({ title: 'Taranacak Aday Yok', message: 'Seçilen kriterlere uygun aday bulunamadı.', type: 'info' });
+            addNotification({ title: 'Analiz Edilecek Aday Yok', message: 'Seçilen kriterlere uygun aday bulunamadı.', type: 'info' });
             return;
         }
 
-        const forceAnalyze = scope !== 'unanalyzed'; // 'all' and 'selected' always re-analyze
 
         try {
             setScanning(true);
@@ -258,8 +280,7 @@ export default function SystemScanner() {
                 }
 
                 // ── Stage 3: Analyst ───────────────────────────────────────
-                const hasManualOverride = candidate.manualScore && candidate.scoringStage !== 'initial';
-                const shouldAnalyze = forceAnalyze || !hasManualOverride;
+                const shouldAnalyze = shouldAnalyzeIn(scope, candidate);
 
                 // İşe alım uzmanının atadığı pozisyon (positionId) her zaman
                 // analiz kümesine dahil edilir ve başlık yazımında bağlayıcıdır.
@@ -276,28 +297,12 @@ export default function SystemScanner() {
                         let bestResult   = null;
                         let bestTitle    = candidate.matchedPositionTitle;
 
-                        // Hedefli taramada YALNIZCA seçilen pozisyon analiz
-                        // edilir — amaç zaten kotayı tek pozisyona odaklamak.
-                        // Force kapsamlarında akıllı sınır açıksa, ücretsiz
-                        // anahtar-kelime skoruyla ön-sıralanıp yalnızca en iyi
-                        // 5 pozisyon AI'a gönderilir.
-                        // calculateMatchScore bir OBJE döndürür ({score, ...});
-                        // .score alınmazsa sıralama NaN karşılaştırır ve "en iyi
-                        // 5" fiilen rastgele 5 olur.
-                        const rankedForce = smartPositionLimit && compatiblePositions.length > 5
-                            ? [...compatiblePositions]
-                                .map(p => ({ p, s: calculateMatchScore(candidate, p)?.score || 0 }))
-                                .sort((a, b) => b.s - a.s)
-                                .slice(0, 5)
-                                .map(x => x.p)
-                            : compatiblePositions;
-                        let positionsToAnalyze =
-                            scope === 'filtered' ? [targetPosition]
-                            : forceAnalyze ? rankedForce
-                            : [assignedPos || bestMatch || compatiblePositions[0]].filter(Boolean);
-                        if (assignedPos && !positionsToAnalyze.some(p => p?.id === assignedPos.id)) {
-                            positionsToAnalyze = [assignedPos, ...positionsToAnalyze];
-                        }
+                        // Hangi pozisyonlar? Onay penceresinde sayılan planın
+                        // AYNISI (scanService.planDetailedAnalysis): varsayılan
+                        // yalnızca atanan pozisyon; hedefli analizde yalnızca
+                        // seçilen pozisyon; "diğer uygun pozisyonlar" açıkken
+                        // akıllı sınırla en iyi 5 + atanan pozisyon.
+                        const positionsToAnalyze = planDetailedAnalysis(candidate, openPositions, planOptions);
 
                         for (const pos of positionsToAnalyze) {
                             if (!pos) continue;
@@ -305,7 +310,7 @@ export default function SystemScanner() {
                             // [ZORUNLU]/[TERCİHEN] etiketli verir; requirements
                             // ayrıca geçilir ki kapsama skoru ağırlıklı
                             // hesaplansın. Bu satırlar eskiden düz birleştirme
-                            // yapıyordu: otonom tarama zorunlu/tercihen ayrımını
+                            // yapıyordu: detaylı analiz zorunlu/tercihen ayrımını
                             // NE skorda NE de anlatımda kullanabiliyordu —
                             // scanService güncellenirken burası atlanmıştı.
                             const jobDesc = buildJobDescription(pos);
@@ -320,7 +325,7 @@ export default function SystemScanner() {
                                 // NUMARASINA bağlı: ilan sonradan değişirse eski
                                 // yargı yanlış maddeye yapışır ve skor sessizce
                                 // yanlış olur. scanService bu damgayı yazıyordu,
-                                // otonom tarama yazmıyordu — yani kullanıcının
+                                // bu ekran yazmıyordu — yani kullanıcının
                                 // FİİLEN kullandığı yol damgasız analiz üretiyordu.
                                 updatedAnalyses[pos.title] = sanitizeForFirestore({
                                     ...result,
@@ -423,8 +428,8 @@ export default function SystemScanner() {
             isScanningRef.current = false;
 
             addNotification({
-                title: 'Sistem Taraması Tamamlandı',
-                message: `${queue.length} aday tarandı, ${aiCount} AI analizi gerçekleştirildi.`
+                title: 'Detaylı Analiz Tamamlandı',
+                message: `${queue.length} aday işlendi.`
                     + (skippedNoCvCount > 0 ? ` ${skippedNoCvCount} aday CV metni olmadığı için atlandı (yeniden ayrıştırma gerekli).` : ''),
                 type: 'success',
             });
@@ -433,7 +438,7 @@ export default function SystemScanner() {
             console.error('Scan Error:', err);
             setScanning(false);
             isScanningRef.current = false;
-            addNotification({ title: 'Tarama Hatası', message: 'Sistem taraması sırasında bir hata oluştu.', type: 'error' });
+            addNotification({ title: 'Analiz Hatası', message: 'Detaylı analiz sırasında bir hata oluştu.', type: 'error' });
         }
     };
 
@@ -454,8 +459,8 @@ export default function SystemScanner() {
                                 <Brain className="w-5 h-5 text-electric" />
                             </div>
                             <div>
-                                <h3 className="text-base font-bold text-white">Sistem Taraması</h3>
-                                <p className="text-xs text-navy-400">5 Aşamalı Otonom Ajan Sistemi</p>
+                                <h3 className="text-base font-bold text-white">Detaylı Analiz</h3>
+                                <p className="text-xs text-navy-400">Yalnızca siz başlattığınızda çalışır</p>
                             </div>
                         </div>
                         <button onClick={() => setShowConfirm(false)} className="p-1.5 hover:bg-white/5 rounded-lg text-navy-400 hover:text-white transition-colors">
@@ -468,7 +473,7 @@ export default function SystemScanner() {
 
                         {/* Scope selector */}
                         <div>
-                            <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Tarama Kapsamı</p>
+                            <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mb-2">Analiz Kapsamı</p>
                             <div className="space-y-2">
                                 {SCOPE_OPTIONS.map(opt => {
                                     const Icon    = opt.icon;
@@ -509,8 +514,24 @@ export default function SystemScanner() {
                             </div>
                         </div>
 
-                        {/* Smart position cap — applies to force-analyze scopes */}
-                        {(scanScope === 'all' || scanScope === 'selected') && (
+                        {/* Diğer pozisyonlar — açık seçim; hedefli analizde anlamsız */}
+                        {scanScope !== 'filtered' && (
+                            <label className="flex items-start gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={compareOthers}
+                                    onChange={e => setCompareOthers(e.target.checked)}
+                                    className="accent-emerald-400 mt-0.5"
+                                />
+                                <span className="text-xs text-navy-300 leading-relaxed">
+                                    <span className="font-bold text-navy-200">Diğer uygun pozisyonlarla da karşılaştır.</span>{' '}
+                                    Kapalıyken her aday yalnızca atandığı pozisyonla karşılaştırılır. Açarsanız alanına uyan diğer açık pozisyonlar da analiz edilir; her karşılaştırma ayrı bir detaylı analizdir.
+                                </span>
+                            </label>
+                        )}
+
+                        {/* Smart position cap — yalnızca diğer pozisyonlar açıkken */}
+                        {scanScope !== 'filtered' && compareOthers && (
                             <label className="flex items-start gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -520,7 +541,7 @@ export default function SystemScanner() {
                                 />
                                 <span className="text-xs text-navy-300 leading-relaxed">
                                     <span className="font-bold text-navy-200">Akıllı pozisyon sınırı (önerilen).</span>{' '}
-                                    Aday başına tüm uyumlu pozisyonlar yerine, ön eşleşmeye göre en iyi 5 pozisyon detaylı analize girer — süre ve AI maliyeti belirgin düşer, analiz kalitesi değişmez.
+                                    Tüm uyumlu pozisyonlar yerine, ön eşleşmeye göre en iyi 5 pozisyon (ve atanan pozisyon) detaylı analize girer.
                                 </span>
                             </label>
                         )}
@@ -554,7 +575,7 @@ export default function SystemScanner() {
                                     <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1.5">Kimler Dahil Edilsin?</p>
                                     <div className="space-y-1">
                                         {[
-                                            { id: 'never_analyzed', label: 'Hiç detaylı analizi olmayanlar (önerilen)', desc: 'Daha önce otonom taramadan geçmiş kayıtlar tekrar analiz edilmez' },
+                                            { id: 'never_analyzed', label: 'Hiç detaylı analizi olmayanlar (önerilen)', desc: 'Daha önce detaylı analizden geçmiş kayıtlar tekrar analiz edilmez' },
                                             { id: 'not_for_position', label: 'Bu pozisyon için analiz edilmemişler', desc: 'Başka pozisyon için analiz edilmiş olsa bile bu pozisyon için analiz edilir' },
                                             { id: 'all', label: 'Eşiği geçen herkes', desc: 'Önceki analizler dahil hepsi yeniden analiz edilir — en yüksek maliyet' },
                                         ].map(opt => (
@@ -661,6 +682,12 @@ export default function SystemScanner() {
                                 <span className="text-sm font-bold text-white">{queuedCount} / {candidates.length}</span>
                             </div>
                         )}
+
+                        {/* Kota: kaç aday–pozisyon karşılaştırması. Başlamadan görünür. */}
+                        <div className="bg-electric/10 border border-electric/30 rounded-xl px-4 py-3">
+                            <p className="text-sm font-bold text-white">{detailedAnalysisUsageText(plannedComparisons)}</p>
+                            <p className="text-xs text-navy-400 mt-0.5">Her aday–pozisyon karşılaştırması 1 detaylı analiz sayılır. CV metni olmayan adaylar atlanır ve sayılmaz.</p>
+                        </div>
                     </div>
 
                     {/* Footer */}
@@ -676,7 +703,7 @@ export default function SystemScanner() {
                             disabled={!canStart}
                             className="flex-1 py-2.5 rounded-xl bg-electric text-text-primary font-bold hover:bg-electric-hover transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <Play className="w-4 h-4 fill-current" /> Başlat
+                            <Play className="w-4 h-4 fill-current" /> Detaylı analizi başlat
                         </button>
                     </div>
                 </div>
@@ -695,7 +722,7 @@ export default function SystemScanner() {
                         ? 'bg-electric/10 border-electric/30 text-electric'
                         : 'bg-white/[0.04] border-white/[0.06] text-navy-400 hover:text-white hover:bg-white/[0.08]'
                 }`}
-                title="Sistem Taraması"
+                title="Detaylı analiz"
             >
                 {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 {scanning && <span className="absolute inset-0 bg-electric/10 animate-pulse" />}
@@ -716,17 +743,17 @@ export default function SystemScanner() {
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-electric opacity-75" />
                                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-electric" />
                                             </span>
-                                            Sistem Taraması Sürüyor...
+                                            Detaylı Analiz Sürüyor...
                                         </>
                                     ) : (
                                         <>
                                             <CheckCircle className="w-5 h-5 text-emerald-400" />
-                                            Tarama Tamamlandı
+                                            Analiz Tamamlandı
                                         </>
                                     )}
                                 </h2>
                                 <p className="text-xs text-navy-400 mt-1">
-                                    {scanning ? 'Ajanlar aktif olarak analiz yapıyor.' : 'Tüm işlemler başarıyla tamamlandı.'}
+                                    {scanning ? 'Adaylar seçtiğiniz pozisyonlarla karşılaştırılıyor.' : 'Tüm işlemler başarıyla tamamlandı.'}
                                 </p>
                             </div>
                             <button onClick={handleStop} className="p-2 hover:bg-white/5 rounded-lg text-navy-400 hover:text-white transition-colors">
@@ -776,7 +803,7 @@ export default function SystemScanner() {
                                     </div>
                                     <h3 className="text-2xl font-bold text-white mb-2">İşlem Tamamlandı</h3>
                                     <p className="text-navy-400 mb-8 max-w-sm">
-                                        {totalQueued} aday tarandı. {aiCount} yeni AI analizi yapıldı ve {updatedCount} profil güncellendi.
+                                        {totalQueued} aday işlendi. {aiCount} detaylı analiz yapıldı ve {updatedCount} profil güncellendi.
                                     </p>
                                     <button
                                         onClick={handleStop}
@@ -795,7 +822,7 @@ export default function SystemScanner() {
                                 <div className="text-xl font-bold text-white">{processedCount} / {totalQueued}</div>
                             </div>
                             <div className="p-3 text-center">
-                                <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">AI Analiz</div>
+                                <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">Detaylı Analiz</div>
                                 <div className="text-xl font-bold text-electric">{aiCount}</div>
                             </div>
                             <div className="p-3 text-center">

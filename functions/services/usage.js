@@ -24,7 +24,11 @@ const log = childLogger('usage');
 /** Etiketler — hangi özellik. Bilinmeyen etiket 'other'a düşer. */
 export const LABELS = new Set([
     'cv-parse',        // CV metnini yapılandırılmış veriye çevirme
-    'coverage',        // madde damgaları — skoru BU belirliyor
+    // madde damgaları — skoru BU belirliyor. Detaylı analizde aday–pozisyon
+    // karşılaştırması başına TAM BİR kez çağrılır; `byLabel.coverage.calls`
+    // bu yüzden detaylı analiz kotasının birimidir (bkz. src/services/
+    // scanService.js countDetailedComparisons).
+    'coverage',
     'narrative',       // anlatım: not/dayanak/fark/özet — skoru etkilemez
     'prescreen',       // başvuru formu ön eleme
     'interview-grade', // mülakat cevaplarının madde damgaları

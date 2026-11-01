@@ -71,7 +71,7 @@ export function cleanRoleText(raw, fallback = '') {
 }
 
 /**
- * Otonom (derin) tarama yapılmış mı? Toplu tarama aksiyonuyla aynı ölçüt:
+ * Detaylı analiz yapılmış mı? Toplu tarama aksiyonuyla aynı ölçüt:
  * STAR analizi kaydı varsa aday derin taramadan geçmiştir.
  */
 export function isDeepScanned(candidate) {
@@ -600,7 +600,7 @@ export function buildExportRows(rows) {
         'Aşama': getStage(resolveCandidateStage(c)).label,
         'Kaynak': c.source || '',
         'Kaynak Detayı': c.sourceDetail || '',
-        'Otonom Tarama': isDeepScanned(c) ? 'Yapıldı' : 'Yapılmadı',
+        'Detaylı Analiz': isDeepScanned(c) ? 'Yapıldı' : 'Yapılmadı',
         // Tabloda bir "Doğrulama" kolonu var; dışa aktarımda olmaması
         // kullanıcının hemen çarpacağı bir tutarsızlık olurdu.
         // "Temiz" YALNIZCA taraması yapılmış adaylar için; taranmamışı

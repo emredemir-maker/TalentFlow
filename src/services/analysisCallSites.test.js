@@ -1,10 +1,12 @@
 // Mimari koruma testi: her analyzeCandidateMatch çağrısı ilan metnini ortak
 // yardımcıyla kurmalı ve gereksinim önceliklerini geçmeli.
 //
-// NEDEN: Bu proje aynı derin-analiz çağrısını BEŞ ayrı yerde yapıyor
+// NEDEN: Bu proje aynı derin-analiz çağrısını eskiden BEŞ ayrı yerde yapıyordu
 // (SystemScanner, scanService×2, CandidateDrawer, ApplyPage, AddCandidateModal).
+// 2026-11'de ön analiz tek çağrıya indi ve CandidateDrawer scanService'e
+// bağlandı; bugün yalnızca SystemScanner ve scanService çağırıyor.
 // 2026-08-06'da zorunlu/tercihen ayrımı eklenirken yalnızca scanService
-// güncellendi; kullanıcının fiilen kullandığı "otonom tarama" (SystemScanner)
+// güncellendi; kullanıcının fiilen kullandığı detaylı analiz (SystemScanner)
 // eski düz birleştirmeyi (`${title}\n${requirements.join(', ')}`) kullanmaya
 // devam etti. Sonuç: ayrım ne skora ne anlatıma yansıdı ve kullanıcı "hâlâ
 // aynı" diye bildirdi. Kopyalardan biri unutulduğunda bu test kırılır.
@@ -37,7 +39,7 @@ const callSites = sourceFiles()
 
 describe('analyzeCandidateMatch çağrı noktaları', () => {
     it('finds the known call sites (test kendi kapsamını doğrular)', () => {
-        expect(callSites.length).toBeGreaterThanOrEqual(4);
+        expect(callSites.length).toBeGreaterThanOrEqual(2);
     });
 
     it.each(callSites.map((c) => c.file))(
@@ -68,7 +70,7 @@ describe('analyzeCandidateMatch çağrı noktaları', () => {
 //
 // `requirementsFingerprint` bunu görünür kılan tek şey, ama yalnızca YAZILDIYSA.
 // 2026-08-17'de iki yol damgayı hiç yazmıyordu: CandidateDrawer'ın "yeniden
-// analiz"i ve — daha kötüsü — kullanıcının fiilen kullandığı otonom tarama
+// analiz"i ve — daha kötüsü — kullanıcının fiilen kullandığı detaylı analiz
 // (SystemScanner). O analizler damgasız oldukları için "hangi listeye ait"
 // sorusuna cevap veremiyor, dolayısıyla bayatlıkları da fark edilemiyordu.
 const analysisWriters = sourceFiles()
@@ -79,7 +81,7 @@ const analysisWriters = sourceFiles()
 
 describe('positionAnalyses yazan yollar', () => {
     it('finds the known writers (test kendi kapsamını doğrular)', () => {
-        expect(analysisWriters.length).toBeGreaterThanOrEqual(3);
+        expect(analysisWriters.length).toBeGreaterThanOrEqual(2);
     });
 
     it.each(analysisWriters.map((c) => c.file))(
@@ -92,4 +94,31 @@ describe('positionAnalyses yazan yollar', () => {
             expect(text).toContain('COVERAGE_SCHEMA');
         }
     );
+});
+
+// ÖN ANALİZ TEK ÇAĞRI, DETAYLI ANALİZ YALNIZCA İSTEYİNCE.
+//
+// Emre'nin kararı (2026-11): elle ekleme ve başvuru formundan gelen CV
+// kendiliğinden detaylı analiz çalıştırmaz; ön analiz her yolda tek çağrıdır
+// (toplu yüklemedeki gibi). Eskiden elle ekleme 3, başvuru formu 4-5 AI
+// çağrısı yapıyordu. Biri detaylı analizi bu yollara geri eklerse bu test
+// kırılır.
+describe('ön analiz yolları detaylı analiz çalıştırmaz', () => {
+    const PRE_ANALYSIS_FILES = ['components/AddCandidateModal.jsx', 'pages/ApplyPage.jsx'];
+
+    it.each(PRE_ANALYSIS_FILES)('%s detaylı analiz çağırmaz', (file) => {
+        const text = fs.readFileSync(path.join(SRC, file), 'utf8');
+        expect(text).not.toMatch(/analyzeCandidateMatch\s*\(/);
+        expect(text).not.toMatch(/deepScanCandidate\s*\(/);
+        expect(text).not.toMatch(/rescanCandidateForPosition\s*\(/);
+        // Ayrıştırma + ön skor tek çağrıda
+        expect(text).toContain('parseAndPrescoreCandidate(');
+    });
+
+    it('SystemScanner yeni pozisyonda kendiliğinden tarama başlatmaz', () => {
+        const text = fs.readFileSync(path.join(SRC, 'components/SystemScanner.jsx'), 'utf8');
+        // Eskiden: useEffect(() => { ... setTimeout(() => handleScan('unanalyzed', ...)) }, [positions.length])
+        expect(text).not.toMatch(/setTimeout\(\(\)\s*=>\s*handleScan/);
+        expect(text).not.toMatch(/useEffect\(/);
+    });
 });

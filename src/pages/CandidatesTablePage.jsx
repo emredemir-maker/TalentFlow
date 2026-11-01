@@ -22,12 +22,13 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import MaintenancePanel from '../components/MaintenancePanel';
 import EvaluationEmailModal from '../components/EvaluationEmailModal';
+import DetailedAnalysisConfirm from '../components/DetailedAnalysisConfirm';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { logAccess, ACCESS_ACTIONS } from '../services/accessLog';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
-import { deepScanCandidate, rescanCandidateForPosition } from '../services/scanService';
+import { deepScanCandidate, rescanCandidateForPosition, detailedAnalysisUsageText } from '../services/scanService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
@@ -357,6 +358,8 @@ export default function CandidatesTablePage() {
     const [bulkApplying, setBulkApplying] = useState(false);
     const [bulkResult, setBulkResult] = useState(null);
     const [scanProgress, setScanProgress] = useState(null); // {done,total}
+    // Detaylı analiz onayı bekleyen seçim: { rows, alreadyScanned }
+    const [scanConfirm, setScanConfirm] = useState(null);
     const [evalModalOpen, setEvalModalOpen] = useState(false);
     const openBulkModal = (type) => { setBulkType(type); setBulkModalOpen(true); };
 
@@ -578,7 +581,7 @@ export default function CandidatesTablePage() {
             `${scopeText} ${targets.length} aday "${selectedPosition.title}" ilanına göre değerlendirilecek.
 
 `
-            + 'Her aday bir AI çağrısı demek; işlem birkaç dakika sürebilir.'
+            + `${detailedAnalysisUsageText(targets.length)} Her aday yalnızca bu ilanla karşılaştırılır; işlem birkaç dakika sürebilir.`
             + (skipped > 0 ? `
 
 Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabilirsin.` : '')
@@ -611,20 +614,20 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
         });
     };
 
-    const handleBulkScan = async () => {
+    // Detaylı analiz: önce onay penceresi (kapsam seçimi + kaç detaylı analiz
+    // kullanılacağı), sonra çalıştırma. Varsayılan: her aday yalnızca atandığı
+    // pozisyonla karşılaştırılır.
+    const handleBulkScan = () => {
         if (bulkApplying || scanProgress || selectedIds.size === 0) return;
-        if (openPositions.length === 0) { setBulkResult({ message: 'Otonom tarama için açık pozisyon gerekli', failed: 1 }); return; }
+        if (openPositions.length === 0) { setBulkResult({ message: 'Detaylı analiz için açık pozisyon gerekli', failed: 1 }); return; }
         const rowById = new Map(coherentRows.map((c) => [c.id, c]));
         const rows = Array.from(selectedIds).map((id) => rowById.get(id)).filter(Boolean);
         const alreadyScanned = rows.filter((c) => c.aiAnalysis?.starAnalysis).length;
-        const ok = window.confirm(
-            `${rows.length} aday için otonom tarama başlatılsın mı?` +
-            (alreadyScanned > 0
-                ? `\n\n${alreadyScanned} aday daha önce taranmış — mevcut analizleri YENİDEN üretilip güncellenecek.`
-                : '') +
-            `\n\nAday başına 1-5 AI çağrısı yapılır.`
-        );
-        if (!ok) return;
+        setScanConfirm({ rows, alreadyScanned });
+    };
+
+    const runBulkScan = async (rows, { includeOtherPositions = false } = {}) => {
+        setScanConfirm(null);
 
         setBulkResult(null);
         setScanProgress({ done: 0, total: rows.length });
@@ -636,7 +639,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                 const candidate = rows[nextIdx];
                 nextIdx += 1;
                 try {
-                    const result = await deepScanCandidate(candidate, openPositions);
+                    const result = await deepScanCandidate(candidate, openPositions, { includeOtherPositions });
                     if (result.status === 'scanned') { await updateCandidate(candidate.id, result.updates); scanned += 1; }
                     else if (result.status === 'skipped_no_cv') skippedNoCv += 1;
                     else noResult += 1;
@@ -649,7 +652,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
         setScanProgress(null);
         setSelectedIds(new Set());
         setBulkResult({
-            message: `${scanned} aday otonom taramadan geçirildi`
+            message: `${scanned} aday için detaylı analiz yapıldı`
                 + (skippedNoCv > 0 ? ` · ${skippedNoCv} aday CV metni olmadığı için atlandı` : '')
                 + (noResult > 0 ? ` · ${noResult} aday için sonuç alınamadı` : ''),
             failed,
@@ -822,10 +825,10 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                             <option value="all">Tüm Departmanlar</option>
                             {departments.filter((d) => d !== 'all').map((d) => <option key={d} value={d}>{d}</option>)}
                         </select>
-                        <select value={filters.scan} onChange={(e) => setFilter('scan', e.target.value)} className={SELECT_CLS} title="Otonom (derin) tarama durumu">
-                            <option value="all">Tarama: Tümü</option>
-                            <option value="scanned">Taranmış</option>
-                            <option value="unscanned">Taranmamış</option>
+                        <select value={filters.scan} onChange={(e) => setFilter('scan', e.target.value)} className={SELECT_CLS} title="Detaylı analiz durumu">
+                            <option value="all">Detaylı analiz: Tümü</option>
+                            <option value="scanned">Detaylı analiz yapıldı</option>
+                            <option value="unscanned">Detaylı analiz yapılmadı</option>
                         </select>
                         {/* Sektör uyumu. "Ölçülemedi" AYRI bir seçenek: taraması
                             yapılmamış adayı "sektör dışı" saymak, bakmadığımız
@@ -935,18 +938,18 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                         <div className="flex items-center justify-between gap-2 flex-wrap bg-n900 text-white rounded-2xl px-4 py-2.5">
                             <span className="text-[13px] font-semibold tabular-nums">
                                 {scanProgress
-                                    ? `Otonom tarama: ${scanProgress.done} / ${scanProgress.total} aday…`
+                                    ? `Detaylı analiz: ${scanProgress.done} / ${scanProgress.total} aday…`
                                     : `${selectedIds.size} aday seçildi`}
                             </span>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                     onClick={handleBulkScan}
                                     disabled={Boolean(scanProgress)}
-                                    title="Seçililerden henüz taranmamış olanlar için derin AI analizi çalıştırır"
+                                    title="Seçili adaylar için detaylı analizi başlatır — önce kaç detaylı analiz kullanılacağı gösterilir"
                                     className="flex items-center gap-1.5 h-8 text-[12px] font-medium bg-brand hover:bg-brand-600 disabled:opacity-60 px-3 rounded-full transition-colors"
                                 >
                                     {scanProgress ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
-                                    Otonom tarama
+                                    Detaylı analiz başlat
                                 </button>
                                 <button
                                     onClick={() => setEvalModalOpen(true)}
@@ -1128,14 +1131,14 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                             {isDeepScanned(c) ? (
                                                 <span
                                                     className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-ok-text bg-ok-bg border border-transparent whitespace-nowrap"
-                                                    title={c.lastScannedAt ? `Son tarama: ${new Date(c.lastScannedAt).toLocaleString('tr-TR')}` : 'Otonom tarama yapıldı'}
+                                                    title={c.lastScannedAt ? `Son detaylı analiz: ${new Date(c.lastScannedAt).toLocaleString('tr-TR')}` : 'Detaylı analiz yapıldı'}
                                                 >
                                                     <Brain className="w-3 h-3" /> Tarandı
                                                 </span>
                                             ) : (
                                                 <span
                                                     className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-warn-text bg-warn-bg border border-transparent whitespace-nowrap"
-                                                    title="Henüz otonom tarama yapılmadı — seçip 'Otonom tarama' ile başlatabilirsin"
+                                                    title="Henüz detaylı analiz yapılmadı — seçip 'Detaylı analiz başlat' ile başlatabilirsin"
                                                 >
                                                     Taranmadı
                                                 </span>
@@ -1199,6 +1202,18 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                 </div>
             </div>
 
+            <DetailedAnalysisConfirm
+                isOpen={Boolean(scanConfirm)}
+                candidates={scanConfirm?.rows || []}
+                openPositions={openPositions}
+                notes={[
+                    scanConfirm?.alreadyScanned > 0
+                        ? `${scanConfirm.alreadyScanned} adayın mevcut detaylı analizi yeniden üretilip güncellenecek.`
+                        : '',
+                ]}
+                onCancel={() => setScanConfirm(null)}
+                onConfirm={(opts) => runBulkScan(scanConfirm?.rows || [], opts)}
+            />
             <EvaluationEmailModal
                 isOpen={evalModalOpen}
                 candidates={Array.from(selectedIds).map((id) => coherentRows.find((c) => c.id === id)).filter(Boolean)}

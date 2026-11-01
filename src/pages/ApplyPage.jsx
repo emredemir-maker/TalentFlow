@@ -6,8 +6,7 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
 import { getAuthHeaders } from '../services/ai/config';
-import { parseCandidateFromText, analyzeCandidateMatch } from '../services/geminiService';
-import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
+import { parseAndPrescoreCandidate } from '../services/geminiService';
 import { calculateMatchScore } from '../services/matchService';
 import { detectSource } from '../services/applicationService';
 import {
@@ -92,6 +91,10 @@ export default function ApplyPage() {
     const [selectedSubSource, setSelectedSubSource]   = useState('');   // sub-source string
 
     const fileInputRef = useRef(null);
+    // CV dosya bırakılınca BİR KEZ ayrıştırılıp skorlanır; gönderimde aynı
+    // sonuç kullanılır. Eskiden aynı CV iki kez ayrıştırılıyor (bırakınca ve
+    // gönderince), ardından bir de detaylı analiz çalışıyordu.
+    const parsedRef = useRef(null); // { file, text, candidate, prescore }
 
     // Fetch position — AuthContext handles anonymous sign-in for public routes.
     // We use onAuthStateChanged to wait until auth is settled before reading Firestore.
@@ -196,7 +199,10 @@ export default function ApplyPage() {
             const text = await extractTextFromFile(file);
             console.log('[CV auto-fill] extracted text length:', text?.length);
             if (text && text.length >= 40) {
-                const parsed = await parseCandidateFromText(text);
+                const { candidate: parsed, prescore } = await parseAndPrescoreCandidate(text, undefined, {
+                    positionTitle: position?.title || '',
+                });
+                parsedRef.current = { file, text, candidate: parsed, prescore };
                 console.log('[CV auto-fill] parsed result:', parsed);
                 if (parsed) {
                     const newForm = {};
@@ -256,19 +262,35 @@ export default function ApplyPage() {
             setProgress('CV okunuyor...');
             const cvText = await extractTextFromFile(cvFile);
 
-            // Step 2 — Parse candidate data with AI
+            // Step 2 — Ön analiz: ayrıştırma + bu pozisyona ön uyum skoru,
+            // TEK AI çağrısı. Dosya bırakılırken yapıldıysa aynı sonuç
+            // kullanılır (yeniden ayrıştırma yok). Detaylı analiz başvuruda
+            // ÇALIŞMAZ; işe alım uzmanı isterse aday ekranından başlatır.
             setProgress('CV analiz ediliyor...');
             let parsedCandidate = null;
-            try {
-                const parseTimeout = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('CV parse timed out after 25s')), 25000)
-                );
-                parsedCandidate = await Promise.race([parseCandidateFromText(cvText), parseTimeout]);
-            } catch {
-                parsedCandidate = null;
+            let prescore = null;
+            const cached = parsedRef.current;
+            if (cached && cached.file === cvFile && cached.candidate) {
+                parsedCandidate = cached.candidate;
+                prescore = cached.prescore;
+            } else {
+                try {
+                    const parseTimeout = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('CV parse timed out after 25s')), 25000)
+                    );
+                    const out = await Promise.race([
+                        parseAndPrescoreCandidate(cvText, undefined, { positionTitle: position?.title || '' }),
+                        parseTimeout,
+                    ]);
+                    parsedCandidate = out?.candidate || null;
+                    prescore = out?.prescore || null;
+                } catch {
+                    parsedCandidate = null;
+                }
             }
 
-            // Step 3 — Score against position (Phase 1: fast deterministic)
+            // Step 3 — Ön skor: AI'nın aynı çağrıda verdiği skor; yoksa
+            // ücretsiz anahtar-kelime skoru.
             setProgress('Pozisyona uygunluk hesaplanıyor...');
             let score = 0;
             let scoreBreakdown = null;
@@ -281,35 +303,7 @@ export default function ApplyPage() {
                     score = 0;
                 }
             }
-
-            // Step 3b — STAR Analysis (Phase 2: AI-powered deep CV evaluation)
-            setProgress('CV STAR analizi yapılıyor...');
-            let starAiAnalysis = null;
-            if (parsedCandidate && position) {
-                try {
-                    const jobText = buildJobDescription(position);
-                    const timeoutPromise = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('STAR analysis timed out after 30s')), 30000)
-                    );
-                    const aiResult = await Promise.race([
-                        analyzeCandidateMatch(jobText, parsedCandidate, 'gemini-2.5-flash', {
-                            requirements: requirementsOf(position),
-                        }),
-                        timeoutPromise,
-                    ]);
-                    starAiAnalysis = {
-                        score: aiResult.score,
-                        summary: aiResult.summary,
-                        starAnalysis: aiResult.starAnalysis,
-                        reasons: aiResult.reasons,
-                        lastAnalyzedAt: new Date().toISOString(),
-                    };
-                    // Use the AI score as the primary score if available
-                    if (aiResult.score > 0) score = aiResult.score;
-                } catch (starErr) {
-                    console.warn('Phase 2 STAR analysis failed (non-blocking):', starErr.message);
-                }
-            }
+            if (prescore && prescore.score > 0) score = prescore.score;
 
             // Step 3c — AI scoring of screening answers via backend (non-blocking)
             // Raw answers are always persisted; AI scoring augments them if available.

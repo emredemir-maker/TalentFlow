@@ -26,6 +26,7 @@ import {
     analyzeResponseEmail
 } from './ai/communication.js';
 import { starPercent } from '../utils/starDimensions';
+import { prescoreInstruction, normalizePrescore, stripPrescoreFields } from '../utils/prescore';
 
 export {
     getModel,
@@ -43,7 +44,29 @@ export {
     analyzeResponseEmail
 };
 
+/**
+ * CV'yi ayrıştırır. Geriye dönük uyumlu: yalnızca aday nesnesini döndürür.
+ * Ön uyum skoru da gerekiyorsa parseAndPrescoreCandidate kullanılır.
+ */
 export async function parseCandidateFromText(text, modelId = 'gemini-2.5-flash') {
+    const { candidate } = await parseAndPrescoreCandidate(text, modelId, null);
+    return candidate;
+}
+
+/**
+ * ÖN ANALİZ — CV ayrıştırma ve (istenirse) ön uyum skoru TEK AI çağrısında.
+ *
+ * Toplu yüklemeyle aynı ilke: elle ekleme ve başvuru formu da artık tek çağrı
+ * yapar. Detaylı analiz (kapsama + anlatım, 2 çağrı) yalnızca kullanıcı
+ * isteyince çalışır.
+ *
+ * @param {string} text
+ * @param {string} [modelId]
+ * @param {{positionTitle?: string, openPositionTitles?: string[]}|null} [scoring]
+ *   null ise skor istenmez (eski davranış, aynı istem).
+ * @returns {Promise<{candidate: object|null, prescore: {score:number, matchedTitle:string|null, reason:string}|null}>}
+ */
+export async function parseAndPrescoreCandidate(text, modelId = 'gemini-2.5-flash', scoring = null) {
     // Extract contact fields (incl. name) with regex BEFORE redacting — they will be
     // merged back into the result so the candidate record retains them without leaking to AI.
     const contactInfo = extractPiiFromText(text);
@@ -89,19 +112,23 @@ Sadece şu JSON formatında dön:
   ]
 }`;
 
-    const prompt = buildStructuredPrompt(instruction, { "PROFIL_METNI": sanitizeForPrompt(safeText, 20000) });
+    // Skor istenmiyorsa istem birebir eskisi — sunucu önbelleği isabet etmeye devam eder.
+    const fullInstruction = scoring ? `${instruction}\n${prescoreInstruction(scoring)}` : instruction;
+    const prompt = buildStructuredPrompt(fullInstruction, { "PROFIL_METNI": sanitizeForPrompt(safeText, 20000) });
     const model = await getModel(modelId);
     // Long CVs produce long structured JSON (cvData + multi-entry experiences).
     // Default 8k cap was truncating the output mid-string and breaking JSON.parse.
     const result = await model.generateContent(prompt, { maxOutputTokens: 32768, label: 'cv-parse' });
-    const parsed = parseAIJson(result.response.text());
+    const raw = parseAIJson(result.response.text());
+    const prescore = scoring ? normalizePrescore(raw, scoring) : null;
+    const parsed = stripPrescoreFields(raw);
     // Merge regex-extracted contact info so the record is complete
     // without having leaked PII to the AI model.
     // Null-safe merge: only overwrite parsed fields with extracted values that are non-null.
     const safeContactInfo = Object.fromEntries(
         Object.entries(contactInfo).filter(([, v]) => v !== null && v !== undefined)
     );
-    return parsed ? { ...parsed, ...safeContactInfo } : parsed;
+    return { candidate: parsed ? { ...parsed, ...safeContactInfo } : parsed, prescore };
 }
 
 export async function parseExperiencesFromText(text, modelId = 'gemini-2.5-flash') {
