@@ -12,7 +12,14 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, generateInterviewFinalReport, stripPII } from '../services/geminiService';
+import { generateInterviewPaths, generateFollowUpQuestion, generateInterviewFinalReport } from '../services/geminiService';
+import { analyzeLiveWindow } from '../services/ai/interview';
+import { buildCompactProfile } from '../services/ai/compactProfile';
+import {
+    LIVE_ANALYSIS_INTERVAL_MS, LIVE_ANALYSIS_HOURLY_CAP, FOLLOWUP_COOLDOWN_MS, FOLLOWUP_HOURLY_CAP,
+    createRateGate, takeLiveAnalysisTurn, minutesAgoText, gateMessage,
+} from '../utils/liveInterviewBudget';
+import { findLatestBiasHit } from '../utils/biasKeywords';
 import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
@@ -127,7 +134,6 @@ export default function LiveInterviewPage() {
     const [coachGenerating, setCoachGenerating] = useState(false);
     const [suggestedQuestion, setSuggestedQuestion] = useState(null);
     const [starAnalyzing, setStarAnalyzing] = useState(false);
-    const [biasWarning, setBiasWarning] = useState(null);
     const [emotionData, setEmotionData] = useState(null);
 
     const [questions, setQuestions] = useState([]);
@@ -196,6 +202,34 @@ export default function LiveInterviewPage() {
     // Tracks whether we've done a first-sync from session (avoids overwriting after editing starts)
     const questionsSyncedRef = useRef(false);
 
+    // ── Canlı AI bütçesi ──────────────────────────────────────────────────
+    // Mülakat oturumunun pozisyonu yetkili bağlantı; yoksa aday kaydındaki.
+    const linkedPosition = useMemo(
+        () => positions?.find(p => p.id === (session?.positionId || candidateData?.positionId)) || null,
+        [positions, session?.positionId, candidateData?.positionId]
+    );
+    const positionForAI = useMemo(() => ({
+        title: session?.positionTitle || linkedPosition?.title || '',
+        requirements: linkedPosition?.requirements || [],
+    }), [session?.positionTitle, linkedPosition]);
+    // Her canlı çağrıya giden ~800 token'lık profil (PII temizlenmiş).
+    const compactProfile = useMemo(
+        () => (candidateData ? buildCompactProfile(candidateData, positionForAI) : null),
+        [candidateData, positionForAI]
+    );
+    // Sayaçlar sayfa ömrü boyunca yaşar; sunucu aynı sınırları ayrıca tutuyor.
+    const [analysisGate] = useState(() => createRateGate({ cap: LIVE_ANALYSIS_HOURLY_CAP }));
+    const [followUpGate] = useState(() => createRateGate({ cap: FOLLOWUP_HOURLY_CAP, cooldownMs: FOLLOWUP_COOLDOWN_MS }));
+    // "X dk önce" ve bekleme süreleri için saat; 15 sn'de bir ilerler.
+    const [clock, setClock] = useState(() => Date.now());
+    const [lastAnalysisAt, setLastAnalysisAt] = useState(null);
+    const [analysisNotice, setAnalysisNotice] = useState('');
+    const [followUpNotice, setFollowUpNotice] = useState('');
+    const analysisState = analysisGate.check(clock);
+    const followUpState = followUpGate.check(clock);
+    const analysisBlockedMsg = gateMessage(analysisState, { capLabel: `Saatlik canlı analiz sınırı (${LIVE_ANALYSIS_HOURLY_CAP})`, now: clock });
+    const followUpBlockedMsg = gateMessage(followUpState, { capLabel: `Saatlik takip sorusu sınırı (${FOLLOWUP_HOURLY_CAP})`, now: clock });
+
     // Generate AI Paths based on strategy — fires ONCE per strategy selection.
     // Guards ensure we never overwrite questions that are already loaded locally.
     useEffect(() => {
@@ -221,7 +255,7 @@ export default function LiveInterviewPage() {
             setPathLoading(true);
             try {
                 console.log("[LiveInterview] Fetching paths for strategy:", activeStrategy);
-                const paths = await generateInterviewPaths(candidateData, activeStrategy);
+                const paths = await generateInterviewPaths(candidateData, activeStrategy, positionForAI);
                 setAvailablePaths(paths);
                 if (paths.length > 0) {
                     const firstSet = paths[0].questions.map((q, i) => ({
@@ -598,6 +632,14 @@ export default function LiveInterviewPage() {
 
     const handleGenerateAIQuestion = async (mode, category = null) => {
         if (!candidateData || coachGenerating) return;
+        // 60 sn bekleme + saatte 10: düğmeye art arda basmak çağrı yakmasın.
+        const now = Date.now();
+        if (!followUpGate.check(now).ok) { setClock(now); return; }
+        followUpGate.record(now);
+        setClock(now);
+        setFollowUpNotice('');
+        // Bekleme bitince düğme kendiliğinden açılsın.
+        setTimeout(() => setClock(Date.now()), FOLLOWUP_COOLDOWN_MS + 50);
 
         setCoachGenerating(true);
         try {
@@ -607,7 +649,8 @@ export default function LiveInterviewPage() {
                 activeStrategy || 'technical',
                 transcript,
                 mode,
-                category
+                category,
+                { interviewId: sessionId, profile: compactProfile }
             );
 
             if (result && result.question) {
@@ -624,9 +667,14 @@ export default function LiveInterviewPage() {
                 ]);
             }
         } catch (err) {
+            if (err?.code === 'INTERVIEW_AI_LIMIT') {
+                followUpGate.blockUntilNextHour();
+                setFollowUpNotice(err.message);
+            }
             console.error("AI question generation error:", err);
         } finally {
             setCoachGenerating(false);
+            setClock(Date.now());
         }
     };
 
@@ -916,80 +964,95 @@ export default function LiveInterviewPage() {
     const sttEngine = chooseSttEngine({ webSpeech: hasWebSpeech(), audioFallbackEnabled });
     const sttUnsupported = sttEngine === 'unsupported';
 
-    // ── Real-time STAR analysis ───────────────────────────────────────────────
-    // Fires automatically after each new ADAY transcript entry (debounced 2.5s).
-    // Candidate's PII is stripped before any data leaves the client.
-    const lastAnalyzedTranscriptLengthRef = useRef(0);
+    // ── Canlı STAR analizi: 3 dakikada bir, toplu ───────────────────────────
+    // Eskiden her aday cümlesinden 2,5 sn sonra bir çağrı gidiyordu (saatte
+    // 100+). Şimdi 3 dakikada bir, yalnızca son analizden bu yana 40+
+    // karakterlik yeni bir aday cevabı varsa; saatte en çok 20 ve "Şimdi
+    // analiz et" düğmesi de bu 20'ye dahil. Kurallar: utils/liveInterviewBudget.
+    // Yalnızca mülakatçı ekranında çalışır — aday tarafı analiz göstermiyor.
+    const lastAnalyzedIndexRef = useRef(0);
+    const latestTranscriptRef = useRef(transcript);
+    useEffect(() => { latestTranscriptRef.current = transcript; }, [transcript]);
+
+    const runLiveAnalysis = async ({ manual = false } = {}) => {
+        if (!isRecruiter || !compactProfile || starAnalyzing) return;
+        const now = Date.now();
+        // Otomatik tur da düğme de aynı kapıdan geçer; hak çağrıdan ÖNCE
+        // düşülür (sunucu da denemeyi sayıyor).
+        const turn = takeLiveAnalysisTurn({
+            gate: analysisGate,
+            transcript: latestTranscriptRef.current,
+            fromIndex: lastAnalyzedIndexRef.current,
+            now,
+        });
+        if (turn.action === 'blocked') { setClock(now); return; }
+        if (turn.action === 'skip') {
+            if (manual) setAnalysisNotice('Son analizden bu yana yeni bir aday cevabı yok.');
+            return;
+        }
+        const { window, nextIndex } = turn;
+        lastAnalyzedIndexRef.current = nextIndex;
+        setAnalysisNotice('');
+        setStarAnalyzing(true);
+        try {
+            const currentQ = questions[currentQuestionIndex]?.text || null;
+            const result = await analyzeLiveWindow(compactProfile, window, currentQ, { interviewId: sessionId });
+            if (!result || !result.scores) return;
+            setLastAnalysisAt(Date.now());
+
+            // Weighted running average: 60% previous + 40% new observation
+            setStarScores(prev => ({
+                technical:     Math.round(prev.technical     * 0.6 + (result.scores.technical     ?? prev.technical)     * 0.4),
+                communication: Math.round(prev.communication * 0.6 + (result.scores.communication ?? prev.communication) * 0.4),
+                problemSolving:Math.round(prev.problemSolving* 0.6 + (result.scores.problemSolving?? prev.problemSolving) * 0.4),
+                cultureFit:    Math.round(prev.cultureFit    * 0.6 + (result.scores.cultureFit    ?? prev.cultureFit)    * 0.4),
+                adaptability:  Math.round(prev.adaptability  * 0.6 + (result.scores.adaptability  ?? prev.adaptability)  * 0.4),
+            }));
+
+            if (result.insight) {
+                setAiInsights(prev => [{
+                    id: Date.now() + 1,
+                    type: 'insight',
+                    text: result.insight,
+                    hint: result.suggestion || null
+                }, ...prev].slice(0, 15));
+            }
+        } catch (err) {
+            if (err?.code === 'INTERVIEW_AI_LIMIT') {
+                analysisGate.blockUntilNextHour();
+                setAnalysisNotice(err.message);
+            }
+            console.error('[Canlı analiz]', err.message);
+        } finally {
+            setStarAnalyzing(false);
+            setClock(Date.now());
+        }
+    };
+
+    // Zamanlayıcı her render'daki güncel fonksiyonu çağırsın (eski kapanış
+    // eski transkripti/profili görürdü).
+    const runLiveAnalysisRef = useRef(runLiveAnalysis);
+    useEffect(() => { runLiveAnalysisRef.current = runLiveAnalysis; });
 
     useEffect(() => {
-        const lastEntry = transcript[transcript.length - 1];
-        if (!lastEntry || lastEntry.role !== 'ADAY') return;
-        if (transcript.length <= lastAnalyzedTranscriptLengthRef.current) return;
-        if (lastEntry.text?.trim().length < 40) return; // too short to evaluate
+        if (!isRecruiter || phase !== 'active') return;
+        const analysisTimer = setInterval(() => runLiveAnalysisRef.current({ manual: false }), LIVE_ANALYSIS_INTERVAL_MS);
+        const clockTimer = setInterval(() => setClock(Date.now()), 15000);
+        return () => { clearInterval(analysisTimer); clearInterval(clockTimer); };
+    }, [isRecruiter, phase]);
 
-        const timer = setTimeout(async () => {
-            lastAnalyzedTranscriptLengthRef.current = transcript.length;
-            if (!candidateData) return;
-
-            setStarAnalyzing(true);
-            try {
-                const safeProfile = stripPII(candidateData);
-                const recentSlice = transcript.slice(-6); // last 3 exchanges max
-                const currentQ = questions.length > 0
-                    ? questions.find(q => !q.answered)?.question || null
-                    : null;
-
-                // Prefer the interview session's positionId as the authoritative link; fall back to candidate record
-                const resolvedPositionId = session?.positionId || candidateData?.positionId;
-                const linkedPosition = positions?.find(p => p.id === resolvedPositionId);
-                const positionReqs = linkedPosition?.requirements?.length
-                    ? linkedPosition.requirements.join(', ')
-                    : null;
-                const result = await analyzeSTARRealTime(safeProfile, recentSlice, currentQ, {
-                    title: session?.positionTitle || linkedPosition?.title || '',
-                    requirements: positionReqs,
-                });
-                if (!result || !result.scores) return;
-
-                // Weighted running average: 60% previous + 40% new observation
-                setStarScores(prev => ({
-                    technical:     Math.round(prev.technical     * 0.6 + (result.scores.technical     ?? prev.technical)     * 0.4),
-                    communication: Math.round(prev.communication * 0.6 + (result.scores.communication ?? prev.communication) * 0.4),
-                    problemSolving:Math.round(prev.problemSolving* 0.6 + (result.scores.problemSolving?? prev.problemSolving) * 0.4),
-                    cultureFit:    Math.round(prev.cultureFit    * 0.6 + (result.scores.cultureFit    ?? prev.cultureFit)    * 0.4),
-                    adaptability:  Math.round(prev.adaptability  * 0.6 + (result.scores.adaptability  ?? prev.adaptability)  * 0.4),
-                }));
-
-                // Bias guardrail alert
-                if (result.bias_warning) {
-                    setBiasWarning(result.bias_detail || 'Olası önyargı tespit edildi. Soruyu gözden geçirin.');
-                    setAiInsights(prev => [{
-                        id: Date.now(),
-                        type: 'warning',
-                        text: `⚠️ Önyargı Uyarısı: ${result.bias_detail || 'Soruyu tarafsızlık açısından gözden geçirin.'}`,
-                        hint: null
-                    }, ...prev].slice(0, 15));
-                }
-
-                // Add insight to coach panel
-                if (result.insight) {
-                    setAiInsights(prev => [{
-                        id: Date.now() + 1,
-                        type: 'insight',
-                        text: result.insight,
-                        hint: result.suggestion || null
-                    }, ...prev].slice(0, 15));
-                }
-            } catch (err) {
-                console.error('[STAR RealTime]', err.message);
-            } finally {
-                setStarAnalyzing(false);
-            }
-        }, 2500);
-
-        return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [transcript]);
+    // ── Önyargı uyarısı: anında, AI'sız ─────────────────────────────────────
+    // Mülakatçının her yeni cümlesi düştüğü an anahtar kelimeyle taranır
+    // (utils/biasKeywords). Eskiden canlı AI çağrısının yan ürünüydü; analiz
+    // 3 dakikada bire inince uyarı da 3 dakika gecikirdi. Transkriptten
+    // türetiliyor: en son işaretlenen mülakatçı cümlesi gösterilir, kapatılan
+    // uyarı yeni bir işaretli cümle gelene kadar kapalı kalır.
+    const latestBiasHit = useMemo(
+        () => (isRecruiter ? findLatestBiasHit(transcript) : null),
+        [transcript, isRecruiter]
+    );
+    const [dismissedBiasKey, setDismissedBiasKey] = useState(null);
+    const biasWarning = latestBiasHit && latestBiasHit.key !== dismissedBiasKey ? latestBiasHit.detail : null;
 
     const sendAudioToGemini = async (blob) => {
         if (blob.size < 1000) return;
@@ -2254,16 +2317,16 @@ export default function LiveInterviewPage() {
                                                 kip düğmesi konmadı. */}
                                             <button
                                                 onClick={() => handleGenerateAIQuestion('deepen')}
-                                                disabled={coachGenerating || !candidateData}
-                                                title={!candidateData ? 'Aday verisi yüklenemedi' : 'Mevcut cevabı derinleştiren soru üret'}
+                                                disabled={coachGenerating || !candidateData || !followUpState.ok}
+                                                title={!candidateData ? 'Aday verisi yüklenemedi' : (followUpBlockedMsg || 'Mevcut cevabı derinleştiren soru üret')}
                                                 className="flex items-center gap-1.5 text-[12px] font-semibold text-brand bg-n0 border border-brand-100 hover:bg-brand-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-2.5 py-[5px]"
                                             >
                                                 {coachGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Derinleştir
                                             </button>
                                             <button
                                                 onClick={() => handleGenerateAIQuestion('new')}
-                                                disabled={coachGenerating || !candidateData}
-                                                title={!candidateData ? 'Aday verisi yüklenemedi' : 'Henüz sorulmamış bir alandan soru üret'}
+                                                disabled={coachGenerating || !candidateData || !followUpState.ok}
+                                                title={!candidateData ? 'Aday verisi yüklenemedi' : (followUpBlockedMsg || 'Henüz sorulmamış bir alandan soru üret')}
                                                 className="flex items-center gap-1.5 text-[12px] font-semibold text-n600 bg-n50 border border-n200 hover:bg-n100 disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-2.5 py-[5px]"
                                             >
                                                 <Sparkles className="w-3 h-3" /> Yeni alan
@@ -2314,6 +2377,11 @@ export default function LiveInterviewPage() {
                                                 <ChevronRight className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
+                                        {(followUpNotice || (!followUpState.ok && followUpBlockedMsg)) && (
+                                            <p className="text-[11px] text-n500 mt-1.5 m-0">
+                                                Takip sorusu: {followUpNotice || followUpBlockedMsg}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -2615,10 +2683,22 @@ export default function LiveInterviewPage() {
                             <div className="flex items-center gap-2">
                                 <h2 className="text-[12px] font-semibold m-0">Canlı değerlendirme</h2>
                                 {starAnalyzing && <Loader2 className="w-3 h-3 text-brand animate-spin" />}
-                                <span className="ml-auto text-[11px] font-semibold text-brand bg-brand-50 px-2 py-0.5 rounded-full">
-                                    Anlık
+                                {/* Kartlar ~3 dakikada bir güncellenir; "anlık" demek yanıltırdı. */}
+                                <span className="ml-auto text-[11px] text-n500">
+                                    {lastAnalysisAt ? `Son analiz ${minutesAgoText(lastAnalysisAt, clock)}` : 'Henüz analiz yok'}
                                 </span>
+                                <button
+                                    onClick={() => runLiveAnalysis({ manual: true })}
+                                    disabled={starAnalyzing || !compactProfile || !analysisState.ok}
+                                    title={analysisBlockedMsg || `3 dakikayı beklemeden şimdi analiz et (saatte en çok ${LIVE_ANALYSIS_HOURLY_CAP}, otomatik analizler dahil)`}
+                                    className="flex items-center gap-1 text-[11px] font-semibold text-brand bg-brand-50 hover:bg-brand-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-full px-2 py-0.5"
+                                >
+                                    <RefreshCw className="w-3 h-3" /> Şimdi analiz et
+                                </button>
                             </div>
+                            {(analysisBlockedMsg || analysisNotice) && (
+                                <p className="text-[11px] text-n500 m-0">{analysisBlockedMsg || analysisNotice}</p>
+                            )}
 
                             {biasWarning && (
                                 <div className="flex items-start gap-2 bg-warn-bg rounded-md p-2.5">
@@ -2627,7 +2707,7 @@ export default function LiveInterviewPage() {
                                         <p className="text-[11px] font-semibold text-warn m-0">Önyargı uyarısı</p>
                                         <p className="text-[11px] text-n700 mt-0.5 leading-snug m-0">{biasWarning}</p>
                                     </div>
-                                    <button onClick={() => setBiasWarning(null)} className="text-n400 hover:text-n700 shrink-0" aria-label="Kapat">
+                                    <button onClick={() => setDismissedBiasKey(latestBiasHit?.key || null)} className="text-n400 hover:text-n700 shrink-0" aria-label="Kapat">
                                         <X className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -2635,7 +2715,7 @@ export default function LiveInterviewPage() {
 
                             {/* YETKİNLİK ÇUBUKLARI — STAR DEĞİL.
                                 Canlı analiz (services/ai/interview.js
-                                `analyzeSTARRealTime`) beş yetkinliği 0-100
+                                `analyzeLiveWindow`) beş yetkinliği 0-100
                                 döndürüyor; S/T/A/R çıkarmıyor. Prototipte bu
                                 panelde 0-3'lük dört STAR çubuğu var ama o
                                 sayılar canlı oturumda ÜRETİLMİYOR — dördünü

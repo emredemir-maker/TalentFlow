@@ -13,7 +13,7 @@
 // Ayırt eden şey durum kodu değil, gövdedeki metin.
 
 /**
- * @typedef {'budget'|'spend-cap'|'quota'|'rate-limit'|'auth'|'gateway'|null} AiErrorKind
+ * @typedef {'budget'|'interview-limit'|'spend-cap'|'quota'|'rate-limit'|'auth'|'gateway'|null} AiErrorKind
  */
 
 /**
@@ -25,6 +25,13 @@
  * Sunucu tarafındaki im: functions/services/aiBudget.js BUDGET_MARKER.
  */
 const OWN_BUDGET = /AI_DAILY_BUDGET_EXCEEDED/;
+
+/**
+ * CANLI MÜLAKATIN SAATLİK SINIRI — sunucudaki mülakat başına sayaç
+ * (functions/services/interviewAiQuota.js). Saat dolana kadar her deneme
+ * aynı cevabı alır; tekrar denemek yalnızca istek harcar.
+ */
+const INTERVIEW_LIMIT = /INTERVIEW_AI_LIMIT/;
 
 /** Harcama tavanı — beklemekle geçmez, insan müdahalesi gerekir. */
 const SPEND_CAP = /spending cap|spend cap|billing account has exceeded|harcama (üst )?(sınırı|tavanı)/i;
@@ -61,6 +68,12 @@ export function aiErrorHint(message) {
             hint: 'Bu kurulum için belirlenmiş günlük AI bütçesi dolmuş — Google kotanla '
                 + 'ilgisi yok. Sayaç UTC gece yarısı sıfırlanır; daha yüksek bir sınır '
                 + 'gerekiyorsa kurulumu işleten kişiye söyle.',
+        };
+    }
+    if (INTERVIEW_LIMIT.test(text)) {
+        return {
+            kind: 'interview-limit',
+            hint: 'Bu mülakat için saatlik canlı AI sınırı doldu. Sayaç saat başında sıfırlanır.',
         };
     }
     if (SPEND_CAP.test(text)) {
@@ -108,5 +121,5 @@ export function isRetryable(message) {
     const { kind } = aiErrorHint(message);
     // Günlük bütçe de tekrar denemeyle geçmez: sayaç gece yarısına kadar
     // yerinde duruyor ve her deneme aynı yanıtı alır.
-    return kind !== 'spend-cap' && kind !== 'auth' && kind !== 'budget';
+    return kind !== 'spend-cap' && kind !== 'auth' && kind !== 'budget' && kind !== 'interview-limit';
 }

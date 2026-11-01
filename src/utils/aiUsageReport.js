@@ -14,6 +14,8 @@ export const LABEL_TR = {
     'interview-grade': 'Mülakat damgaları',
     'interview-eval': 'Mülakat gözlemi',
     'interview-plan': 'Mülakat soruları',
+    'interview-live': 'Canlı mülakat analizi',
+    'interview-followup': 'Canlı mülakat takip sorusu',
     'interview-review': 'Mülakat raporu',
     requirement: 'İlan danışmanı',
     assistant: 'İK asistanı',
