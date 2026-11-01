@@ -196,13 +196,13 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     }
 
     async function handleDeleteApp(appId) {
-        if (!window.confirm('Bu başvuruyu silmek istediğinizden emin misiniz?')) return;
+        if (!window.confirm('Bu başvuruyu silmek istediğine emin misin?')) return;
         setDeletingAppId(appId);
         try {
             await deleteApplication(appId);
         } catch (err) {
             console.error('Delete application failed:', err);
-            alert('Başvuru silinemedi. Lütfen tekrar deneyin.');
+            alert('Başvuru silinemedi. Tekrar dene.');
         } finally {
             setDeletingAppId(null);
         }
@@ -242,7 +242,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                 <button
                                     onClick={onRescan}
                                     className="p-2 rounded-md bg-brand-50 border border-brand-100 text-brand hover:bg-brand-100 transition-colors"
-                                    title="Bu ilan için adayları yeniden tara (skor eşiği seçebilirsiniz)"
+                                    title="Bu ilan için adayları yeniden tara (skor eşiği seçebilirsin)"
                                 >
                                     <Target size={16} />
                                 </button>
@@ -396,7 +396,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             <div className="text-center py-16">
                                 <FileText className="w-10 h-10 text-n200 mx-auto mb-3" />
                                 <p className="text-n400 text-sm font-semibold">Henüz başvuru yok</p>
-                                <p className="text-n300 text-xs mt-1">Başvuru linkinizi paylaşın</p>
+                                <p className="text-n300 text-xs mt-1">Başvuru linkini paylaş</p>
                                 <button
                                     onClick={() => setActiveTab('link')}
                                     className="mt-4 px-4 py-2 rounded-md bg-brand-50 border border-brand-100 text-brand text-xs font-semibold hover:bg-brand-100 transition-colors inline-flex items-center gap-1.5"
@@ -610,7 +610,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                         <div>
                             <h3 className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-1">BAŞVURU LİNKİ</h3>
                             <p className="text-[11px] text-n400 leading-relaxed">
-                                Aşağıdaki linki LinkedIn, e-posta veya istediğiniz platformda paylaşın. Kaynağı seçin — sistem hangi kanaldan geldiğini otomatik kaydeder.
+                                Aşağıdaki linki LinkedIn, e-posta ya da istediğin platformda paylaş. Kaynağı seç — sistem hangi kanaldan geldiğini otomatik kaydeder.
                             </p>
                         </div>
 
@@ -660,9 +660,9 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                         <div className="bg-brand-50 border border-brand-100 rounded-[14px] p-3">
                             <div className="text-[10px] font-semibold text-brand uppercase tracking-[0.08em] mb-2">NASIL KULLANILIR?</div>
                             <ul className="space-y-1.5 text-[11px] text-n500 leading-relaxed">
-                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />LinkedIn iş ilanına "Başvur" butonu olarak ekleyin</li>
-                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />E-posta imzanıza veya kampanyaya hyperlink ekleyin</li>
-                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />Her platform için ayrı kaynak seçin — istatistikler ayrı tutulur</li>
+                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />LinkedIn iş ilanına "Başvur" butonu olarak ekle</li>
+                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />E-posta imzana ya da kampanyaya hyperlink ekle</li>
+                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />Her platform için ayrı kaynak seç — istatistikler ayrı tutulur</li>
                                 <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />Gelen başvurular "Başvurular" sekmesinde AI skoru ile görünür</li>
                             </ul>
                         </div>
@@ -809,10 +809,10 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                         <Sparkles size={14} className="text-brand" />
                         <h3 className="text-[11px] font-semibold text-brand uppercase tracking-[0.08em]">AI ile Otomatik Doldur</h3>
                     </div>
-                    <p className="text-[11px] text-n500 mb-3 leading-relaxed">İş ilanı metnini yapıştırın, AI tüm alanları otomatik dolduracak.</p>
+                    <p className="text-[11px] text-n500 mb-3 leading-relaxed">İş ilanı metnini yapıştır, AI tüm alanları otomatik dolduracak.</p>
                     <textarea
                         className="flex-1 min-h-[180px] bg-n0 border border-brand-100 rounded-[14px] p-3 text-sm text-n600 placeholder:text-n300 focus:outline-none focus:ring-2 focus:ring-brand-100 resize-none transition-all"
-                        placeholder="İş ilanı metnini buraya yapıştırın... (en az 50 karakter)"
+                        placeholder="İş ilanı metnini buraya yapıştır... (en az 50 karakter)"
                         value={jdText}
                         onChange={(e) => setJdText(e.target.value)}
                     />
@@ -917,7 +917,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 <CheckCircle2 size={24} className="text-n300" />
                             </div>
                             <p className="text-[12px] text-n400 font-medium">Ön eleme kapalı</p>
-                            <p className="text-[11px] text-n300 max-w-[180px]">Açmak için yukarıdaki anahtarı kullanın</p>
+                            <p className="text-[11px] text-n300 max-w-[180px]">Açmak için yukarıdaki anahtarı kullan</p>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2 mt-4">
@@ -959,7 +959,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                         </div>
                                         <input
                                             type="text"
-                                            placeholder="Sorunuzu buraya yazın veya AI önerisi ekleyin..."
+                                            placeholder="Sorunu buraya yaz ya da AI önerisi ekle..."
                                             value={q}
                                             onChange={e => {
                                                 const next = [...formData.screeningQuestions];
@@ -1069,7 +1069,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                     <div className="mx-8 mt-5 px-4 py-3 rounded-[14px] bg-warn-bg border border-warn flex items-center gap-2 shrink-0">
                         <AlertCircle size={14} className="text-warn shrink-0" />
                         <span className="text-[11px] text-warn font-medium">
-                            Bu pozisyona bağlı {candidateCount} aday etkilenebilir. Değişiklikleri kaydetmeden önce gözden geçirin.
+                            Bu pozisyona bağlı {candidateCount} aday etkilenebilir. Değişiklikleri kaydetmeden önce gözden geçir.
                         </span>
                     </div>
                 )}
@@ -1132,7 +1132,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                             <div className="p-3 pt-0">
                                 <textarea
                                     className="w-full min-h-[120px] bg-n0 border border-brand-100 rounded-md p-3 text-[11px] text-n600 placeholder:text-n300 focus:outline-none focus:ring-2 focus:ring-brand-100 resize-y"
-                                    placeholder="Güncel ilan / aranan profil metnini buraya yapıştırın... (en az 50 karakter)"
+                                    placeholder="Güncel ilan / aranan profil metnini buraya yapıştır... (en az 50 karakter)"
                                     value={jdText}
                                     onChange={(e) => setJdText(e.target.value)}
                                 />
@@ -1365,7 +1365,7 @@ export default function PositionsPage() {
         };
         if (isDepartmentUser) {
             await addPositionRequest(newPos, { uid: user?.uid, email: userProfile?.email, displayName: userProfile?.displayName, department: userDepartments?.[0] || '' });
-            alert('✅ Pozisyon talebiniz gönderildi.');
+            alert('✅ Pozisyon talebin gönderildi.');
         } else {
             await addPosition(newPos);
         }
@@ -1467,7 +1467,7 @@ export default function PositionsPage() {
     const handleBuildGlossary = async (position) => {
         if (!position?.id) return;
         const entries = await buildRequirementGlossary(position);
-        if (entries.length === 0) throw new Error('Sözlük üretilemedi, tekrar deneyin.');
+        if (entries.length === 0) throw new Error('Sözlük üretilemedi, tekrar dene.');
         const record = buildGlossaryRecord(position, entries, new Date().toISOString());
         await updatePosition(position.id, { requirementGlossary: record });
         setDetailPos((prev) => (prev?.id === position.id ? { ...prev, requirementGlossary: record } : prev));
@@ -1534,7 +1534,7 @@ export default function PositionsPage() {
                 .map(c => { const ps = analysisScoreFor(c, pos); const ms = calculateMatchScore(c, pos).score; return { ...c, effectiveScore: Math.max(ps, ms) }; })
                 .filter(c => c.effectiveScore >= 60)
                 .sort((a, b) => b.effectiveScore - a.effectiveScore);
-            if (!matches.length) { alert('Uygun aday bulunamadı. Önce adayları analiz edin.'); return; }
+            if (!matches.length) { alert('Uygun aday bulunamadı. Önce adayları analiz et.'); return; }
             let released = 0;
             for (const c of matches) {
                 const cur = c.visibleToDepartments || [];
@@ -1612,7 +1612,7 @@ export default function PositionsPage() {
                     <p className="text-sm font-semibold text-brand-700">
                         Adaylar yeni gereksinimlere göre yeniden taranıyor — {rescanProgress.done} / {rescanProgress.total}
                     </p>
-                    <span className="text-[11px] text-brand">Bu sayfadan ayrılmayın</span>
+                    <span className="text-[11px] text-brand">Bu sayfadan ayrılma</span>
                 </div>
             )}
 
@@ -1621,7 +1621,7 @@ export default function PositionsPage() {
                 <div className="mx-6 mt-4 px-4 py-2.5 rounded-xl bg-warn-bg flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-warn" />
-                        <p className="text-[13px] font-semibold text-warn-text m-0">{pendingCount} pozisyon talebi onayınızı bekliyor.</p>
+                        <p className="text-[13px] font-semibold text-warn-text m-0">{pendingCount} pozisyon talebi onayını bekliyor.</p>
                     </div>
                     <button onClick={() => setStatusFilter('pending_approval')} className="tf-btn tf-btn-secondary">
                         Talepleri gör
@@ -1824,7 +1824,7 @@ export default function PositionsPage() {
                                                 </div>
                                             </>}
                                             {isPending && isRecruiterOrAdmin && <>
-                                                <button onClick={() => { if (window.confirm('Onaylamak istiyor musunuz?')) approvePosition(pos.id); }} className="p-1.5 rounded-md bg-ok-bg text-ok-text hover:opacity-80" title="Onayla"><CheckCircle2 className="w-4 h-4" /></button>
+                                                <button onClick={() => { if (window.confirm('Onaylamak istiyor musun?')) approvePosition(pos.id); }} className="p-1.5 rounded-md bg-ok-bg text-ok-text hover:opacity-80" title="Onayla"><CheckCircle2 className="w-4 h-4" /></button>
                                                 <button onClick={() => { const r = prompt('Red nedeni:'); if (r !== null) rejectPosition(pos.id, r); }} className="p-1.5 rounded-md bg-bad-bg border border-transparent text-bad-text hover:opacity-90 transition-colors" title="Reddet"><XCircle className="w-4 h-4" /></button>
                                             </>}
                                             {isRejected && isRecruiterOrAdmin && (
