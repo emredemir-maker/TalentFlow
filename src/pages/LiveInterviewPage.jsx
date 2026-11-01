@@ -18,6 +18,7 @@ import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getAuthHeaders } from '../services/ai/config';
+import { chooseSttEngine, fetchAudioFallbackEnabled, hasWebSpeech, STT_UNSUPPORTED_TITLE, STT_UNSUPPORTED_DETAIL } from '../utils/sttEngine';
 
 export default function LiveInterviewPage() {
     const { sessionId } = useParams();
@@ -897,6 +898,24 @@ export default function LiveInterviewPage() {
     const liveTranscriptRef = useRef(transcript);
     useEffect(() => { liveTranscriptRef.current = transcript; }, [transcript]);
 
+    // ── Gemini ses yedeği anahtarı ───────────────────────────────────────
+    // Web Speech olmayan tarayıcıda pahalı Gemini yedeği yalnız sunucuda
+    // açıksa (uygulama içi mülakat ek paketi) kullanılır. null = henüz
+    // öğrenilmedi; o sürede yedek başlatılmaz. Chrome'da hiç sorulmaz.
+    const [audioFallbackEnabled, setAudioFallbackEnabled] = useState(null);
+    useEffect(() => {
+        if (hasWebSpeech() || audioFallbackEnabled !== null) return;
+        let cancelled = false;
+        // Aday anonim oturumu sayfa açılırken hazır olmayabilir (401 → null);
+        // kullanıcı ya da aşama değişince yeniden sorulur.
+        fetchAudioFallbackEnabled(getAuthHeaders).then((value) => {
+            if (!cancelled && value !== null) setAudioFallbackEnabled(value);
+        });
+        return () => { cancelled = true; };
+    }, [audioFallbackEnabled, user?.uid, phase]);
+    const sttEngine = chooseSttEngine({ webSpeech: hasWebSpeech(), audioFallbackEnabled });
+    const sttUnsupported = sttEngine === 'unsupported';
+
     // ── Real-time STAR analysis ───────────────────────────────────────────────
     // Fires automatically after each new ADAY transcript entry (debounced 2.5s).
     // Candidate's PII is stripped before any data leaves the client.
@@ -989,6 +1008,11 @@ export default function LiveInterviewPage() {
                 headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify({ audio: base64Audio, mimeType }),
             });
+            if (sttRes.status === 403) {
+                // Anahtar sunucuda kapatıldı — yedeği durdur, "Chrome kullanın" göster.
+                setAudioFallbackEnabled(false);
+                return;
+            }
             if (!sttRes.ok) { console.warn('[STT] Backend error:', sttRes.status); return; }
             const { text: rawText } = await sttRes.json();
             const raw = (rawText || '').trim();
@@ -1040,7 +1064,8 @@ export default function LiveInterviewPage() {
     useEffect(() => {
         // ── STT Engine ────────────────────────────────────────────────────
         // Primary: Web Speech API (browser-native, ~0 latency, tr-TR)
-        // Fallback: Gemini audio chunks (3 s) when Web Speech API unavailable
+        // Fallback: Gemini audio chunks (3 s) when Web Speech API unavailable —
+        // YALNIZ sunucudaki AUDIO_FALLBACK_ENABLED açıksa (bkz. utils/sttEngine.js)
         if (phase !== 'active' || !isMicOn || !stream) {
             // Stop Web Speech API
             if (recognitionRef.current) {
@@ -1059,8 +1084,17 @@ export default function LiveInterviewPage() {
         }
 
         const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const engine = chooseSttEngine({ webSpeech: Boolean(SpeechRecognitionAPI), audioFallbackEnabled });
 
-        if (SpeechRecognitionAPI) {
+        if (engine === 'pending' || engine === 'unsupported') {
+            // Yedek kapalı ya da durumu henüz bilinmiyor: ses kaydı başlatılmaz,
+            // arayüz "Bu özellik için Chrome kullanın" gösterir; mülakatın geri
+            // kalanı (görüntü, sorular, notlar) çalışmaya devam eder.
+            setIsRecording(false);
+            return;
+        }
+
+        if (engine === 'webspeech') {
             // ── Web Speech API path ──────────────────────────────────────
             const recognition = new SpeechRecognitionAPI();
             recognition.continuous     = true;
@@ -1188,7 +1222,7 @@ export default function LiveInterviewPage() {
                 setIsRecording(false);
             };
         }
-    }, [phase, isMicOn, stream, isRecruiter]);
+    }, [phase, isMicOn, stream, isRecruiter, audioFallbackEnabled]);
 
     useEffect(() => {
         const getDevices = async () => {
@@ -1824,6 +1858,15 @@ export default function LiveInterviewPage() {
                                                             {isMicOn ? (isRecording ? 'Konuşmanız algılanıyor...' : 'Mikrofon Bağlı') : 'Lütfen Mikrofonu Açın'}
                                                         </p>
                                                     </div>
+                                                    {sttUnsupported && (
+                                                        <div role="status" className="mt-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 not-italic">
+                                                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                                            <div>
+                                                                <p className="text-[11px] font-bold text-amber-800 m-0">{STT_UNSUPPORTED_TITLE}</p>
+                                                                <p className="text-[10px] text-amber-700 m-0">{STT_UNSUPPORTED_DETAIL}</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Phase 5: Premium Waiting State */}
@@ -2412,7 +2455,7 @@ export default function LiveInterviewPage() {
                                     <span className={`w-1.5 h-1.5 rounded-full ${isRecording ? 'bg-ok animate-pulse' : 'bg-n400'}`} />
                                     {isRecording ? 'Kaydediyor' : 'Beklemede'}
                                 </span>
-                                {!isRecording && isMicOn && (
+                                {!isRecording && isMicOn && !sttUnsupported && (
                                     <button
                                         onClick={() => { try { recognitionRef.current?.start(); } catch { /* zaten çalışıyor */ } }}
                                         className="text-[11px] font-medium text-brand border border-brand-100 bg-brand-50 rounded px-1.5 py-0.5"
@@ -2421,6 +2464,15 @@ export default function LiveInterviewPage() {
                                     </button>
                                 )}
                             </div>
+                            {sttUnsupported && (
+                                <div role="status" className="mb-2 flex items-start gap-2 rounded-md border border-warn/30 bg-warn-bg px-2.5 py-1.5">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-warn-text shrink-0 mt-px" />
+                                    <div>
+                                        <p className="text-[11px] font-semibold text-warn-text m-0">{STT_UNSUPPORTED_TITLE}</p>
+                                        <p className="text-[10px] text-n500 m-0">{STT_UNSUPPORTED_DETAIL}</p>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1.5 pr-1" ref={transcriptRef}>
                                 {transcript.length === 0 && (
                                     <div className="h-full flex flex-col items-center justify-center text-n400">
@@ -2689,6 +2741,13 @@ export default function LiveInterviewPage() {
                         <span className="text-[10px] font-bold text-white/90 italic">{candidateData?.name}</span>
                     </div>
                 </div>
+                {sttUnsupported && (
+                    <div role="status" className="flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="text-[10px] font-bold text-amber-200">{STT_UNSUPPORTED_TITLE}</span>
+                        <span className="hidden sm:inline text-[10px] text-amber-200/70">{STT_UNSUPPORTED_DETAIL}</span>
+                    </div>
+                )}
             </header>
 
             <div className="flex-1 flex p-2 gap-2 overflow-hidden">

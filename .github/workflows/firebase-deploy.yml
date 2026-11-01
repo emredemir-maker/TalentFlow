@@ -156,7 +156,7 @@ jobs:
       # CORS izin listesi (middleware/cors.js).
       - name: Create functions/.env
         run: |
-          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\n' \
+          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\nAUDIO_FALLBACK_ENABLED=%s\n' \
             "$EMAIL_USER" \
             "$EMAIL_PASS" \
             "$VITE_GEMINI_API_KEY" \
@@ -167,6 +167,7 @@ jobs:
             "$PROJECT_ID" \
             "$STORAGE_BUCKET" \
             "$APP_URL" \
+            "$AUDIO_FALLBACK_ENABLED" \
             > functions/.env
           echo "✅ functions/.env oluşturuldu:"
           sed 's/=.*/=***/' functions/.env
@@ -189,6 +190,12 @@ jobs:
           # arama destekli çağrılar istek başına faturalanıyor ve token
           # tavanı bu kalemi görmüyor.
           AI_DAILY_GROUNDED_LIMIT: ${{ secrets.AI_DAILY_GROUNDED_LIMIT }}
+          # Gemini ses yedeği (Web Speech olmayan tarayıcıda 3 sn'lik ses
+          # parçaları → saatte ~1.200 Gemini çağrısı). SIR DEĞİL: repo
+          # DEĞİŞKENİ (vars). Tanımlı değilse satır boş yazılır ve yedek
+          # KAPALI kalır; yalnız "uygulama içi mülakat" ek paketi alan
+          # müşteride `true` yapılır. Bkz. functions/services/audioFallback.js.
+          AUDIO_FALLBACK_ENABLED: ${{ vars.AUDIO_FALLBACK_ENABLED }}
 
       # Anahtar dosyası env üzerinden yazılıyor (önceden `echo '${{ … }}'`):
       # JSON'daki bir tek tırnak kabuğu bozabiliyordu. Ardından anahtarın
