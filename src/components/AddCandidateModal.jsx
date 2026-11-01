@@ -7,8 +7,7 @@ import {
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain } from '../services/matchService';
-import { analyzeCandidateMatch, parseCandidateFromText } from '../services/geminiService';
-import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
+import { parseAndPrescoreCandidate } from '../services/geminiService';
 import { extractTextFromFile } from '../services/cvParser';
 import { getAuthHeaders } from '../services/ai/config';
 import { storage } from '../config/firebase';
@@ -170,7 +169,13 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         resultsData.push({ fileName: file.name, error: 'İçerik okunamadı veya çok kısa', success: false });
                         continue;
                     }
-                    const candidate = await parseCandidateFromText(text, 'gemini-2.5-flash');
+                    // ÖN ANALİZ TEK ÇAĞRI: ayrıştırma + açık pozisyonlara göre
+                    // ön uyum skoru aynı yanıtta (toplu yüklemeyle aynı). Eskiden
+                    // ayrıştırmanın ardından en uygun pozisyon için kendiliğinden
+                    // tam bir detaylı analiz (2 çağrı daha) çalışıyordu.
+                    const { candidate, prescore } = await parseAndPrescoreCandidate(text, 'gemini-2.5-flash', {
+                        openPositionTitles: openPositions.map(p => p.title).filter(Boolean),
+                    });
                     if (!candidate) {
                         resultsData.push({ fileName: file.name, error: 'AI ayrıştırma hatası', success: false });
                         continue;
@@ -215,49 +220,37 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             console.error('Firebase Storage Upload Error:', uploadError);
                         }
                     }
-                    resultsData.push({ fileName: file.name, candidate, success: true, isDuplicate: false });
+                    resultsData.push({ fileName: file.name, candidate, prescore, success: true, isDuplicate: false });
                 } catch (err) {
                     console.error(`Error processing ${file.name}:`, err);
                     resultsData.push({ fileName: file.name, error: err.message, success: false });
                 }
             }
 
-            // Sequential (not parallel) so we never fire concurrent AI calls and
-            // avoid hitting the backend rate-limit (20 req/min).
-            const processedResults = [];
-            for (const res of resultsData) {
-                if (!res.success || res.isDuplicate) {
-                    processedResults.push(res);
-                    continue;
+            // Eşleşme: ön analizin (aynı çağrının) skoru. AI skor alanı
+            // döndürmediyse ücretsiz anahtar-kelime skoruna düşülür — ek AI
+            // çağrısı YOK. Detaylı analiz aday ekranından, kullanıcı isteyince.
+            const processedResults = resultsData.map((res) => {
+                if (!res.success || res.isDuplicate) return res;
+                const { prescore, ...rest } = res;
+                if (prescore) {
+                    const pos = prescore.matchedTitle
+                        ? openPositions.find(p => p.title === prescore.matchedTitle)
+                        : null;
+                    return {
+                        ...rest,
+                        match: pos ? { ...pos, score: prescore.score, aiInsight: prescore.reason } : null,
+                    };
                 }
-                // Filter positions to only those compatible with the candidate's domain
                 const compatiblePositions = filterPositionsByDomain(res.candidate, openPositions);
-                const ranked = compatiblePositions.map(pos => ({
-                    pos,
-                    static: calculateMatchScore(res.candidate, pos),
-                })).sort((a, b) => b.static.score - a.static.score);
-
-                const topCandidate = ranked[0];
-                if (topCandidate && topCandidate.static.score > 0) {
-                    try {
-                        const jobText = buildJobDescription(topCandidate.pos);
-                        const aiQuick = await analyzeCandidateMatch(jobText, res.candidate, 'gemini-2.5-flash', {
-                            requirements: requirementsOf(topCandidate.pos),
-                        });
-                        processedResults.push({
-                            ...res,
-                            match: { ...topCandidate.pos, score: aiQuick.score, aiInsight: aiQuick.summary },
-                        });
-                    } catch {
-                        processedResults.push({ ...res, match: { ...topCandidate.pos, score: topCandidate.static.score } });
-                    }
-                } else {
-                    processedResults.push({ ...res, match: null });
-                }
-            }
+                const top = compatiblePositions
+                    .map(pos => ({ pos, score: calculateMatchScore(res.candidate, pos)?.score || 0 }))
+                    .sort((x, y) => y.score - x.score)[0];
+                return { ...rest, match: top && top.score > 0 ? { ...top.pos, score: top.score } : null };
+            });
 
             // Kota KAYDETMEDE değil, AYRIŞTIRMADA düşüyor: maliyet burada
-            // oluşuyor (her CV için en az iki AI çağrısı). Sonucu görüp
+            // oluşuyor (her CV için bir AI çağrısı). Sonucu görüp
             // vazgeçen biri de o çağrıları yaptırmış oluyor.
             if (IS_DEMO) {
                 kotaDus(files.length);
@@ -313,7 +306,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         scoringStage: 'initial',
                         aiAnalysis: r.match ? {
                             score: r.match.score,
-                            summary: r.match.aiInsight || 'Ön AI taraması yapıldı.',
+                            summary: r.match.aiInsight || 'Ön analiz yapıldı.',
                         } : null,
                         appliedDate: new Date().toISOString().split('T')[0],
                         source: sourceType,
@@ -488,7 +481,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                                         <p className="text-[10px] text-slate-500 font-medium">{res.candidate.position}</p>
                                                     </div>
                                                     <span className="inline-flex items-center gap-1 text-[8px] font-black px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-full shrink-0">
-                                                        <Sparkles className="w-2.5 h-2.5" />Otonom Tarama ✓
+                                                        <Sparkles className="w-2.5 h-2.5" />Ön analiz ✓
                                                     </span>
                                                 </div>
                                                 {res.match?.aiInsight && (
@@ -697,8 +690,8 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 flex items-start gap-2">
                                 <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="text-[10px] font-bold text-blue-800">AI Analizi Başlayacak</p>
-                                    <p className="text-[10px] text-blue-600/80 mt-0.5 leading-relaxed">Her CV ayrıştırılacak, pozisyon eşleşmesi yapılacak ve otonom tarama gerçekleştirilecek.</p>
+                                    <p className="text-[10px] font-bold text-blue-800">Ön Analiz Başlayacak</p>
+                                    <p className="text-[10px] text-blue-600/80 mt-0.5 leading-relaxed">Her CV ayrıştırılacak ve açık pozisyonlara göre ön uyum skoru verilecek (CV başına tek AI çağrısı). Detaylı analiz, aday ekranından siz başlattığınızda çalışır.</p>
                                 </div>
                             </div>
 

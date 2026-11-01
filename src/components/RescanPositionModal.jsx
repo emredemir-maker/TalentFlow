@@ -23,6 +23,7 @@ import { calculateMatchScore } from '../services/matchService';
 import { analysisFor, isStaleFor } from '../utils/positionScore';
 import { usesCurrentRubric } from '../utils/coverageDetail';
 import { resolveTargets, searchableTargets } from '../utils/rescanTargets';
+import { detailedAnalysisUsageText } from '../services/scanService';
 
 /** Tarama kapsamı. */
 const SCOPES = {
@@ -324,8 +325,8 @@ export default function RescanPositionModal({
 
                     <div className="px-3 py-2.5 rounded-md bg-n50 border border-n100">
                         <p className="text-[10px] text-n500 leading-relaxed">
-                            Her aday için <strong>1 AI çağrısı</strong> yapılır — bu tarama{' '}
-                            <strong>{selected.length} çağrı</strong> demek. Bu pozisyona ait analiz yeni
+                            <strong>{detailedAnalysisUsageText(selected.length)}</strong>{' '}
+                            Her aday yalnızca bu pozisyonla karşılaştırılır (aday başına 1 detaylı analiz). Bu pozisyona ait analiz yeni
                             gereksinimlere göre yeniden üretilir; diğer pozisyonların analizlerine
                             dokunulmaz.
                         </p>

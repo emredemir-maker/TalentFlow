@@ -73,8 +73,8 @@ function candidateCardHtml(r, { appUrl, includeTable, includeLinks }) {
         ? `${escapeHtml(r.matchedTitle)} · ${scoreTxt} uyum`
         : '<span style="color:#B45309;font-style:italic;">Uygun açık pozisyon yok</span>';
     const scanBadge = r.scanned
-        ? `<span style="${S.badge}background:#ECFDF5;color:#047857;">Otonom tarama ✓</span>`
-        : `<span style="${S.badge}background:#FFFBEB;color:#B45309;">Taranmadı</span>`;
+        ? `<span style="${S.badge}background:#ECFDF5;color:#047857;">Detaylı analiz ✓</span>`
+        : `<span style="${S.badge}background:#FFFBEB;color:#B45309;">Detaylı analiz yapılmadı</span>`;
 
     let html = `<div style="${S.card}">`;
     html += `<p style="${S.name}">${escapeHtml(r.name)}${scanBadge}</p>`;
@@ -130,7 +130,7 @@ export function buildEvaluationEmail({ rows, note, appUrl, includeTable = true, 
     const textLines = [];
     if (note) textLines.push(note, '');
     for (const r of rows) {
-        textLines.push(`• ${r.name} — ${r.matchedTitle ? `${r.matchedTitle} (%${r.matchedScore ?? '—'} uyum)` : 'Uygun açık pozisyon yok'}${r.scanned ? ' [Otonom tarama ✓]' : ' [Taranmadı]'}`);
+        textLines.push(`• ${r.name} — ${r.matchedTitle ? `${r.matchedTitle} (%${r.matchedScore ?? '—'} uyum)` : 'Uygun açık pozisyon yok'}${r.scanned ? ' [Detaylı analiz ✓]' : ' [Detaylı analiz yapılmadı]'}`);
         if (includeTable && r.analysisText) textLines.push(`  Analiz: ${r.analysisText}`);
         if (includeTable) for (const f of r.fits) textLines.push(`  - ${f.title}: %${f.score} (${f.isAi ? 'AI' : 'anahtar kelime'})`);
         if (includeLinks) textLines.push(`  Detay: ${appUrl}/?aday=${r.id}`);

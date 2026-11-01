@@ -75,7 +75,7 @@ function buildInviteEmailHtml({ companyName = 'Clyro Talent' }, { inviteLink, ro
     <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;margin-bottom:14px;">
       <span style="color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;">Talent</span><span style="color:#93C5FD;font-size:26px;font-weight:800;letter-spacing:-0.5px;">-Inn</span>
     </div>
-    <p style="color:rgba(255,255,255,0.80);font-size:13px;margin:0;letter-spacing:0.02em;">AI Destekli İK Yönetimi &amp; Otonom Mülakat Koçu</p>
+    <p style="color:rgba(255,255,255,0.80);font-size:13px;margin:0;letter-spacing:0.02em;">AI Destekli İK Yönetimi &amp; Mülakat Koçu</p>
   </td></tr>
 
   <!-- BODY -->
@@ -94,7 +94,7 @@ function buildInviteEmailHtml({ companyName = 'Clyro Talent' }, { inviteLink, ro
       <p style="color:#64748B;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 14px 0;">Clyro Talent nedir?</p>
       <p style="color:#334155;font-size:14px;line-height:1.65;margin:0 0 16px 0;">
         Clyro Talent; yapay zeka destekli bir <strong>İnsan Kaynakları yönetimi ve işe alım platformudur</strong>.
-        CV analizi, aday pipeline takibi ve <strong>otonom mülakat koçu</strong> sayesinde işe alım süreçlerinizi uçtan uca dijitalleştirir.
+        CV analizi, aday pipeline takibi ve <strong>yapay zekâ destekli mülakat koçu</strong> sayesinde işe alım süreçlerinizi uçtan uca dijitalleştirir.
       </p>
       <table cellpadding="0" cellspacing="0" width="100%">
         <tr>
@@ -104,7 +104,7 @@ function buildInviteEmailHtml({ companyName = 'Clyro Talent' }, { inviteLink, ro
           </td>
           <td style="width:50%;vertical-align:top;padding:4px 0 4px 8px;">
             <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
-            <span style="color:#334155;font-size:13px;"> Otonom Mülakat Koçu</span>
+            <span style="color:#334155;font-size:13px;"> Yapay Zekâ Destekli Mülakat Koçu</span>
           </td>
         </tr>
         <tr>

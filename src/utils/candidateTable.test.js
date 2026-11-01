@@ -318,7 +318,7 @@ describe('buildExportRows', () => {
             'Aşama': 'Planlı Mülakat',
             'Kaynak': 'LinkedIn',
             'Kaynak Detayı': 'Sponsorlu',
-            'Otonom Tarama': 'Yapılmadı',
+            'Detaylı Analiz': 'Yapılmadı',
             'Doğrulama': 'Doğrulanmadı',
             'Sektör Uyumu': 'Ölçülemedi',
             'Ön Skor (İlk)': '',

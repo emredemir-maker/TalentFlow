@@ -26,6 +26,7 @@ import { doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp, collection, 
 import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
+import DetailedAnalysisConfirm from '../components/DetailedAnalysisConfirm';
 import CandidateAvatar from '../components/CandidateAvatar';
 import CandidateStory from '../components/flow/CandidateStory';
 import FlowTrace from '../components/flow/FlowTrace';
@@ -83,6 +84,8 @@ export default function CandidateProcessPage() {
     const [actionSuccess, setActionSuccess] = useState(null); // 'comment' | 'reject' | 'final' | 'stage'
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
     const [analyzingIds, setAnalyzingIds]       = useState(new Set());
+    // Detaylı analiz onayı bekleyen aday (kapsam + kaç detaylı analiz)
+    const [analysisConfirmFor, setAnalysisConfirmFor] = useState(null);
     const [analysisError, setAnalysisError]     = useState(null);
     const [isAddModalOpen, setIsAddModalOpen]   = useState(false);
     const [reparsingCareer, setReparsingCareer] = useState(false);
@@ -707,22 +710,35 @@ export default function CandidateProcessPage() {
         }
     };
 
-    const handleRunStarAnalysis = async (targetCandidate) => {
+    // Detaylı analiz HER ZAMAN onayla başlar: pencere kapsamı (yalnızca
+    // atanan pozisyon / diğer uygun pozisyonlar da) ve kaç detaylı analiz
+    // kullanılacağını gösterir. Mevcut analiz varsa yeniden üretileceği de
+    // orada söylenir (eskiden ayrı bir window.confirm'dü).
+    const openPositionsForAnalysis = useMemo(
+        () => (positions || []).filter(p => p.status === 'open'),
+        [positions]
+    );
+    const analysisConfirmCandidates = useMemo(
+        () => (analysisConfirmFor ? [analysisConfirmFor] : []),
+        [analysisConfirmFor]
+    );
+
+    const handleRunStarAnalysis = (targetCandidate) => {
         const c = targetCandidate || candidate;
         if (!c || analyzingIds.has(c.id)) return;
-
-        // Eski davranış: mevcut STAR analizi varsa buton SESSİZCE hiçbir şey
-        // yapmıyordu — kullanıcı "analiz çalışmıyor" sanıyordu. Artık yeniden
-        // analiz onaylatılır (eski/yanlış pozisyona yapılmış analizler de
-        // böylece tazelenebilir).
-        if (c.aiAnalysis?.starAnalysis) {
-            const ok = window.confirm(
-                `${c.name || 'Bu aday'} için mevcut bir otonom analiz var` +
-                (c.aiAnalysis?.analyzedForPosition ? ` ("${c.aiAnalysis.analyzedForPosition}" pozisyonu için)` : '') +
-                `.\nYeniden analiz edilsin mi? Mevcut analiz güncellenecek.`
-            );
-            if (!ok) return;
+        // Kanıt kontrolü pencereden ÖNCE: CV yokken "0 detaylı analiz" diyen
+        // bir pencere açmak yerine sebebi doğrudan söyle.
+        const cvBody = `${c.cvData || ''}${c.cvText || ''}`.trim();
+        if (cvBody.length < 40 && !(c.experiences?.length > 0)) {
+            setAnalysisError('CV metni bulunamadı — önce Bakım > "Eksik Profilleri Tamamla" çalıştır ya da adayın CV\'sini yeniden yükle.');
+            return;
         }
+        setAnalysisConfirmFor(c);
+    };
+
+    const runStarAnalysis = async (c, { includeOtherPositions = false } = {}) => {
+        setAnalysisConfirmFor(null);
+        if (!c || analyzingIds.has(c.id)) return;
 
         // Kanıt kontrolü: CV gövdesi ve deneyim listesi boşsa analiz boş
         // girdiyle çalışıp yanıltıcı düşük skor üretir — açık hata göster.
@@ -746,7 +762,7 @@ export default function CandidateProcessPage() {
             // yazmıyordu — bu yüzden adayın profilinden analiz tazelense bile
             // listedeki "Poz. Uyum" skoru ve pozisyon bazlı filtreler eski
             // değerde kalıyordu.
-            const result = await deepScanCandidate(c, openPositions, { allowUnrelatedFallback: false });
+            const result = await deepScanCandidate(c, openPositions, { allowUnrelatedFallback: false, includeOtherPositions });
 
             if (result.status === 'no_compatible_position') {
                 throw new Error(
@@ -1032,7 +1048,7 @@ export default function CandidateProcessPage() {
      *
      * Sonucu canlıda görüldü: meslek alanı "Veri/Analitik" tespit edilen bir
      * adayda altı açık ilanın altısı da "ayrı alan" sayıldı. Bu durumda
-     * otonom tarama hiçbir şey yapmıyor — analiz edilecek pozisyon listesi
+     * detaylı analiz hiçbir şey yapmıyor — analiz edilecek pozisyon listesi
      * `[assignedPos || bestMatch || compatiblePositions[0]]` ve üçü de boş.
      * Kullanıcı adayı ilerletemiyor, üstelik istediği ilana uyum %76.
      */
@@ -1332,15 +1348,15 @@ export default function CandidateProcessPage() {
                                                     <button
                                                         onClick={() => handleRunStarAnalysis(candidate)}
                                                         disabled={analyzingIds.has(candidate.id)}
-                                                        title="Bu aday için analizi güncel modelle yeniden çalıştır"
+                                                        title="Bu aday için detaylı analizi yeniden çalıştır — önce kaç detaylı analiz kullanılacağı gösterilir"
                                                         className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-n50 border border-n200 text-[11px] font-semibold text-n500 hover:border-brand-200 hover:text-brand hover:bg-brand-50 transition-colors disabled:opacity-50"
                                                     >
                                                         {analyzingIds.has(candidate.id)
                                                             ? <><Loader2 size={10} className="animate-spin" /> Analiz ediliyor…</>
-                                                            : <><RefreshCw size={10} /> Yeniden Analiz Et</>}
+                                                            : <><RefreshCw size={10} /> Detaylı analizi yenile</>}
                                                     </button>
                                                     <span className="text-[10px] text-n400 italic hidden sm:inline">
-                                                        Toplu yenileme için Sistem Taraması
+                                                        Toplu analiz için üstteki Detaylı analiz düğmesi
                                                     </span>
                                                 </div>
                                             )}
@@ -1417,7 +1433,7 @@ export default function CandidateProcessPage() {
                                                 <div className="w-12 h-12 rounded-[14px] bg-brand-50 border border-brand-100 flex items-center justify-center">
                                                     <Sparkles className="w-6 h-6 text-brand animate-pulse" />
                                                 </div>
-                                                <p className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">Otonom Ajan Analiz Ediyor…</p>
+                                                <p className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">Detaylı analiz yapılıyor…</p>
                                                 <div className="flex items-center gap-2 text-[10px] text-n400">
                                                     <span className="flex items-center gap-1"><Brain className="w-3 h-3 text-brand" /> Analyst</span>
                                                     <span className="text-n200">→</span>
@@ -1435,7 +1451,7 @@ export default function CandidateProcessPage() {
                                                 <div>
                                                     <p className="text-[11px] font-semibold text-n700 mb-1">STAR Analizi Henüz Yapılmadı</p>
                                                     <p className="text-[11px] text-n400 max-w-xs leading-relaxed">
-                                                        Adayın CV'si ve pozisyon gereksinimleri STAR metodolojisiyle otonom ajan sistemi üzerinden analiz edilecektir.
+                                                        Detaylı analiz yalnızca siz başlattığınızda çalışır: adayın CV'si, atandığı pozisyonun gereksinimleriyle STAR yöntemine göre karşılaştırılır.
                                                     </p>
                                                 </div>
                                                 <button
@@ -1444,7 +1460,7 @@ export default function CandidateProcessPage() {
                                                     className="flex items-center gap-2 px-6 py-2.5 rounded-md bg-brand hover:bg-brand-600 text-white font-semibold text-sm shadow-xl shadow-none transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
                                                 >
                                                     <Sparkles className="w-4 h-4" />
-                                                    Otonom Analizi Başlat
+                                                    Detaylı analizi başlat
                                                 </button>
                                             </div>
                                         )}
@@ -1773,11 +1789,11 @@ export default function CandidateProcessPage() {
                                                                                 BAYAT
                                                                             </span>
                                                                         )}
-                                                                        {/* Kullanıcının kararı görünür durur: otonom
+                                                                        {/* Kullanıcının kararı görünür durur: detaylı
                                                                             tarama da bu ilanı bağlayıcı sayıyor. */}
                                                                         {isAssigned && (
                                                                             <span
-                                                                                title="Bu adayı bu ilana sen atadın; otonom tarama da bu ilanı esas alır"
+                                                                                title="Bu adayı bu ilana sen atadın; detaylı analiz de bu ilanı esas alır"
                                                                                 className="shrink-0 inline-flex items-center gap-1 text-[7px] font-semibold px-1.5 py-0.5 bg-brand-50 text-brand border border-brand-100 rounded-full"
                                                                             >
                                                                                 <Target className="w-2 h-2" /> ATANDI
@@ -1809,7 +1825,7 @@ export default function CandidateProcessPage() {
                                                                     "hangi tarihte, güncel mi" görünür olmalı. */}
                                                                 <div className="shrink-0 self-start flex items-center gap-1.5">
                                                                     {/* ATAMA: adayın hangi ilan için düşünüldüğünü
-                                                                        SİSTEM değil kullanıcı söyler. Otonom tarama
+                                                                        SİSTEM değil kullanıcı söyler. Detaylı analiz
                                                                         atanan ilanı her zaman analiz kümesine alıyor
                                                                         (SystemScanner), bu yüzden meslek alanı
                                                                         filtresine takılan adaylar da ilerleyebiliyor. */}
@@ -1818,7 +1834,7 @@ export default function CandidateProcessPage() {
                                                                         disabled={Boolean(assigningId)}
                                                                         title={isAssigned
                                                                             ? 'Atamayı kaldır'
-                                                                            : 'Bu adayı bu ilana ata — otonom tarama da bu ilanı esas alır'}
+                                                                            : 'Bu adayı bu ilana ata — detaylı analiz de bu ilanı esas alır'}
                                                                         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:opacity-40 ${
                                                                             isAssigned
                                                                                 ? 'border-brand-100 bg-brand-50 text-brand hover:bg-brand-100'
@@ -1832,8 +1848,8 @@ export default function CandidateProcessPage() {
                                                                         onClick={() => evaluateForPosition(pos)}
                                                                         disabled={Boolean(evaluatingTitle)}
                                                                         title={match.isAi
-                                                                            ? 'Bu adayı bu ilana göre yeniden değerlendir (1 AI çağrısı)'
-                                                                            : 'Bu adayı bu ilana göre değerlendir (1 AI çağrısı)'}
+                                                                            ? 'Bu adayı bu ilana göre yeniden değerlendir — 1 detaylı analiz kullanır'
+                                                                            : 'Bu adayı bu ilana göre değerlendir — 1 detaylı analiz kullanır'}
                                                                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-n200 text-[11px] font-semibold uppercase tracking-[0.08em] text-n600 hover:border-brand-200 hover:text-brand transition-colors disabled:opacity-40"
                                                                     >
                                                                         {busy
@@ -1870,12 +1886,12 @@ export default function CandidateProcessPage() {
                                                         Bu pozisyonlar aday profiliyle farklı meslek alanında; otomatik eşleştirme önceliği almaz ama her biri ayrıca skorlanır.
                                                     </p>
                                                     {/* MESLEK ALANI BİR SEZGİ, KİLİT DEĞİL. Tespit yanılabilir
-                                                        ve yanıldığında aday hiçbir yere ilerleyemiyor: otonom
+                                                        ve yanıldığında aday hiçbir yere ilerleyemiyor: detaylı
                                                         tarama uyumlu pozisyon bulamayınca analiz edecek bir şey
                                                         bulamıyor. "Ata" bu kararı insana geri veriyor. */}
                                                     <p className="text-[10px] text-n400 mt-1 leading-relaxed">
                                                         Alan tespiti yanılmış olabilir. <strong>Ata</strong> derseniz bu ilan bağlayıcı
-                                                        olur: otonom tarama da onu esas alır ve aday uyumlu listeye taşınır.
+                                                        olur: detaylı analiz de onu esas alır ve aday uyumlu listeye taşınır.
                                                     </p>
                                                     <div className="space-y-1 mt-2">
                                                         {incompatible.map(({ position: pos, match }) => (
@@ -1894,7 +1910,7 @@ export default function CandidateProcessPage() {
                                                                 <button
                                                                     onClick={() => assignToPosition(pos)}
                                                                     disabled={Boolean(assigningId)}
-                                                                    title="Bu adayı bu ilana ata — alan tespitini ez, otonom tarama da bu ilanı esas alsın"
+                                                                    title="Bu adayı bu ilana ata — alan tespitini ez, detaylı analiz de bu ilanı esas alsın"
                                                                     className="shrink-0 ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-brand hover:text-brand disabled:opacity-40"
                                                                 >
                                                                     <Target className="w-2.5 h-2.5" /> ata
@@ -1902,6 +1918,7 @@ export default function CandidateProcessPage() {
                                                                 <button
                                                                     onClick={() => evaluateForPosition(pos)}
                                                                     disabled={Boolean(evaluatingTitle)}
+                                                                    title="Bu adayı bu ilana göre değerlendir — 1 detaylı analiz kullanır"
                                                                     className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-n400 hover:text-brand disabled:opacity-40"
                                                                 >
                                                                     {evaluatingTitle === pos.title ? 'değerlendiriliyor…' : 'değerlendir'}
@@ -3063,6 +3080,21 @@ export default function CandidateProcessPage() {
             )}
 
             <AddCandidateModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+            <DetailedAnalysisConfirm
+                isOpen={Boolean(analysisConfirmFor)}
+                candidates={analysisConfirmCandidates}
+                openPositions={openPositionsForAnalysis}
+                // Tekil akış alanına uymayan bir ilana kendiliğinden düşmez
+                allowUnrelatedFallback={false}
+                title={`Detaylı analiz — ${analysisConfirmFor?.name || 'aday'}`}
+                notes={[
+                    analysisConfirmFor?.aiAnalysis?.starAnalysis
+                        ? `Mevcut detaylı analiz${analysisConfirmFor.aiAnalysis.analyzedForPosition ? ` ("${analysisConfirmFor.aiAnalysis.analyzedForPosition}" pozisyonu için)` : ''} yeniden üretilip güncellenecek.`
+                        : '',
+                ]}
+                onCancel={() => setAnalysisConfirmFor(null)}
+                onConfirm={(opts) => runStarAnalysis(analysisConfirmFor, opts)}
+            />
 
         </div>
     );

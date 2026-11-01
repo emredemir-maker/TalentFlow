@@ -16,7 +16,13 @@ vi.mock('./matchService', () => ({
 }));
 
 const { analyzeCandidateMatch } = await import('./geminiService');
-const { deepScanCandidate, rescanCandidateForPosition } = await import('./scanService');
+const {
+    deepScanCandidate,
+    rescanCandidateForPosition,
+    planDetailedAnalysis,
+    countDetailedComparisons,
+    detailedAnalysisUsageText,
+} = await import('./scanService');
 
 const CANDIDATE = {
     id: 'c1',
@@ -72,7 +78,7 @@ describe('deepScanCandidate — teknik hata ayrımı', () => {
             .mockRejectedValueOnce(new Error('bozuk yanıt'))
             .mockResolvedValueOnce({ score: 72, summary: 'iyi' });
 
-        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
+        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false, includeOtherPositions: true });
 
         expect(out.status).toBe('scanned');
         expect(out.updates.aiScore).toBe(72);
@@ -170,7 +176,7 @@ describe('deepScanCandidate — sıfır puanlı sonuç', () => {
     it('saves the analyses instead of throwing the paid work away', async () => {
         analyzeCandidateMatch.mockResolvedValue(zeroResult);
 
-        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
+        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false, includeOtherPositions: true });
 
         expect(out.status).toBe('scanned');
         expect(out.updates.positionAnalyses['Growth Product Manager']).toBeTruthy();
@@ -180,7 +186,7 @@ describe('deepScanCandidate — sıfır puanlı sonuç', () => {
     it('tells the caller this was a measurement, not a misconfiguration', () => {
         // Arayüz doğru cümleyi ancak bu bayrakla kurabiliyor
         analyzeCandidateMatch.mockResolvedValue(zeroResult);
-        return deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false })
+        return deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false, includeOtherPositions: true })
             .then((out) => {
                 expect(out.noneScored).toBe(true);
                 expect(out.produced).toBe(2);
@@ -203,7 +209,7 @@ describe('deepScanCandidate — sıfır puanlı sonuç', () => {
             .mockResolvedValueOnce({ ...zeroResult, score: 0 })
             .mockResolvedValueOnce({ ...zeroResult, score: 42 });
 
-        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
+        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false, includeOtherPositions: true });
 
         expect(out.noneScored).toBe(false);
         expect(out.updates.matchedPositionTitle).toBe('Product Manager');
@@ -219,5 +225,95 @@ describe('deepScanCandidate — sıfır puanlı sonuç', () => {
 
         expect(out.status).toBe('analysis_failed');
         expect(out.noneScored).toBeUndefined();
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DETAYLI ANALİZ KOTASI — aday–pozisyon karşılaştırması başına.
+//
+// Emre'nin kararı: varsayılan olarak aday YALNIZCA atandığı pozisyonla
+// karşılaştırılır; "diğer uygun pozisyonlar" açık bir seçimdir ve kaç kota
+// düşeceği önceden gösterilir. Eskiden her tarama 6'ya kadar pozisyonu
+// (12 AI çağrısı) kendiliğinden analiz ediyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('planDetailedAnalysis — varsayılan tek pozisyon', () => {
+    const SIX = Array.from({ length: 7 }, (_, i) => ({ id: `p${i}`, title: `Pozisyon ${i}` }));
+
+    it('compares only the assigned position by default', () => {
+        const plan = planDetailedAnalysis({ ...CANDIDATE, positionId: 'p2' }, POSITIONS);
+        expect(plan.map((p) => p.id)).toEqual(['p2']);
+    });
+
+    it('falls back to the pre-analysis match when nothing is assigned', () => {
+        const plan = planDetailedAnalysis({ ...CANDIDATE, matchedPositionTitle: 'Product Manager' }, POSITIONS);
+        expect(plan.map((p) => p.id)).toEqual(['p2']);
+    });
+
+    it('uses one position even without assignment or match', () => {
+        expect(planDetailedAnalysis(CANDIDATE, POSITIONS)).toHaveLength(1);
+    });
+
+    it('adds other compatible positions only when asked, capped at 5 + assigned', () => {
+        const withOthers = planDetailedAnalysis({ ...CANDIDATE, positionId: 'p6' }, SIX, { includeOtherPositions: true });
+        // akıllı sınır 5 + atanan pozisyon (en iyi 5'in dışında kaldıysa)
+        expect(withOthers.length).toBeLessThanOrEqual(6);
+        expect(withOthers[0].id).toBe('p6');
+        expect(planDetailedAnalysis({ ...CANDIDATE, positionId: 'p6' }, SIX)).toHaveLength(1);
+    });
+
+    it('targeted scan analyses only the target position', () => {
+        const plan = planDetailedAnalysis(CANDIDATE, POSITIONS, { targetPosition: POSITIONS[1], includeOtherPositions: true });
+        expect(plan).toEqual([POSITIONS[1]]);
+    });
+
+    it('plans nothing for a candidate without CV evidence', () => {
+        expect(planDetailedAnalysis({ id: 'x', cvText: '' }, POSITIONS, { includeOtherPositions: true })).toEqual([]);
+    });
+
+    it('returns nothing when no compatible position and fallback is off', async () => {
+        const { filterPositionsByDomain } = await import('./matchService');
+        filterPositionsByDomain.mockReturnValueOnce([]);
+        expect(planDetailedAnalysis(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false })).toEqual([]);
+    });
+});
+
+describe('countDetailedComparisons — kota birimi', () => {
+    it('counts one per candidate by default, skipping candidates without CV', () => {
+        const pool = [CANDIDATE, { ...CANDIDATE, id: 'c3' }, { id: 'c4', cvText: '' }];
+        expect(countDetailedComparisons(pool, POSITIONS)).toBe(2);
+    });
+
+    it('counts every candidate–position pair when other positions are included', () => {
+        const pool = [CANDIDATE, { ...CANDIDATE, id: 'c3' }];
+        expect(countDetailedComparisons(pool, POSITIONS, { includeOtherPositions: true })).toBe(4);
+    });
+
+    it('matches what deepScanCandidate actually runs', async () => {
+        analyzeCandidateMatch.mockResolvedValue({ score: 60, summary: 's' });
+        const planned = countDetailedComparisons([CANDIDATE], POSITIONS, { allowUnrelatedFallback: false });
+        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
+        expect(analyzeCandidateMatch).toHaveBeenCalledTimes(planned);
+        expect(out.aiCalls).toBe(planned);
+    });
+
+    it('phrases the usage line the same way everywhere', () => {
+        expect(detailedAnalysisUsageText(4)).toBe('Bu işlem 4 detaylı analiz kullanır.');
+        expect(detailedAnalysisUsageText(0)).toBe('Bu işlem detaylı analiz kullanmaz.');
+    });
+});
+
+describe('deepScanCandidate — varsayılan tek karşılaştırma', () => {
+    it('runs exactly one comparison for an assigned candidate', async () => {
+        analyzeCandidateMatch.mockResolvedValue({ score: 70, summary: 's' });
+        const out = await deepScanCandidate({ ...CANDIDATE, positionId: 'p2' }, POSITIONS);
+        expect(analyzeCandidateMatch).toHaveBeenCalledTimes(1);
+        expect(Object.keys(out.updates.positionAnalyses)).toEqual(['Product Manager']);
+        expect(out.updates.matchedPositionTitle).toBe('Product Manager');
+    });
+
+    it('runs every compatible position only with includeOtherPositions', async () => {
+        analyzeCandidateMatch.mockResolvedValue({ score: 70, summary: 's' });
+        await deepScanCandidate(CANDIDATE, POSITIONS, { includeOtherPositions: true });
+        expect(analyzeCandidateMatch).toHaveBeenCalledTimes(2);
     });
 });

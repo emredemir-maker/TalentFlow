@@ -17,7 +17,7 @@ const STEPS = [
     { id: 'extraction', label: 'Veri Ayıklama', icon: Search, desc: 'CV ve LinkedIn verileri yapılandırılıyor...' },
     { id: 'semantic', label: 'Semantik Eşleşme', icon: Scale, desc: 'Yetenekler ve deneyim analizi yapılıyor...' },
     { id: 'risk', label: 'Risk Analizi', icon: ShieldAlert, desc: 'Eksik alanlar (Gap) kontrol ediliyor...' },
-    { id: 'decision', label: 'Otonom Karar', icon: CheckCircle2, desc: 'Aksiyon planı oluşturuldu.' },
+    { id: 'decision', label: 'Karar', icon: CheckCircle2, desc: 'Aksiyon planı oluşturuldu.' },
 ];
 
 export default function AgentThoughtPanel({ isProcessing, reasoning, decision }) {
@@ -104,7 +104,7 @@ export default function AgentThoughtPanel({ isProcessing, reasoning, decision })
                                 {step.id === 'decision' && !isProcessing && decision && (
                                     <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold animate-in slide-in-from-left-2">
                                         <Cpu className="w-3.5 h-3.5" />
-                                        <span>Otonom Karar: {decision}</span>
+                                        <span>Karar: {decision}</span>
                                     </div>
                                 )}
                             </div>

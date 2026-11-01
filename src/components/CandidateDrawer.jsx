@@ -12,10 +12,9 @@ import {
 } from 'lucide-react';
 import MatchScoreRing from './MatchScoreRing';
 import AIAnalysisPanel from './AIAnalysisPanel';
-import { analyzeCandidateMatch } from '../services/geminiService';
-import { rescanCandidateForPosition } from '../services/scanService';
-import { buildJobDescription, requirementsOf, requirementsFingerprint, isStaleFor } from '../utils/positionRequirements';
-import { COVERAGE_SCHEMA, usesCurrentRubric } from '../utils/coverageDetail';
+import { rescanCandidateForPosition, deepScanCandidate } from '../services/scanService';
+import { isStaleFor } from '../utils/positionRequirements';
+import { usesCurrentRubric } from '../utils/coverageDetail';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
@@ -217,75 +216,18 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 return;
             }
 
-            const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
-            let highestScore = -1;
-            let bestResult = null;
-            let bestTitle = null;
-
-            // Analyze all open positions in parallel
-            await Promise.all(openPositions.map(async (pos) => {
-                const descToUse = buildJobDescription(pos);
-                try {
-                    const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.5-flash', {
-                        requirements: requirementsOf(pos),
-                    });
-                    // DAMGA OLMADAN ANALİZ HANGİ LİSTEYE AİT BİLİNMEZ. Bu yol
-                    // damgayı hiç yazmıyordu: madde değerlendirmeleri madde
-                    // NUMARASINA bağlı olduğu için, ilan sonradan değişince
-                    // eski yargı yanlış maddeye yapışıyor ve kimse fark
-                    // etmiyordu. Pozisyonlar ekranındaki tarama zaten damgayı
-                    // yazıyor (services/scanService.js); iki yol aynı kaydı
-                    // üretmeli.
-                    updatedAnalyses[pos.title] = {
-                        ...result,
-                        requirementsFingerprint: requirementsFingerprint(pos),
-                        coverageSchema: COVERAGE_SCHEMA,
-                        analyzedAt: new Date().toISOString(),
-                    };
-
-                    if (result.score > highestScore) {
-                        highestScore = result.score;
-                        bestResult = result;
-                        bestTitle = pos.title;
-                    }
-                } catch (e) {
-                    console.error("AI Error for pos", pos.title, e);
-                }
-            }));
-
-            if (!bestResult) throw new Error("Aday hiçbir pozisyon için analiz edilemedi.");
-
-            setAiResult(bestResult);
-
-            // İşe alım uzmanının atadığı pozisyon bağlayıcı — "en iyi eşleşme"
-            // başlığı onu ezemez.
-            const assignedPos = candidate.positionId
-                ? openPositions.find(p => p.id === candidate.positionId) || null
-                : null;
-            const updates = {
-                aiAnalysis: bestResult, // keep backward compat
-                aiScore: bestResult.score,
-                matchedPositionTitle: assignedPos ? assignedPos.title : bestTitle,
-                summary: bestResult.summary,
-                positionAnalyses: updatedAnalyses,
-                lastScannedAt: new Date().toISOString()
-            };
-
-            // Rule: AI can only overwrite common matchScore in 'initial' stage
-            const currentStage = candidate.scoringStage || 'initial';
-            if (currentStage === 'initial') {
-                updates.matchScore = bestResult.score;
-                // initialAiScore BURADA EZİLİRDİ. Alanın adı "ilk skor" ama
-                // derin tarama üzerine yazınca "ilk" kalmıyordu: aday havuza
-                // girerken kaç almıştı sorusunun cevabı yok oluyordu. Toplu
-                // tarayıcı (SystemScanner) bu alana zaten dokunmuyor; iki yol
-                // aynı adayda farklı sonuç veriyordu — hangisiyle taradığınıza
-                // göre ön skorunuz duruyor ya da duruyordu.
-                //
-                // Ön skor ile derin skoru karşılaştırmak, ölçeğin şişip
-                // şişmediğini anlamanın TEK yolu. Bu alan artık giriş anına ait
-                // ve değişmiyor.
+            // Aday ekranı ve toplu tarama ile AYNI çekirdek. Bu yol eskiden
+            // TÜM açık pozisyonları paralel analiz ediyordu: on açık ilanda
+            // tek tıkla on detaylı analiz (yirmi AI çağrısı). Artık varsayılan
+            // olarak yalnızca atandığı pozisyonla karşılaştırılır.
+            const result = await deepScanCandidate(candidate, openPositions, { allowUnrelatedFallback: false });
+            if (result.status !== 'scanned') {
+                throw new Error(result.status === 'analysis_failed'
+                    ? (result.failures?.[0]?.message || 'AI çağrısı başarısız oldu.')
+                    : 'Aday için analiz edilecek uygun pozisyon bulunamadı.');
             }
+            setAiResult(result.updates.aiAnalysis);
+            const updates = result.updates;
 
             await updateCandidate(candidate.id, updates);
         } catch (err) {
@@ -647,7 +589,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         <div className="space-y-4">
                             <div className="flex justify-between items-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-lg mb-4 shadow-sm">
                                 <span className="text-xs font-semibold leading-relaxed max-w-[70%]">
-                                    * Aday mevcut özgeçmişiyle sistemdeki tüm açık pozisyonlarla karşılaştırılır. Detaylı analiz için pozisyona tıklayın.
+                                    * Yeniden analiz adayı yalnızca atandığı pozisyonla karşılaştırır (1 detaylı analiz). Başka bir pozisyon için o pozisyona tıklayın.
                                 </span>
                                 <button
                                     onClick={handleRunAnalysis}
