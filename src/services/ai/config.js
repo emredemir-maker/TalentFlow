@@ -61,6 +61,11 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
             // ancak bununla ayırt edebiliyor. Etiketsiz çağrılar 'other'a
             // düşer ve toplamı bozmaz, yalnızca kırılımdan kaybolur.
             if (options.label) body.label = options.label;
+            // Düşünme ayarı bir AD; değeri sunucu beyaz listeden seçiyor
+            // (functions/routes/ai.js THINKING_PRESETS).
+            if (options.thinking) body.thinking = options.thinking;
+            // Canlı mülakat etiketlerinde sunucu bu kimlikle saatlik kota tutuyor.
+            if (options.interviewId) body.interviewId = options.interviewId;
 
             // 502'yi Gemini degil, onundeki ag gecidi uretiyor: backend'in
             // kendi yeniden deneme dongusune istek hic ulasmiyor. Bu yuzden
@@ -74,7 +79,11 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `AI isteği başarısız: ${res.status}`);
+                const err = new Error(errData.error || `AI isteği başarısız: ${res.status}`);
+                // Çağıran "sınır doldu" ile "geçici hata"yı ayırabilsin diye.
+                err.status = res.status;
+                if (errData.code) err.code = errData.code;
+                throw err;
             }
 
             const { text } = await res.json();

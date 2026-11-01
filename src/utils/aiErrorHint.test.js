@@ -108,3 +108,11 @@ describe('günlük kurulum bütçesi', () => {
         expect(aiErrorHint('429 RESOURCE_EXHAUSTED quota exceeded').kind).toBe('quota');
     });
 });
+
+describe('canlı mülakat saatlik sınırı', () => {
+    it('is recognised and never retried — the bucket only resets on the hour', () => {
+        const body = '{"code":"INTERVIEW_AI_LIMIT","kind":"analysis","error":"Bu mülakat için saatlik canlı analiz sınırına ulaşıldı."}';
+        expect(aiErrorHint(body).kind).toBe('interview-limit');
+        expect(isRetryable(body)).toBe(false);
+    });
+});

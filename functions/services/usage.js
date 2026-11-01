@@ -34,6 +34,10 @@ export const LABELS = new Set([
     'interview-grade', // mülakat cevaplarının madde damgaları
     'interview-eval',  // mülakat gözlem metni
     'interview-plan',  // mülakat sorularının yazılması
+    // uygulama içi canlı mülakat: 3 dakikalık toplu STAR analizi (+ "Şimdi
+    // analiz et"). Mülakat başına saatte en çok 20 — bkz. interviewAiQuota.js
+    'interview-live',
+    'interview-followup', // canlı mülakatta takip sorusu düğmesi (saatte en çok 10)
     'requirement',     // ilan danışmanı / sözlük / normalleştirme
     'assistant',       // İK asistanı
     'grounded',        // Google aramalı yanıt

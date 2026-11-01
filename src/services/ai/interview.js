@@ -2,6 +2,7 @@
 import { getModel } from './config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
 import { stripPiiForAI } from '../../utils/pii.js';
+import { buildCompactProfile } from './compactProfile.js';
 
 // ─── PII Stripping ────────────────────────────────────────────────────────────
 // Delegate to the centralized pii.js utility so stripping logic is maintained
@@ -78,6 +79,65 @@ JSON formatında SADECE şu yapıda dön (başka hiçbir metin ekleme):
     }
 }
 
+// ─── Uygulama içi canlı mülakat: 3 dakikalık toplu analiz ────────────────────
+// LiveInterviewPage bunu 3 dakikada bir (ve "Şimdi analiz et" düğmesiyle)
+// çağırıyor; sıklık ve saatlik sınır src/utils/liveInterviewBudget.js'te.
+//
+// analyzeSTARRealTime'dan farkları, hepsi maliyet için:
+//   - Profil KOMPAKT (~800 token), tüm aday kaydı değil.
+//   - Çıktı tavanı 1024, düşünme düşük. Sunucu `interview-live` etiketinde
+//     bunları zaten zorluyor; burada da isteniyor ki niyet okunsun.
+//   - Önyargı tespiti YOK: anında, istemcide anahtar kelimeyle yapılıyor
+//     (src/utils/biasKeywords.js). 3 dakika gecikmeli uyarının değeri yok.
+//
+// Sınır dolduysa (sunucu 429 INTERVIEW_AI_LIMIT) hata FIRLATILIR: arayüz
+// düğmeyi kapatabilsin diye. Diğer hatalarda null döner.
+export const LIVE_CALL_OPTIONS = { maxOutputTokens: 1024, thinking: 'low' };
+
+export async function analyzeLiveWindow(compactProfile, windowTranscript, currentQuestion, { interviewId } = {}) {
+    const instruction = `Sen tarafsız bir mülakat gözlemcisisin. Son birkaç dakikanın konuşmasını STAR metodolojisini kullanarak 5 yetkinlik boyutunda değerlendir.
+
+ZORUNLU DEĞERLENDİRME KURALLARI:
+1. Yalnızca gözlemlenebilir DAVRANIŞLARI ve somut KANITları değerlendir.
+2. Cinsiyet, yaş, etnisite, aksanlı konuşma, isimleri veya kişisel özellikler hiçbir zaman puanlamayı ETKİLEMEZ.
+3. İletişim tarzı değil, içerik ve kanıt önemlidir.
+4. Aday yeterli bilgi vermemişse düşük puan VER, tahmin ETME.
+
+GÖREV:
+- ADAY satırlarını değerlendir; MÜLAKATÇI satırları yalnızca bağlamdır.
+- Puanları hedef pozisyon gereksinimleri ışığında yorumla.
+- Mülakatçıya kısa, eyleme geçirilebilir bir içgörü ve sonraki soru için somut bir öneri yaz (Türkçe).
+
+JSON formatında SADECE şu yapıda dön:
+{
+  "scores": { "technical": <0-100>, "communication": <0-100>, "problemSolving": <0-100>, "cultureFit": <0-100>, "adaptability": <0-100> },
+  "insight": "Tek cümle",
+  "suggestion": "Tek cümle"
+}`;
+
+    const prompt = buildStructuredPrompt(instruction, {
+        "ADAY_PROFİLİ": JSON.stringify(compactProfile || {}),
+        "GÜNCEL_SORU": currentQuestion || '(Mülakatçı tarafından sözlü soruldu)',
+        "PENCERE_KONUŞMALARI": JSON.stringify(
+            (windowTranscript || []).map(t => ({ rol: t.role === 'ADAY' ? 'ADAY' : 'MÜLAKATÇI', metin: t.text }))
+        ),
+    });
+
+    try {
+        const model = await getModel();
+        const result = await model.generateContent(prompt, {
+            ...LIVE_CALL_OPTIONS,
+            label: 'interview-live',
+            interviewId,
+        });
+        return parseAIJson(result.response.text(), null);
+    } catch (e) {
+        if (e?.code === 'INTERVIEW_AI_LIMIT') throw e;
+        console.error('[Canlı analiz]', e.message);
+        return null;
+    }
+}
+
 // ─── Existing Functions (PII stripped) ───────────────────────────────────────
 
 export async function generateInterviewQuestions(candidate, starAnalysis, interviewType = 'technical') {
@@ -100,8 +160,11 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
     }
 }
 
-export async function generateInterviewPaths(candidate, interviewType = 'technical') {
+export async function generateInterviewPaths(candidate, interviewType = 'technical', position = undefined) {
     const safe = stripPII(candidate);
+    // Soru planına da kompakt profil gidiyor; tüm aday kaydı (cvData dahil)
+    // birkaç bin token ve soru yazmak için gerekmiyor.
+    const compact = buildCompactProfile(candidate, position);
     const typeContexts = {
         technical: "Teknik Kültür / Mühendislik Lead personasıyla, mimari, derin teknik bilgi, problem çözme ve saha tecrübesine odaklan.",
         product: "Product Manager personasıyla, ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan.",
@@ -138,13 +201,13 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
     ÖNEMLİ: icon alanı "zap", "target", "users", "code", "brain", "activity" gibi Lucide ikon adları olabilir.`;
 
     const prompt = buildStructuredPrompt(instruction, {
-        "TARGET_POSITION": safe.matchedPositionTitle || safe.position,
-        "CANDIDATE_DATA": sanitizeForPrompt(JSON.stringify(safe))
+        "TARGET_POSITION": compact.targetPosition.title || safe.matchedPositionTitle || safe.position,
+        "CANDIDATE_DATA": sanitizeForPrompt(JSON.stringify(compact))
     });
 
     try {
         const model = await getModel();
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt, { label: 'interview-plan' });
         const parsed = parseAIJson(result.response.text(), { paths: [] });
         let paths = parsed.paths || (Array.isArray(parsed) ? parsed : []);
 
@@ -316,8 +379,13 @@ JSON formatında SADECE şu yapıda dön:
     }
 }
 
-export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen', category = null) {
-    const safe = stripPII(candidate);
+// Takip sorusu için yeterli bağlam: son birkaç konuşma. Tüm transkript bir
+// saatlik mülakatta binlerce token ve her düğme basışında yeniden gidiyordu.
+export const FOLLOWUP_HISTORY_LINES = 12;
+
+export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen', category = null, { interviewId, profile, position } = {}) {
+    // Kompakt profil (PII temizliği içinde) — çağıran hazırını verebilir.
+    const safe = profile || buildCompactProfile(candidate, position);
     const persona = interviewType === 'product' ? 'Product Manager' : (interviewType === 'culture' ? 'İK Direktörü' : 'Technical Lead');
 
     let modeInstruction = "";
@@ -351,18 +419,23 @@ ${BIAS_GUARDRAIL}
     const prompt = buildStructuredPrompt(instruction, {
         "CANDIDATE_PROFILE": JSON.stringify(safe),
         "CONVERSATION_HISTORY": JSON.stringify(
-            conversationHistory.map(t => ({ rol: t.role, metin: t.text }))
+            (conversationHistory || []).slice(-FOLLOWUP_HISTORY_LINES).map(t => ({ rol: t.role, metin: t.text }))
         )
     });
 
     try {
         const model = await getModel();
-        const result = await model.generateContent(prompt);
+        // Mülakat kimliği varsa canlı kota etiketiyle gider (saatte 10);
+        // yoksa (eski çağıranlar) eskisi gibi etiketsiz.
+        const result = await model.generateContent(prompt, interviewId
+            ? { ...LIVE_CALL_OPTIONS, label: 'interview-followup', interviewId }
+            : {});
         return parseAIJson(result.response.text(), {
             question: category ? `${category} ile ilgili bir deneyiminden bahseder misin?` : "Biraz daha detaylandırır mısın?",
             category: category || 'Genel'
         });
     } catch (e) {
+        if (e?.code === 'INTERVIEW_AI_LIMIT') throw e;
         console.error("Follow up error:", e);
         return {
             question: "Biraz daha detaylandırır mısın?",

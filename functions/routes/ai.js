@@ -3,7 +3,9 @@
 //
 //   POST /api/ai/generate   — generic prompt-in, text-out (with retry/backoff
 //                              on 429/503, configurable maxOutputTokens up to 32k,
-//                              optional text/plain mimeType for free-form answers)
+//                              optional text/plain mimeType for free-form answers,
+//                              optional whitelisted `thinking` preset; canlı mülakat
+//                              etiketleri mülakat başına saatlik kotaya tabi)
 //   POST /api/ai/stt        — base64 audio → transcript + emotion JSON
 //   POST /api/gemini-stt    — same as above but accepts multipart/form-data uploads
 //                              (LiveInterviewPage path) and base64 JSON
@@ -21,6 +23,7 @@ import { wrapMulter } from '../middleware/multipart.js';
 import { getApiKeyDetailed, generateText, generateGrounded } from '../services/gemini.js';
 import { childLogger } from '../services/logger.js';
 import { isAudioFallbackEnabled, requireAudioFallback } from '../services/audioFallback.js';
+import { consumeInterviewQuota, isValidInterviewId, LIVE_LABEL_KIND } from '../services/interviewAiQuota.js';
 const log = childLogger('ai');
 
 const require = createRequire(import.meta.url);
@@ -31,10 +34,57 @@ const router = Router();
 // verifyFirebaseToken: anonim oturumlar da geçer (başvuru formu ve canlı
 // mülakat adayı anon Firebase oturumuyla gelir) — ama tokensız dış çağrılar
 // (açık Gemini proxy kötüye kullanımı) 401 alır.
+// DÜŞÜNME AYARI YALNIZ BU LİSTEDEN. İstemci ham bir `thinkingConfig` nesnesi
+// gönderebilseydi bütçeyi istediği kadar büyütebilirdi; düşünme token'ları
+// çıktı fiyatından faturalanıyor. İstemci yalnızca bir ad seçer, değeri
+// sunucu belirler. Bilinmeyen ad yok sayılır (modelin varsayılanı kalır).
+export const THINKING_PRESETS = {
+    low: { thinkingBudget: 512 },
+};
+
+/** Beyaz listedeki ön ayarı döndürür; geri kalan her şey için undefined. */
+export function resolveThinkingConfig(raw) {
+    if (typeof raw !== 'string') return undefined;
+    return Object.prototype.hasOwnProperty.call(THINKING_PRESETS, raw) ? { ...THINKING_PRESETS[raw] } : undefined;
+}
+
+// Canlı mülakat çağrılarının çıktı tavanı. Kart güncellemesi kısa bir JSON;
+// istemci zaten 1024 istiyor ama tavan sunucuda da sabit — değiştirilmiş bir
+// istemci 32k isteyip saatte 20 pahalı çağrı yapamasın.
+export const LIVE_MAX_OUTPUT_TOKENS = 1024;
+
 router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res) => {
-    const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens, label } = req.body || {};
+    const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens, label, thinking, interviewId } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
+    }
+
+    // CANLI MÜLAKAT ETİKETLERİ KOTALI. Bkz. services/interviewAiQuota.js.
+    // Not: bu kota dürüst etiketli çağrıyı korur; etiketi değiştiren bir
+    // istemci genel frenlere (aiLimiter + bütçe freni) düşer.
+    const liveKind = typeof label === 'string' ? LIVE_LABEL_KIND[label] : undefined;
+    if (liveKind) {
+        // Canlı analiz mülakatçı ekranının işi; aday (anonim oturum) bu
+        // çağrıları yapmaz.
+        if (!req.authUser || req.authUser.provider === 'anonymous') {
+            return res.status(403).json({ error: 'Canlı analiz yalnızca mülakatçı oturumuyla yapılabilir.' });
+        }
+        if (!isValidInterviewId(interviewId)) {
+            return res.status(400).json({ error: 'interviewId gerekli' });
+        }
+        const quota = await consumeInterviewQuota({ interviewId, kind: liveKind });
+        if (!quota.allowed) {
+            if (quota.reason === 'not_found') {
+                return res.status(404).json({ error: 'Mülakat bulunamadı' });
+            }
+            return res.status(429).json({
+                code: 'INTERVIEW_AI_LIMIT',
+                kind: liveKind,
+                error: liveKind === 'analysis'
+                    ? 'Bu mülakat için saatlik canlı analiz sınırına ulaşıldı.'
+                    : 'Bu mülakat için saatlik takip sorusu sınırına ulaşıldı.',
+            });
+        }
     }
 
     const keyInfo = await getApiKeyDetailed();
@@ -49,7 +99,10 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
     // CV parsing and similar tasks return large structured JSON; default 8192
     // gives enough room while still capping run-away outputs. Caller may
     // override with an explicit `maxOutputTokens` field (clamped to 32k).
-    const tokenCap = Math.min(Math.max(parseInt(maxOutputTokens, 10) || 8192, 512), 32768);
+    const requestedCap = Math.min(Math.max(parseInt(maxOutputTokens, 10) || 8192, 512), 32768);
+    const tokenCap = liveKind ? Math.min(requestedCap, LIVE_MAX_OUTPUT_TOKENS) : requestedCap;
+    // Canlı çağrıda düşünme her zaman düşük; diğerlerinde istenirse.
+    const thinkingConfig = resolveThinkingConfig(liveKind ? 'low' : thinking);
 
     try {
         // generateText() handles retry/backoff (4 attempts on 429/503) and
@@ -66,6 +119,7 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
                 topK: responseMimeType === 'text/plain' ? 40 : 1,
                 maxOutputTokens: tokenCap,
                 responseMimeType,
+                ...(thinkingConfig ? { thinkingConfig } : {}),
             },
         });
         res.json({ text });
