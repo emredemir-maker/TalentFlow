@@ -96,7 +96,7 @@ describe('günlük kurulum bütçesi', () => {
     it('GOOGLE KOTASIYLA KARIŞTIRILMIYOR', () => {
         // Mesajın içinde "günlük" geçiyor ve kota kalıbına da uyabilirdi;
         // sıralama bu yüzden önemli.
-        expect(aiErrorHint(MESAJ).hint).toContain('Google kotanızla');
+        expect(aiErrorHint(MESAJ).hint).toContain('Google kotanla');
         expect(aiErrorHint(MESAJ).hint).not.toContain('planı yükselt');
     });
 
