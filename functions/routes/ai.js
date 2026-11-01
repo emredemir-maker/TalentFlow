@@ -8,6 +8,10 @@
 //   POST /api/gemini-stt    — same as above but accepts multipart/form-data uploads
 //                              (LiveInterviewPage path) and base64 JSON
 //                              (SettingsPage mic test path) interchangeably
+//   GET  /api/ai/stt-config — istemciye Gemini ses yedeğinin açık olup olmadığını söyler
+//
+// Ses kabul eden iki uç da requireAudioFallback arkasında: anahtar kapalıyken
+// (varsayılan) 403 döner ve Gemini'ye hiç gidilmez. Bkz. services/audioFallback.js.
 import { Router } from 'express';
 import { createRequire } from 'module';
 
@@ -16,6 +20,7 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { getApiKeyDetailed, generateText, generateGrounded } from '../services/gemini.js';
 import { childLogger } from '../services/logger.js';
+import { isAudioFallbackEnabled, requireAudioFallback } from '../services/audioFallback.js';
 const log = childLogger('ai');
 
 const require = createRequire(import.meta.url);
@@ -113,7 +118,14 @@ router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
     }
 });
 
-router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
+// İstemci, Web Speech olmayan tarayıcıda yedeği başlatmadan önce bunu sorar.
+// Kapalıysa "Bu özellik için Chrome kullanın" gösterir. Asıl koruma yine
+// sunucudadır: bu uç yalnızca gereksiz istekleri baştan önlemek için.
+router.get('/api/ai/stt-config', verifyFirebaseToken, (req, res) => {
+    res.json({ audioFallbackEnabled: isAudioFallbackEnabled() });
+});
+
+router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, requireAudioFallback, async (req, res) => {
     const { audio, mimeType = 'audio/webm' } = req.body || {};
     if (!audio || typeof audio !== 'string') {
         return res.status(400).json({ error: 'audio (base64) is required' });
@@ -136,7 +148,7 @@ router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
 // Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
-router.post('/api/gemini-stt', aiLimiter, verifyFirebaseToken, (req, res, next) => {
+router.post('/api/gemini-stt', aiLimiter, verifyFirebaseToken, requireAudioFallback, (req, res, next) => {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
         wrapMulter(audioUpload.single('audio'))(req, res, next);

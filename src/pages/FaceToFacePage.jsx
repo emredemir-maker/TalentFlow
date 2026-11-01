@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Mic, MicOff, Square, Play, ChevronLeft, Clock, Users, Code, Target,
     Sparkles, Brain, CheckCircle2, ArrowRight, Loader2, AlertCircle,
-    StickyNote, Volume2, Activity, Trophy, FileText
+    StickyNote, Volume2, Activity, Trophy, FileText, AlertTriangle
 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -15,6 +15,7 @@ import {
 import { doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getAuthHeaders } from '../services/ai/config';
+import { chooseSttEngine, fetchAudioFallbackEnabled, hasWebSpeech, STT_UNSUPPORTED_TITLE, STT_UNSUPPORTED_DETAIL } from '../utils/sttEngine';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -247,6 +248,21 @@ export default function FaceToFacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [transcript]);
 
+    // ── Gemini ses yedeği anahtarı ───────────────────────────────────────────
+    // Web Speech olmayan tarayıcıda pahalı yedek yalnız sunucuda açıksa
+    // (uygulama içi mülakat ek paketi). null = henüz öğrenilmedi. Chrome'da
+    // hiç sorulmaz. Bkz. utils/sttEngine.js, functions/services/audioFallback.js
+    const [audioFallbackEnabled, setAudioFallbackEnabled] = useState(null);
+    useEffect(() => {
+        if (hasWebSpeech() || audioFallbackEnabled !== null) return;
+        let cancelled = false;
+        fetchAudioFallbackEnabled(getAuthHeaders).then((value) => {
+            if (!cancelled && value !== null) setAudioFallbackEnabled(value);
+        });
+        return () => { cancelled = true; };
+    }, [audioFallbackEnabled, phase]);
+    const sttUnsupported = chooseSttEngine({ webSpeech: hasWebSpeech(), audioFallbackEnabled }) === 'unsupported';
+
     // ── STT engine ───────────────────────────────────────────────────────────
     const pushTranscriptEntry = useCallback((text) => {
         if (!text || text.trim().length < 3) return;
@@ -281,6 +297,7 @@ export default function FaceToFacePage() {
                 headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify({ audio: base64, mimeType: blob.type.split(';')[0] || 'audio/webm' }),
             });
+            if (res.status === 403) { setAudioFallbackEnabled(false); return; }
             if (!res.ok) return;
             const { text } = await res.json();
             pushTranscriptEntry(text);
@@ -306,8 +323,16 @@ export default function FaceToFacePage() {
         }
 
         const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const engine = chooseSttEngine({ webSpeech: Boolean(SpeechAPI), audioFallbackEnabled });
 
-        if (SpeechAPI) {
+        if (engine === 'pending' || engine === 'unsupported') {
+            // Yedek kapalı ya da durumu bilinmiyor: kayıt başlatılmaz; notlar,
+            // sorular ve bitirme akışı çalışmaya devam eder.
+            setIsRecording(false);
+            return;
+        }
+
+        if (engine === 'webspeech') {
             const recognition = new SpeechAPI();
             recognition.continuous = true;
             recognition.interimResults = false;
@@ -376,7 +401,7 @@ export default function FaceToFacePage() {
                 setIsRecording(false);
             };
         }
-    }, [phase, isMicOn, stream, pushTranscriptEntry, sendAudioChunk]);
+    }, [phase, isMicOn, stream, pushTranscriptEntry, sendAudioChunk, audioFallbackEnabled]);
 
     // ── start interview ──────────────────────────────────────────────────────
     const handleStart = async () => {
@@ -627,9 +652,18 @@ export default function FaceToFacePage() {
                                 />
                             ))}
                         </div>
-                        <p className="text-center text-[10px] text-white/30 mt-2 font-medium">
-                            {isMicOn ? (isRecording ? 'Ses algılanıyor · AI analiz ediyor' : 'Başlatılıyor…') : 'Mikrofon kapalı'}
-                        </p>
+                        {sttUnsupported ? (
+                            <div role="status" className="mt-2 flex flex-col items-center gap-0.5 text-center">
+                                <p className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300 m-0">
+                                    <AlertTriangle className="w-3.5 h-3.5" /> {STT_UNSUPPORTED_TITLE}
+                                </p>
+                                <p className="text-[10px] text-white/40 m-0">{STT_UNSUPPORTED_DETAIL}</p>
+                            </div>
+                        ) : (
+                            <p className="text-center text-[10px] text-white/30 mt-2 font-medium">
+                                {isMicOn ? (isRecording ? 'Ses algılanıyor · AI analiz ediyor' : 'Başlatılıyor…') : 'Mikrofon kapalı'}
+                            </p>
+                        )}
                     </div>
 
                     {/* Transcript */}

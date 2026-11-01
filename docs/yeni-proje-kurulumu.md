@@ -163,6 +163,16 @@ gerekirse: Google Hesabı → Güvenlik → **2 Adımlı Doğrulama** açık →
 | Variable | `FIREBASE_APP_ID`              | Web uygulaması yapılandırmasından (`1:<numara>:web:…`)    |
 | Variable | `FIREBASE_STORAGE_BUCKET`      | `agentinn-nyqpx.firebasestorage.app` (ya da `….appspot.com`) |
 | Variable | `APP_URL`                      | İsteğe bağlı; yalnızca özel alan adı bağlanırsa           |
+| Variable | `AUDIO_FALLBACK_ENABLED`       | İsteğe bağlı; boş = kapalı. Yalnız uygulama içi mülakat ek paketi alan müşteride `true` (aşağıya bak) |
+
+**Gemini ses yedeği (`AUDIO_FALLBACK_ENABLED`).** Uygulama içi mülakatta Chrome'un Web Speech'i ücretsiz
+çalışır. Web Speech olmayan tarayıcıda (ör. Firefox) ses 3 saniyelik parçalarla Gemini'ye gider: saatte ~1.200
+çağrı, katılımcı-saat başına kabaca +54–200 TL. Bu yüzden varsayılan **kapalı**; kapalıyken `/api/ai/stt` ve
+`/api/gemini-stt` 403 döner ve ekranda "Bu özellik için Chrome kullanın" görünür. Ek paketi alan müşteride açmak
+için: `Settings → Secrets and variables → Actions → Variables` altında `AUDIO_FALLBACK_ENABLED` = `true` ekle,
+ardından "Deploy to Firebase" iş akışını yeniden çalıştır (değer `functions/.env`'e yazılır). Kapatmak için
+değişkeni sil ya da `false` yap ve yeniden dağıt. Yerelde `functions/.env` içine `AUDIO_FALLBACK_ENABLED=true`.
+Şirket başına açma/kapama çok şirketli yapıya geçişte ek paket hakkından (`inAppInterviewAddon`) gelecek.
 
 Dağıtım, servis hesabı anahtarı başka projeye aitse kendini durduruyor. Anahtar dosyasını GitHub'a koyduktan sonra
 sil.
