@@ -1,5 +1,5 @@
 // src/pages/TechDocsPage.jsx
-// Talent-Inn — Teknik Dokümantasyon Sayfası
+// Clyro Talent — Teknik Dokümantasyon Sayfası
 
 import { useState } from 'react';
 import {
@@ -186,7 +186,7 @@ function ArchitectureSection() {
         <div>
             <SectionTitle>Genel Bakış</SectionTitle>
             <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                Talent-Inn, üç katmanlı bir mimari üzerine kurulmuştur. React 19 tabanlı tarayıcı uygulaması, tüm hassas işlemleri Express 5 backend'e devreder; backend ise Firebase Admin SDK ile Firestore'a güvenli erişim sağlar.
+                Clyro Talent, üç katmanlı bir mimari üzerine kurulmuştur. React 19 tabanlı tarayıcı uygulaması, tüm hassas işlemleri Express 5 backend'e devreder; backend ise Firebase Admin SDK ile Firestore'a güvenli erişim sağlar.
             </p>
             <CodeBlock lang="mimari">{`TARAYICI (React 19 + Vite 7)
   Context API ↔ Pages ↔ Components
@@ -823,7 +823,7 @@ function EmailSection() {
         <div>
             <SectionTitle>Genel Bakış</SectionTitle>
             <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                Talent-Inn iki farklı e-posta kanalı kullanır: sistem davetleri için Nodemailer (Gmail SMTP), mülakat yazışmaları için Gmail API (OAuth 2.0 — recruiter hesabı üzerinden). Tüm e-postalar branding nesnesiyle kişiselleştirilebilen HTML şablonlarıyla gönderilir.
+                Clyro Talent iki farklı e-posta kanalı kullanır: sistem davetleri için Nodemailer (Gmail SMTP), mülakat yazışmaları için Gmail API (OAuth 2.0 — recruiter hesabı üzerinden). Tüm e-postalar branding nesnesiyle kişiselleştirilebilen HTML şablonlarıyla gönderilir.
             </p>
             <Table
                 headers={['Kanal', 'Kullanım', 'Kimlik Doğrulama']}
@@ -849,7 +849,7 @@ function EmailSection() {
             <SectionTitle>Branding Nesnesi</SectionTitle>
             <CodeBlock lang="javascript">{`// Firestore: artifacts/talent-flow/public/data/settings/branding
 const branding = {
-    companyName: string,    // Şirket adı (fallback: 'Talent-Inn')
+    companyName: string,    // Şirket adı (fallback: 'Clyro Talent')
     logoUrl: string,        // Firebase Storage URL veya boş
     primaryColor: string,   // HEX — başlık arka planı ve buton rengi
     tagline: string,        // Slogan (başlık altında)
@@ -857,7 +857,7 @@ const branding = {
 };
 
 // Varsayılan (branding kayıtlı değilse):
-DEFAULT_BRANDING = { companyName: 'Talent-Inn', primaryColor: '#111312', ... }`}</CodeBlock>
+DEFAULT_BRANDING = { companyName: 'Clyro Talent', primaryColor: '#111312', ... }`}</CodeBlock>
 
             <SectionTitle>HTML Şablon Yapısı</SectionTitle>
             <CodeBlock lang="html">{`<!-- baseLayout() her şablona sarılır -->
@@ -1003,7 +1003,7 @@ export default function TechDocsPage() {
                         <Code2 className="w-3.5 h-3.5" /> Teknik Dokümantasyon
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-                        Talent-Inn — Sistem Kılavuzu
+                        Clyro Talent — Sistem Kılavuzu
                     </h1>
                     <p className="text-slate-500 text-sm leading-relaxed max-w-xl mx-auto">
                         Mimari, güvenlik prensipleri, API referansı, veri modeli ve deploy notları — geliştiriciler için kapsamlı teknik başvuru kaynağı.
@@ -1081,7 +1081,7 @@ export default function TechDocsPage() {
 
                 {/* Footer */}
                 <div className="text-center py-8 text-xs text-slate-400">
-                    Bu dokümantasyon Talent-Inn v2.0 ile günceldir. Mimari değişikliklerinde lütfen
+                    Bu dokümantasyon Clyro Talent v2.0 ile günceldir. Mimari değişikliklerinde lütfen
                     <span className="font-mono mx-1 text-violet-600">docs/TECHNICAL.md</span>
                     ve
                     <span className="font-mono mx-1 text-violet-600">replit.md</span>
