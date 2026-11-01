@@ -211,7 +211,7 @@ export default function SettingsPage({ initialTab }) {
     };
 
     const handleGoogleDisconnect = async () => {
-        if (!window.confirm("Google bağlantısını kesmek istediğinizden emin misiniz?")) return;
+        if (!window.confirm("Google bağlantısını kesmek istediğine emin misin?")) return;
         setIsConnectingGoogle(true);
         try {
             const res = await disconnectGoogleWorkspace();
@@ -236,7 +236,7 @@ export default function SettingsPage({ initialTab }) {
     };
 
     const handleMicrosoftDisconnect = async () => {
-        if (!window.confirm("Microsoft bağlantısını kesmek istediğinizden emin misiniz?")) return;
+        if (!window.confirm("Microsoft bağlantısını kesmek istediğine emin misin?")) return;
         setIsConnectingMicrosoft(true);
         try {
             const res = await disconnectMicrosoftWorkspace();
@@ -361,7 +361,7 @@ export default function SettingsPage({ initialTab }) {
                                             <div className="text-xs text-n400 mt-0.5">
                                                 {isGoogleConnected
                                                     ? <span>Bağlı: <span className="text-ok font-medium">{userProfile.integrations.google.email}</span></span>
-                                                    : 'Gmail ve Google Calendar ile entegre edin.'}
+                                                    : 'Gmail ve Google Calendar ile entegre et.'}
                                             </div>
                                         </div>
                                     </div>
@@ -397,7 +397,7 @@ export default function SettingsPage({ initialTab }) {
                                             <div className="text-xs text-n400 mt-0.5">
                                                 {isMicrosoftConnected
                                                     ? <span>Bağlı: <span className="text-ok font-medium">{userProfile.integrations.microsoft.email}</span></span>
-                                                    : 'Outlook ve Microsoft Teams ile entegre edin.'}
+                                                    : 'Outlook ve Microsoft Teams ile entegre et.'}
                                             </div>
                                         </div>
                                     </div>
@@ -446,7 +446,7 @@ export default function SettingsPage({ initialTab }) {
                                             type={showGeminiKey ? 'text' : 'password'}
                                             value={geminiKey}
                                             onChange={e => setGeminiKey(e.target.value)}
-                                            placeholder={hasSavedGeminiKey ? 'Yeni anahtar girin (mevcut anahtar güvenlik gereği görüntülenemez)' : 'AIzaSy...'}
+                                            placeholder={hasSavedGeminiKey ? 'Yeni anahtar gir (mevcut anahtar güvenlik gereği görüntülenemez)' : 'AIzaSy...'}
                                             className="w-full bg-n50 border border-n200 rounded-md px-4 py-2.5 pr-10 text-sm text-n700 font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 transition-all"
                                         />
                                         <button onClick={() => setShowGeminiKey(v => !v)}
@@ -455,7 +455,7 @@ export default function SettingsPage({ initialTab }) {
                                         </button>
                                     </div>
                                     <p className="text-xs text-n400">
-                                        Google AI Studio'dan ücretsiz alabilirsiniz.{' '}
+                                        Google AI Studio'dan ücretsiz alabilirsin.{' '}
                                         <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-brand hover:underline">Ücretsiz al →</a>
                                     </p>
                                     <button onClick={handleSaveGeminiKey} disabled={savingGeminiKey || !geminiKey.trim()}
@@ -477,7 +477,7 @@ export default function SettingsPage({ initialTab }) {
                                     </div>
                                     <div>
                                         <h2 className="text-sm font-semibold text-n900">Ses Tanıma Motoru Testi</h2>
-                                        <p className="text-xs text-n400">STT motorunun çalışırlığını doğrulayın</p>
+                                        <p className="text-xs text-n400">STT motorunun çalışırlığını doğrula</p>
                                     </div>
                                 </div>
                                 <div className="rounded-md border border-n200 p-3 bg-n50">
@@ -507,10 +507,10 @@ export default function SettingsPage({ initialTab }) {
                                                 </span>
                                             </div>
                                             <div className="text-[11px] text-n500 min-h-[18px]">
-                                                {sttStatus === 'idle' && 'Mikrofon butonuna basarak testi başlatın.'}
+                                                {sttStatus === 'idle' && 'Mikrofon butonuna basarak testi başlat.'}
                                                 {sttStatus === 'listening' && (
                                                     <span className="flex items-center gap-1 text-brand">
-                                                        Konuşun, dinliyorum
+                                                        Konuş, dinliyorum
                                                         <span className="animate-bounce inline-block" style={{ animationDelay: '0ms' }}>.</span>
                                                         <span className="animate-bounce inline-block" style={{ animationDelay: '150ms' }}>.</span>
                                                         <span className="animate-bounce inline-block" style={{ animationDelay: '300ms' }}>.</span>
@@ -570,7 +570,7 @@ export default function SettingsPage({ initialTab }) {
                                     )}
                                 </div>
                                 <p className="text-[11px] text-n400 mt-3">
-                                    Bu test, mülakatlarda kullanılan Gemini tabanlı ses tanıma motorunun cihazınızda düzgün çalışıp çalışmadığını doğrular.
+                                    Bu test, mülakatlarda kullanılan Gemini tabanlı ses tanıma motorunun cihazında düzgün çalışıp çalışmadığını doğrular.
                                 </p>
                             </div>
                         </div>
