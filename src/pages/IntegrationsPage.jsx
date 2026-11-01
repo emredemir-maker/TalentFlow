@@ -99,7 +99,7 @@ function ConfigField({ label, hint, value, onChange, type = 'text', mono = false
                         ${mono ? 'font-mono' : ''}
                         ${readOnly ? 'cursor-default text-slate-500 select-all' : 'focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 text-slate-700'}
                         ${(isSecret || copyable) ? 'pr-16' : 'pr-3.5'}`}
-                    placeholder={readOnly ? '' : (placeholder || `${label} girin...`)}
+                    placeholder={readOnly ? '' : (placeholder || `${label} gir...`)}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     {isSecret && (
@@ -328,7 +328,7 @@ export default function IntegrationsPage() {
     };
 
     const removeGoogle = async () => {
-        if (!window.confirm('Google Workspace yapılandırmasını silmek istediğinizden emin misiniz?')) return;
+        if (!window.confirm('Google Workspace yapılandırmasını silmek istediğine emin misin?')) return;
         try {
             await authFetch(`${API_PATH}/google`, { method: 'DELETE' });
             setGoog({ clientId: '', clientSecret: '', enabled: true });
@@ -373,7 +373,7 @@ export default function IntegrationsPage() {
     };
 
     const removeMicrosoft = async () => {
-        if (!window.confirm('Microsoft 365 yapılandırmasını silmek istediğinizden emin misiniz?')) return;
+        if (!window.confirm('Microsoft 365 yapılandırmasını silmek istediğine emin misin?')) return;
         try {
             await authFetch(`${API_PATH}/microsoft365`, { method: 'DELETE' });
             setMs({ clientId: '', tenantId: '', clientSecret: '', enabled: true });
@@ -412,7 +412,7 @@ export default function IntegrationsPage() {
                     </div>
                     <div>
                         <h1 className="text-sm font-bold text-slate-900 leading-none">Entegrasyon Merkezi</h1>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Dış servis bağlantılarını yönetin</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Dış servis bağlantılarını yönet</p>
                     </div>
                     <span className="ml-auto text-[10px] bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                         <Shield className="w-3 h-3" /> Süper Admin
@@ -428,7 +428,7 @@ export default function IntegrationsPage() {
                     <div>
                         <p className="text-xs font-bold text-blue-800 mb-0.5">Platform Bağımsız Yapılandırma</p>
                         <p className="text-xs text-blue-700 leading-relaxed">
-                            Her iki entegrasyon da kendi OAuth credentials'larınızla yapılandırılır. Bu sayede uygulamayı farklı bir sunucuya veya kuruluşa deploy ettiğinizde sadece bu panelden kimlik bilgilerini güncelleyerek çalışmaya devam eder.
+                            Her iki entegrasyon da kendi OAuth credentials'larınla yapılandırılır. Bu sayede uygulamayı farklı bir sunucuya ya da kuruluşa deploy ettiğinde sadece bu panelden kimlik bilgilerini güncelleyerek çalışmaya devam eder.
                         </p>
                     </div>
                 </div>
@@ -493,10 +493,10 @@ export default function IntegrationsPage() {
                                         </summary>
                                         <div className="mt-3 space-y-3 pl-5">
                                             <InfoBox type="info">
-                                                Bu uygulamayı <strong>farklı bir Firebase projesi veya kuruluşa</strong> deploy ederken kendi Google Cloud Console credentials'larınızı buraya girerek Firebase projesinden bağımsız hale getirebilirsiniz. Mevcut testi etkilemez.
+                                                Bu uygulamayı <strong>farklı bir Firebase projesi veya kuruluşa</strong> deploy ederken kendi Google Cloud Console credentials'larını buraya girerek Firebase projesinden bağımsız hâle getirebilirsin. Mevcut testi etkilemez.
                                             </InfoBox>
                                             <ConfigField
-                                                label="Redirect URI (Google Console'a kaydedin)"
+                                                label="Redirect URI (Google Console'a kaydet)"
                                                 value={googleRedirectUri}
                                                 readOnly={true}
                                                 mono={true}
@@ -555,7 +555,7 @@ export default function IntegrationsPage() {
                             configContent={
                                 <div className="space-y-4">
                                     <InfoBox type="info">
-                                        Microsoft Azure AD'de bir uygulama kaydı oluşturun ve aşağıdaki Redirect URI'yi "Yetkilendirme redirect URI'leri" listesine ekleyin.
+                                        Microsoft Azure AD'de bir uygulama kaydı oluştur ve aşağıdaki Redirect URI'yi "Yetkilendirme redirect URI'leri" listesine ekle.
                                     </InfoBox>
 
                                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
@@ -566,18 +566,18 @@ export default function IntegrationsPage() {
                                             accent="bg-slate-200 text-slate-600"
                                             steps={[
                                                 'Azure Portal → Microsoft Entra ID → Uygulama kayıtları',
-                                                '"Yeni kayıt" ile yeni bir uygulama oluşturun',
+                                                '"Yeni kayıt" ile yeni bir uygulama oluştur',
                                                 'Desteklenen hesap türleri: Herhangi bir kuruluş + kişisel hesaplar',
-                                                'Redirect URI olarak aşağıdaki URL\'yi Web türünde ekleyin',
-                                                'Gerekli API izinlerini ekleyin: User.Read, Calendars.ReadWrite, Mail.Send',
-                                                '"Sertifikalar ve Gizlilikler" bölümünden yeni bir Client Secret oluşturun',
+                                                'Redirect URI olarak aşağıdaki URL\'yi Web türünde ekle',
+                                                'Gerekli API izinlerini ekle: User.Read, Calendars.ReadWrite, Mail.Send',
+                                                '"Sertifikalar ve Gizlilikler" bölümünden yeni bir Client Secret oluştur',
                                             ]}
                                         />
                                     </div>
 
                                     <ConfigField
-                                        label="Redirect URI (Azure'a kaydedin)"
-                                        hint="Bu URL'yi Azure AD → Uygulamanız → Kimlik Doğrulama → Redirect URIs bölümüne ekleyin."
+                                        label="Redirect URI (Azure'a kaydet)"
+                                        hint="Bu URL'yi Azure AD → Uygulaman → Kimlik Doğrulama → Redirect URIs bölümüne ekle."
                                         value={msRedirectUri}
                                         readOnly={true}
                                         mono={true}
@@ -594,7 +594,7 @@ export default function IntegrationsPage() {
                                         />
                                         <ConfigField
                                             label="Directory (Tenant) ID"
-                                            hint="'common' yazabilirsiniz (tüm hesaplar) veya kuruluşunuza özgü Tenant ID girin."
+                                            hint="'common' yazabilirsin (tüm hesaplar) ya da kuruluşuna özgü Tenant ID gir."
                                             value={ms.tenantId}
                                             onChange={v => setMs(p => ({ ...p, tenantId: v }))}
                                             mono={true}
@@ -649,19 +649,19 @@ export default function IntegrationsPage() {
                             {
                                 icon: <SlackIcon size={22} />,
                                 name: 'Slack',
-                                desc: 'Mülakat bildirimleri ve aday güncellemelerini Slack kanalına gönderin.',
+                                desc: 'Mülakat bildirimleri ve aday güncellemelerini Slack kanalına gönder.',
                                 chips: ['Bildirimler', 'Botlar'],
                             },
                             {
                                 icon: <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center"><Users className="w-4 h-4 text-white" /></div>,
                                 name: 'LinkedIn',
-                                desc: 'Aday profillerini LinkedIn üzerinden otomatik içe aktarın.',
+                                desc: 'Aday profillerini LinkedIn üzerinden otomatik içe aktar.',
                                 chips: ['Aday Arama', 'Profil İçe Aktarma'],
                             },
                             {
                                 icon: <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center"><Globe className="w-4 h-4 text-white" /></div>,
                                 name: 'Greenhouse / Workday',
-                                desc: 'ATS çift yönlü entegrasyonu ile mevcut İK sistemlerinize bağlanın.',
+                                desc: 'ATS çift yönlü entegrasyonu ile mevcut İK sistemlerine bağlan.',
                                 chips: ['ATS Sync', 'Webhook'],
                             },
                         ].map((item, i) => (

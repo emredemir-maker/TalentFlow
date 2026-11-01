@@ -151,7 +151,7 @@ export default function FaceToFacePage() {
             setStream(s);
             return s;
         } catch (err) {
-            setMicError('Mikrofon erişimi reddedildi. Tarayıcı izinlerini kontrol edin.');
+            setMicError('Mikrofon erişimi reddedildi. Tarayıcı izinlerini kontrol et.');
             return null;
         }
     }, []);
@@ -543,7 +543,7 @@ export default function FaceToFacePage() {
                         </button>
                     </div>
 
-                    <p className="text-center text-xs text-white/20">Görüşme boyunca ses cihazınız kaydedilecek ve AI tarafından analiz edilecektir.</p>
+                    <p className="text-center text-xs text-white/20">Görüşme boyunca ses cihazın kaydedilecek ve AI tarafından analiz edilecektir.</p>
                 </div>
             </div>
         );
@@ -653,7 +653,7 @@ export default function FaceToFacePage() {
                                 <textarea
                                     value={manualNote}
                                     onChange={e => setManualNote(e.target.value)}
-                                    placeholder="Mülakata özel notlarınızı buraya yazın…"
+                                    placeholder="Mülakata özel notlarını buraya yaz…"
                                     rows={2}
                                     className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2 text-xs text-white/70 placeholder:text-white/20 resize-none focus:outline-none focus:border-amber-500/40"
                                 />

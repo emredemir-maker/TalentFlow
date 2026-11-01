@@ -504,7 +504,7 @@ export default function AnalyticsPage() {
     const openResponseModal = (msg) => setProcessingResponse({ message: msg, emailText: '', loading: false, result: null, checkingMail: false });
 
     const handleCheckEmail = async (msg) => {
-        if (!isGoogleConnected(userProfile)) { alert('Lütfen önce Google hesabınızı bağlayın (Ayarlar → Entegrasyonlar).'); return; }
+        if (!isGoogleConnected(userProfile)) { alert('Önce Google hesabını bağla (Ayarlar → Entegrasyonlar).'); return; }
         if (!msg.candidateEmail) { alert('Aday e-posta adresi bulunamadı.'); return; }
         setProcessingResponse({ message: msg, emailText: '', loading: false, result: null, checkingMail: true });
         try {
@@ -746,7 +746,7 @@ export default function AnalyticsPage() {
                                 ) : (
                                     <textarea
                                         className="w-full h-48 bg-n50 border border-n200 rounded-xl p-3 text-sm text-n900 outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 resize-none transition-all"
-                                        placeholder="Yanıtı buraya yapıştırın veya 'Mail Ara' butonuna tıklayın..."
+                                        placeholder="Yanıtı buraya yapıştır ya da 'Mail Ara' butonuna tıkla..."
                                         value={processingResponse.emailText}
                                         onChange={e => setProcessingResponse(prev => ({ ...prev, emailText: e.target.value }))}
                                     />

@@ -255,7 +255,7 @@ export default function InterviewReportPage() {
             if (!result) {
                 // Model çağrısı düştü ya da geçersiz yanıt döndü. Boş bırakmak
                 // "henüz analiz edilmedi" gibi okunuyordu.
-                setEvalUnavailable('Değerlendirme üretilemedi; tekrar deneyebilirsiniz.');
+                setEvalUnavailable('Değerlendirme üretilemedi; tekrar deneyebilirsin.');
             }
             if (result) {
                 setRecruiterEval(result);
@@ -672,7 +672,7 @@ export default function InterviewReportPage() {
                                             onChange={(e) => setRecruiterNotes(e.target.value)}
                                             rows={4}
                                             className="w-full bg-n50 border border-n200 rounded-md p-2.5 text-[11px] text-n800 leading-relaxed focus:outline-none focus:border-brand resize-none placeholder:text-n400"
-                                            placeholder="Kararınızı ve gerekçesini yazın…"
+                                            placeholder="Kararını ve gerekçesini yaz…"
                                         />
                                         <button
                                             onClick={handleSaveNotes}
