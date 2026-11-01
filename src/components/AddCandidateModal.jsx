@@ -134,7 +134,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                 if (elenen.length > 0) {
                     setError(
                         kalanKota() === 0
-                            ? `Demo hakkınız doldu (${DEMO_CV_LIMITI} CV). Sekmeyi yenileyerek yeniden başlayabilirsiniz.`
+                            ? `Demo hakkın doldu (${DEMO_CV_LIMITI} CV). Sekmeyi yenileyerek yeniden başlayabilirsin.`
                             : `Demoda oturum başına ${DEMO_CV_LIMITI} CV inceleniyor; ${elenen.length} dosya alınmadı.`
                     );
                 } else {
@@ -536,15 +536,15 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             {IS_DEMO && (
                                 <div className="rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-3">
                                     <p className="text-[11px] font-bold text-blue-900 m-0">
-                                        Demo — yüklediğiniz CV kaydedilmez
+                                        Demo — yüklediğin CV kaydedilmez
                                     </p>
                                     <p className="text-[10px] leading-relaxed text-blue-800/80 m-0 mt-1">
                                         Dosya hiçbir yere yüklenmiyor, havuza aday olarak yazılmıyor
                                         ve başka ziyaretçiler görmüyor. Yalnızca ayrıştırılıp açık
-                                        pozisyonlarla eşleştiriliyor; sonucu kapattığınızda veri
+                                        pozisyonlarla eşleştiriliyor; sonucu kapattığında veri
                                         ortadan kalkıyor.{' '}
                                         <strong className="font-bold">
-                                            Kalan hakkınız: {kalanHak}/{DEMO_CV_LIMITI} CV
+                                            Kalan hakkın: {kalanHak}/{DEMO_CV_LIMITI} CV
                                         </strong>
                                     </p>
                                 </div>
@@ -569,7 +569,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                 </div>
                                 <div>
                                     <p className="text-[12px] font-bold text-[#0F172A]">
-                                        {files.length > 0 ? `${files.length} Dosya Seçildi` : 'Dosyaları Seçin veya Sürükleyin'}
+                                        {files.length > 0 ? `${files.length} Dosya Seçildi` : 'Dosyaları Seç ya da Sürükle'}
                                     </p>
                                     <p className="text-[10px] text-slate-400 font-medium mt-0.5">PDF, DOCX · Maksimum 30MB/dosya</p>
                                 </div>
@@ -621,7 +621,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     {/* STEP 2: SOURCE */}
                     {!results && step === 2 && (
                         <div className="space-y-2">
-                            <p className="text-[11px] font-semibold text-slate-500 mb-4">Bu adayları nereden buldunuz?</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mb-4">Bu adayları nereden buldun?</p>
                             {SOURCES.map((s) => {
                                 const isActive = sourceType === s.id;
                                 return (
@@ -753,7 +753,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             <button
                                 onClick={() => {
                                     if (step === 1 && files.length === 0) {
-                                        setError('Lütfen en az bir dosya seçin.');
+                                        setError('En az bir dosya seç.');
                                         return;
                                     }
                                     setError(null);

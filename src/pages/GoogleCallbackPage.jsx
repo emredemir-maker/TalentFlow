@@ -37,7 +37,7 @@ export default function GoogleCallbackPage() {
             }
 
             try {
-                setMessage('Google hesabınız bağlanıyor...');
+                setMessage('Google hesabın bağlanıyor...');
                 const idToken = await user?.getIdToken();
                 const redirectUri = `${window.location.origin}/auth/google/callback`;
 
@@ -118,7 +118,7 @@ export default function GoogleCallbackPage() {
                     {status === 'error' && 'Bağlantı Başarısız'}
                 </h2>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                    {message || (status === 'loading' ? 'Google hesabınız doğrulanıyor...' : '')}
+                    {message || (status === 'loading' ? 'Google hesabın doğrulanıyor...' : '')}
                 </p>
                 {status !== 'loading' && (
                     <p className="text-[10px] text-slate-400 mt-3">Bu pencere otomatik kapanacak...</p>

@@ -184,7 +184,7 @@ export default function MessagesPage() {
     const handleCheckReplies = useCallback(async (thread) => {
         setCheckingThread(thread.id);
         try {
-            if (!isGoogleConnected(userProfile)) { alert('Google bağlantısı gerekli. Ayarlar → Sistem bölümünden bağlanın.'); return; }
+            if (!isGoogleConnected(userProfile)) { alert('Google bağlantısı gerekli. Ayarlar → Sistem bölümünden bağlan.'); return; }
             const result = await fetchEmailThread(thread.threadId);
             if (result.success) {
                 setThreadMessages(prev => ({ ...prev, [thread.threadId]: result.messages }));
@@ -315,7 +315,7 @@ export default function MessagesPage() {
                                 </div>
                                 <h3 className="text-lg font-semibold text-n700">Mesaj Yok</h3>
                                 <p className="text-sm text-n400 max-w-sm">
-                                    {filter !== 'all' ? 'Bu filtreye uygun mesaj bulunamadı.' : 'Henüz kuyrukta mesaj yok. Aday profilinden mesaj oluşturabilirsiniz.'}
+                                    {filter !== 'all' ? 'Bu filtreye uygun mesaj bulunamadı.' : 'Henüz kuyrukta mesaj yok. Aday profilinden mesaj oluşturabilirsin.'}
                                 </p>
                             </div>
                         )}
@@ -412,7 +412,7 @@ export default function MessagesPage() {
                             <AlertCircle className="w-4 h-4 text-warn shrink-0" />
                             <div className="flex-1">
                                 <p className="text-[12px] text-warn font-semibold">Gmail bağlantısı gerekli</p>
-                                <p className="text-[11px] text-warn/70 mt-0.5">E-posta yazışmalarını görmek için Gmail API erişimine izin verin.</p>
+                                <p className="text-[11px] text-warn/70 mt-0.5">E-posta yazışmalarını görmek için Gmail API erişimine izin ver.</p>
                             </div>
                             <button
                                 onClick={async () => {
@@ -456,7 +456,7 @@ export default function MessagesPage() {
                             </div>
                             <h3 className="text-lg font-semibold text-n700">E-posta Yok</h3>
                             <p className="text-sm text-n400 max-w-sm">
-                                Mülakat Yönetimi ekranından aday veya katılımcılara e-posta gönderdiğinizde burada görünür.
+                                Mülakat Yönetimi ekranından aday veya katılımcılara e-posta gönderdiğinde burada görünür.
                             </p>
                         </div>
                     )}
@@ -514,7 +514,7 @@ export default function MessagesPage() {
                                             <span className="text-[11px] text-n400 font-medium">
                                                 {msgs.length > 0
                                                     ? `${msgs.length} mesaj — ${replyCount > 0 ? `${replyCount} yanıt` : 'yanıt yok'}`
-                                                    : 'Yanıtları kontrol etmek için butona tıklayın'}
+                                                    : 'Yanıtları kontrol etmek için butona tıkla'}
                                             </span>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleCheckReplies(thread); }}
@@ -603,7 +603,7 @@ export default function MessagesPage() {
                                 <ClipboardList className="w-8 h-8 text-n400" />
                             </div>
                             <h3 className="text-lg font-semibold text-n700">Bilgi Talebi Yok</h3>
-                            <p className="text-sm text-n400 max-w-sm">Aday kartından "Mesaj Gönder → Bilgi İste" ile talep gönderdiğinizde burada görünür.</p>
+                            <p className="text-sm text-n400 max-w-sm">Aday kartından "Mesaj Gönder → Bilgi İste" ile talep gönderdiğinde burada görünür.</p>
                         </div>
                     )}
 
@@ -692,7 +692,7 @@ export default function MessagesPage() {
                                                     }
                                                     Yanıt Alındı
                                                 </button>
-                                                <span className="text-[10px] text-n300">Gelen kutunuzda yanıt gördüyseniz manuel olarak işaretleyebilirsiniz.</span>
+                                                <span className="text-[10px] text-n300">Gelen kutunda yanıt gördüysen elle işaretleyebilirsin.</span>
                                             </div>
                                         )}
                                     </div>

@@ -47,11 +47,11 @@ export default function HubLaunchPage() {
                 {error ? (
                     <>
                         <p className="text-slate-800">{error}</p>
-                        <p className="text-sm text-slate-500">Hub-Inn'den yeniden açabilir ya da buradan giriş yapabilirsiniz.</p>
+                        <p className="text-sm text-slate-500">Hub-Inn'den yeniden açabilir ya da buradan giriş yapabilirsin.</p>
                         <a href="/" className="text-sm text-indigo-600 underline">Giriş ekranına git</a>
                     </>
                 ) : (
-                    <p className="text-slate-500">Hub-Inn hesabınızla giriş yapılıyor…</p>
+                    <p className="text-slate-500">Hub-Inn hesabınla giriş yapılıyor…</p>
                 )}
             </div>
         </div>

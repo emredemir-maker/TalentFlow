@@ -483,7 +483,7 @@ export default function Dashboard() {
                 <div className="p-6">
                     <div className="tf-empty max-w-lg mx-auto" role="alert">
                         <div className="tf-empty-title">Veriler eşitlenemedi</div>
-                        Sayfayı yenileyin; sorun sürerse bağlantınızı kontrol edin.
+                        Sayfayı yenile; sorun sürerse bağlantını kontrol et.
                     </div>
                 </div>
             </div>
@@ -539,7 +539,7 @@ export default function Dashboard() {
                     <p className="m-0 mt-1.5 text-[14px] text-n600 tabular-nums">
                         {isLoading ? 'Havuz okunuyor…' : teamWaiting === 0
                             ? 'Ekipten adım bekleyen aday yok.'
-                            : `${teamWaiting} aday sizden bir adım bekliyor${
+                            : `${teamWaiting} aday senden bir adım bekliyor${
                                 longestWait && longestWait.days > 0 ? `; en uzun bekleyen ${longestWait.name}, ${longestWait.days} gündür` : ''
                             }.`}
                         {queues.offer.length > 0 && ` ${queues.offer.length} teklif adayın yanıtında.`}
@@ -802,7 +802,7 @@ export default function Dashboard() {
                     ))
                 ) : shownRows.length === 0 ? (
                     <div className="px-6 py-12 text-center text-[13px] text-n500">
-                        {poolFilter ? 'Bu aşamada aday yok.' : 'Havuzda aday yok. Yeni aday ekleyerek başlayın.'}
+                        {poolFilter ? 'Bu aşamada aday yok.' : 'Havuzda aday yok. Yeni aday ekleyerek başla.'}
                     </div>
                 ) : shownRows.map((r) => {
                     const action = rowActionFor(r.candidate);

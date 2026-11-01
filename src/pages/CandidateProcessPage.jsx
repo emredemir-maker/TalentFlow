@@ -507,7 +507,7 @@ export default function CandidateProcessPage() {
 
     const handleInfoRequestSend = async () => {
         if (!infoMessage.trim() && infoItems.length === 0) {
-            alert('Lütfen bir mesaj yazın veya talep edilecek bilgileri ekleyin.');
+            alert('Bir mesaj yaz ya da talep edilecek bilgileri ekle.');
             return;
         }
         if (!candidate?.email) { alert('Adayın email adresi bulunamadı.'); return; }
@@ -626,7 +626,7 @@ export default function CandidateProcessPage() {
                     );
                 }
                 if (bulkFiles.length > MAX_SOURCES) {
-                    throw new Error(`Tek seferde en fazla ${MAX_SOURCES} dosya seçilebilir (${bulkFiles.length} seçili). Bir ZIP içinde istediğiniz kadar CV olabilir.`);
+                    throw new Error(`Tek seferde en fazla ${MAX_SOURCES} dosya seçilebilir (${bulkFiles.length} seçili). Bir ZIP içinde istediğin kadar CV olabilir.`);
                 }
                 // Toplam CV sayısı arşiv açılana kadar bilinmiyor; uydurulmuş
                 // bir hedef yerine yükleme oranı gösterilir, sayıyı worker
@@ -728,7 +728,7 @@ export default function CandidateProcessPage() {
         // girdiyle çalışıp yanıltıcı düşük skor üretir — açık hata göster.
         const cvBody = `${c.cvData || ''}${c.cvText || ''}`.trim();
         if (cvBody.length < 40 && !(c.experiences?.length > 0)) {
-            setAnalysisError('CV metni bulunamadı — önce Bakım > "Eksik Profilleri Tamamla" çalıştırın ya da adayın CV\'sini yeniden yükleyin.');
+            setAnalysisError('CV metni bulunamadı — önce Bakım > "Eksik Profilleri Tamamla" çalıştır ya da adayın CV\'sini yeniden yükle.');
             return;
         }
 
@@ -737,7 +737,7 @@ export default function CandidateProcessPage() {
         try {
             const openPositions = positions?.filter(p => p.status === 'open') || [];
             if (openPositions.length === 0) {
-                throw new Error('Açık pozisyon yok. Önce bir pozisyon açın.');
+                throw new Error('Açık pozisyon yok. Önce bir pozisyon aç.');
             }
 
             // Toplu tarama ile AYNI çekirdek (scanService.deepScanCandidate).
@@ -750,11 +750,11 @@ export default function CandidateProcessPage() {
 
             if (result.status === 'no_compatible_position') {
                 throw new Error(
-                    'Bu adayın domain\'ine uygun açık pozisyon yok. Açık pozisyon ekleyin veya mevcut pozisyonların durumunu kontrol edin.'
+                    'Bu adayın domain\'ine uygun açık pozisyon yok. Açık pozisyon ekle ya da mevcut pozisyonların durumunu kontrol et.'
                 );
             }
             if (result.status === 'skipped_no_cv') {
-                throw new Error('CV metni bulunamadı — Bakım > "Eksik Profilleri Tamamla" çalıştırın.');
+                throw new Error('CV metni bulunamadı — Bakım > "Eksik Profilleri Tamamla" çalıştır.');
             }
             if (result.status === 'analysis_failed') {
                 // Teknik hata: CV'yi suçlamak yanlış yönlendiriyordu.
@@ -770,7 +770,7 @@ export default function CandidateProcessPage() {
             }
             if (result.status !== 'scanned') {
                 throw new Error(
-                    'Analiz hiçbir sonuç üretmedi. Adayın alanına uygun bir pozisyon açık mı, kontrol edin.'
+                    'Analiz hiçbir sonuç üretmedi. Adayın alanına uygun bir pozisyon açık mı, kontrol et.'
                 );
             }
 
@@ -787,14 +787,14 @@ export default function CandidateProcessPage() {
                 setAnalysisError(
                     'Analiz tamamlandı: aday açık ilanların hiçbirinde puan alamadı. ' +
                     'Madde bazlı değerlendirmeler kaydedildi — Pozisyon Eşleşmeleri sekmesinden ' +
-                    'hangi maddelerde eksik kaldığını görebilirsiniz.'
+                    'hangi maddelerde eksik kaldığını görebilirsin.'
                 );
                 return;
             }
             showSuccess('comment');
         } catch (err) {
             console.error('STAR Analysis error:', err);
-            setAnalysisError(err.message || 'Analiz sırasında bir hata oluştu. Tekrar deneyin.');
+            setAnalysisError(err.message || 'Analiz sırasında bir hata oluştu. Tekrar dene.');
         } finally {
             setAnalyzingIds(prev => {
                 const next = new Set(prev);
@@ -1514,7 +1514,7 @@ export default function CandidateProcessPage() {
                                                 candidate.aiAnalysis.analyzedForPosition !== candidate.matchedPositionTitle && (
                                                 <p className="mt-1.5 text-[10px] text-warn font-semibold flex items-center gap-1">
                                                     <AlertTriangle className="w-3 h-3 shrink-0" />
-                                                    Bu değerlendirme metni "{candidate.aiAnalysis.analyzedForPosition}" pozisyonu için üretilmiş eski bir analizdir; güncel eşleşme ({candidate.matchedPositionTitle}) için AI Analiz'i yeniden çalıştırın.
+                                                    Bu değerlendirme metni "{candidate.aiAnalysis.analyzedForPosition}" pozisyonu için üretilmiş eski bir analizdir; güncel eşleşme ({candidate.matchedPositionTitle}) için AI Analiz'i yeniden çalıştır.
                                                 </p>
                                             )}
                                             <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-n0 border border-n200 rounded-md text-[11px] font-semibold text-brand shadow-sm">
@@ -1777,7 +1777,7 @@ export default function CandidateProcessPage() {
                                                                             tarama da bu ilanı bağlayıcı sayıyor. */}
                                                                         {isAssigned && (
                                                                             <span
-                                                                                title="Bu adayı bu ilana siz atadınız; otonom tarama da bu ilanı esas alır"
+                                                                                title="Bu adayı bu ilana sen atadın; otonom tarama da bu ilanı esas alır"
                                                                                 className="shrink-0 inline-flex items-center gap-1 text-[7px] font-semibold px-1.5 py-0.5 bg-brand-50 text-brand border border-brand-100 rounded-full"
                                                                             >
                                                                                 <Target className="w-2 h-2" /> ATANDI
@@ -2414,7 +2414,7 @@ export default function CandidateProcessPage() {
                                     <Users className="w-12 h-12 mb-3 text-n300" />
                                     <h2 className="text-[12px] font-semibold text-n900 mb-1">Henüz aday yok</h2>
                                     <p className="text-[11px] text-n500 max-w-xs leading-relaxed mb-4">
-                                        CV yükleyerek ya da toplu yükleme ile başlayabilirsiniz.
+                                        CV yükleyerek ya da toplu yükleme ile başlayabilirsin.
                                     </p>
                                     <div className="flex items-center gap-2">
                                         <button
@@ -2436,7 +2436,7 @@ export default function CandidateProcessPage() {
                                     <Users className="w-12 h-12 mb-3 text-n300" />
                                     <h2 className="text-[12px] font-semibold text-n900 mb-1">Aday bulunamadı</h2>
                                     <p className="text-[11px] text-n500 max-w-xs leading-relaxed mb-4">
-                                        Aradığınız aday silinmiş ya da görme yetkiniz olmayabilir.
+                                        Aradığın aday silinmiş ya da görme yetkin olmayabilir.
                                     </p>
                                     <button
                                         onClick={() => setViewCandidateId(null)}
@@ -2482,7 +2482,7 @@ export default function CandidateProcessPage() {
                             <textarea
                                 value={commentText}
                                 onChange={e => setCommentText(e.target.value)}
-                                placeholder={`${candidate?.name} hakkında yorumunuzu yazın...`}
+                                placeholder={`${candidate?.name} hakkında yorumunu yaz...`}
                                 className="w-full h-28 bg-n50 border border-n200 rounded-md p-3 text-[11px] text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-0 resize-none transition-all"
                             />
                             <div className="flex gap-2 justify-end">
@@ -2522,7 +2522,7 @@ export default function CandidateProcessPage() {
                             <div className="bg-bad-bg rounded-md p-3 flex items-start gap-2">
                                 <AlertCircle className="w-4 h-4 text-bad shrink-0 mt-0.5" />
                                 <p className="text-[11px] text-bad leading-relaxed">
-                                    <span className="font-semibold">{candidate?.name}</span> adlı adayı süreçten çıkarmak üzeresiniz. Bu işlem Firestore'a kaydedilir.
+                                    <span className="font-semibold">{candidate?.name}</span> adlı adayı süreçten çıkarmak üzeresin. Bu işlem Firestore'a kaydedilir.
                                 </p>
                             </div>
                             <div>
@@ -2569,7 +2569,7 @@ export default function CandidateProcessPage() {
                                 </div>
                                 <p className="text-[11px] font-semibold text-n700 mb-1">{candidate?.name}</p>
                                 <p className="text-[11px] text-warn leading-relaxed">
-                                    Bu adayı final turuna taşımak istediğinizi onaylıyor musunuz? Durum Firestore'da güncellenecektir.
+                                    Bu adayı final turuna taşımak istediğini onaylıyor musun? Durum Firestore'da güncellenecektir.
                                 </p>
                             </div>
                             <div className="flex gap-2 justify-end">
@@ -2608,7 +2608,7 @@ export default function CandidateProcessPage() {
                                 </div>
                                 <p className="text-[11px] font-semibold text-n900 mb-1">{candidate?.name}</p>
                                 <p className="text-[11px] text-bad leading-relaxed">
-                                    Bu adayı kalıcı olarak silmek istediğinizi onaylıyor musunuz? Bu işlem geri alınamaz.
+                                    Bu adayı kalıcı olarak silmek istediğini onaylıyor musun? Bu işlem geri alınamaz.
                                 </p>
                             </div>
                             <div className="flex gap-2 justify-end">
@@ -2704,7 +2704,7 @@ export default function CandidateProcessPage() {
                                                 </button>
                                             </div>
                                             <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)}
-                                                placeholder="Adaya iletmek istediğiniz geri bildirimi yazın..."
+                                                placeholder="Adaya iletmek istediğin geri bildirimi yaz..."
                                                 rows={5}
                                                 className="w-full bg-n50 border border-n200 rounded-md p-3 text-[11px] text-n700 placeholder-n400 outline-none focus:border-brand resize-none transition-all"
                                             />
@@ -2725,9 +2725,9 @@ export default function CandidateProcessPage() {
                                 {msgTab === 'info' && (
                                     <div className="space-y-4 animate-in fade-in duration-200">
                                         <div>
-                                            <label className="text-[12px] font-medium text-n500 block mb-1.5">Mesajınız</label>
+                                            <label className="text-[12px] font-medium text-n500 block mb-1.5">Mesajın</label>
                                             <textarea value={infoMessage} onChange={e => setInfoMessage(e.target.value)}
-                                                placeholder="Adaya iletmek istediğiniz mesaj veya açıklama..."
+                                                placeholder="Adaya iletmek istediğin mesaj ya da açıklama..."
                                                 rows={4}
                                                 className="w-full bg-n50 border border-n200 rounded-md p-3 text-[11px] text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-0 resize-none transition-all"
                                             />
@@ -2835,9 +2835,9 @@ export default function CandidateProcessPage() {
                                                     }}
                                                 />
                                                 <Upload className="w-8 h-8 text-brand-200 mx-auto mb-2" />
-                                                <p className="text-[12px] font-semibold text-n500">Sürükleyin veya tıklayın</p>
+                                                <p className="text-[12px] font-semibold text-n500">Sürükle ya da tıkla</p>
                                                 <p className="text-[10px] text-n400 mt-1">PDF, DOCX veya ZIP (içinde PDF/DOCX) • Maks. {MAX_SOURCES} dosya, her biri {formatBytes(MAX_SOURCE_BYTES)}</p>
-                                                <p className="text-[10px] text-n400 mt-0.5">Bir ZIP&apos;in içinde kaç CV olduğu sınırlı değil — hepsini tek arşive koyabilirsiniz.</p>
+                                                <p className="text-[10px] text-n400 mt-0.5">Bir ZIP&apos;in içinde kaç CV olduğu sınırlı değil — hepsini tek arşive koyabilirsin.</p>
                                             </div>
 
                                             {bulkFiles.length > 0 && (
@@ -2882,7 +2882,7 @@ export default function CandidateProcessPage() {
 
                                     {bulkTab === 'json' && (
                                         <div className="space-y-2">
-                                            <p className="text-[10px] text-n400">Şu formatta bir JSON dizisi yapıştırın:</p>
+                                            <p className="text-[10px] text-n400">Şu formatta bir JSON dizisi yapıştır:</p>
                                             <pre className="text-[11px] text-n400 bg-n50 rounded-md px-3 py-2 border border-n200 overflow-x-auto">{`[{"name":"Ali Veli","email":"ali@sirket.com","cvText":"..."}]`}</pre>
                                             <textarea
                                                 value={bulkJsonText}
@@ -2902,7 +2902,7 @@ export default function CandidateProcessPage() {
                                             onChange={e => setBulkPositionId(e.target.value)}
                                             className="w-full bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-brand-200 transition-all"
                                         >
-                                            <option value="">— Pozisyon seçin —</option>
+                                            <option value="">— Pozisyon seç —</option>
                                             {positions.filter(p => p.status === 'open').map(p => (
                                                 <option key={p.id} value={p.id}>{p.title}</option>
                                             ))}
@@ -2910,7 +2910,7 @@ export default function CandidateProcessPage() {
                                         {!bulkPositionId && (
                                             <p className="mt-1.5 text-[10px] text-warn font-semibold flex items-start gap-1">
                                                 <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                                                Pozisyon seçilmezse adaylar genel havuza alınır ve sizin belirlediğiniz bir pozisyona göre puanlanmaz — sistem en uygun açık pozisyonu kendisi seçer.
+                                                Pozisyon seçilmezse adaylar genel havuza alınır ve senin belirlediğin bir pozisyona göre puanlanmaz — sistem en uygun açık pozisyonu kendisi seçer.
                                             </p>
                                         )}
                                     </div>
@@ -3011,7 +3011,7 @@ export default function CandidateProcessPage() {
                                             <span>
                                                 {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed - (bulkProgress.duplicates || 0)} başarılı${bulkProgress.duplicates > 0 ? `, ${bulkProgress.duplicates} mükerrer atlandı` : ''}${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
                                                  bulkProgress.status === 'error' ? (bulkProgress.errorMessage || 'İşlem hatası oluştu') :
-                                                 bulkProgress.status === 'uploading' ? 'Dosyalar yükleniyor — sekmeyi kapatmayın' :
+                                                 bulkProgress.status === 'uploading' ? 'Dosyalar yükleniyor — sekmeyi kapatma' :
                                                  // Toplam büyürken gösterilir: sayı henüz kesin değil.
                                                  bulkProgress.status === 'unpacking' ? `Arşiv açılıyor — ${bulkProgress.total} CV bulundu` :
                                                  bulkProgress.status === 'processing' ? `İşleniyor… ${bulkProgress.completed + bulkProgress.failed}/${bulkProgress.total}` :

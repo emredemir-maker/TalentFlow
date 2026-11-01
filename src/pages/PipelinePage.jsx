@@ -215,7 +215,7 @@ function CandidateListView({ rows, selectedId, onSelect, onOpen }) {
         return (
             <div className="tf-empty">
                 <div className="tf-empty-title">Aday bulunamadı</div>
-                Arama kutusunu temizleyerek tüm adayları görebilirsiniz.
+                Arama kutusunu temizleyerek tüm adayları görebilirsin.
             </div>
         );
     }
@@ -587,10 +587,10 @@ export default function PipelinePage() {
                         {!selected ? (
                             <div className="tf-empty">
                                 <MousePointerClick className="w-5 h-5 text-n400 mx-auto mb-2" aria-hidden="true" />
-                                <div className="tf-empty-title">Bir aday seçin</div>
+                                <div className="tf-empty-title">Bir aday seç</div>
                                 <p className="text-[13px] leading-[1.5] text-n500 m-0">
-                                    Karttan seçtiğiniz adayın aşamasını buradan taşıyabilir, mülakat planlayabilir
-                                    veya süreçten çıkarabilirsiniz.
+                                    Karttan seçtiğin adayın aşamasını buradan taşıyabilir, mülakat planlayabilir
+                                    ya da süreçten çıkarabilirsin.
                                 </p>
                             </div>
                         ) : (
@@ -704,7 +704,7 @@ export default function PipelinePage() {
                                 <p className="text-[13px] font-semibold text-n600">Mülakat bulunamadı</p>
                                 <p className="text-[13px] mt-1">
                                     {allInterviews.length === 0
-                                        ? 'Henüz hiç mülakat planlanmamış. Mülakat yönetiminden yeni mülakat ekleyebilirsiniz.'
+                                        ? 'Henüz hiç mülakat planlanmamış. Mülakat yönetiminden yeni mülakat ekleyebilirsin.'
                                         : 'Bu filtreye uygun mülakat yok.'}
                                 </p>
                                 {allInterviews.length === 0 && (

@@ -180,7 +180,7 @@ const SELECT_CLS = 'h-8 text-[12px] border border-n200 rounded-full bg-n0 pl-3 p
 const BULK_TYPES = {
     stage:      { title: 'Toplu Aşama Değişikliği',   icon: Layers,    warn: (n) => `Seçili ${n} adayın aşaması topluca değiştirilecek.` },
     source:     { title: 'Toplu Kaynak Değişikliği',  icon: Share2,    warn: (n) => `Seçili ${n} adayın kaynak bilgisi topluca değiştirilecek.` },
-    department: { title: 'Departmana Aç',             icon: Building2, warn: (n) => `Seçili ${n} aday, seçeceğiniz departmanın kullanıcılarına görünür olacak.` },
+    department: { title: 'Departmana Aç',             icon: Building2, warn: (n) => `Seçili ${n} aday, seçeceğin departmanın kullanıcılarına görünür olacak.` },
 };
 
 function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
@@ -257,7 +257,7 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
                     sources === null ? (
                         <div className="flex items-center gap-2 text-n400 text-[11px] py-3"><Loader2 className="w-4 h-4 animate-spin" /> Kaynaklar yükleniyor…</div>
                     ) : sources.length === 0 ? (
-                        <p className="text-[11px] text-n400 py-3">Tanımlı kaynak yok — Kaynak Yönetimi sayfasından ekleyebilirsiniz.</p>
+                        <p className="text-[11px] text-n400 py-3">Tanımlı kaynak yok — Kaynak Yönetimi sayfasından ekleyebilirsin.</p>
                     ) : (
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
@@ -289,7 +289,7 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
                     departments === null ? (
                         <div className="flex items-center gap-2 text-n400 text-[11px] py-3"><Loader2 className="w-4 h-4 animate-spin" /> Departmanlar yükleniyor…</div>
                     ) : departments.length === 0 ? (
-                        <p className="text-[11px] text-n400 py-3">Tanımlı departman yok — Departman Yönetimi sayfasından ekleyebilirsiniz.</p>
+                        <p className="text-[11px] text-n400 py-3">Tanımlı departman yok — Departman Yönetimi sayfasından ekleyebilirsin.</p>
                     ) : (
                         <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
                             {departments.map((d) => (
@@ -581,7 +581,7 @@ export default function CandidatesTablePage() {
             + 'Her aday bir AI çağrısı demek; işlem birkaç dakika sürebilir.'
             + (skipped > 0 ? `
 
-Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabilirsiniz.` : '')
+Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabilirsin.` : '')
         );
         if (!ok) return;
 
@@ -907,11 +907,11 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                             anahtar kelime ya da başka bir pozisyonun analizinden geliyor ve
                             diğerleriyle doğrudan karşılaştırılamaz.
                             {selectedIds.size > 0 && (
-                                <> Seçiminizde bunlardan <strong>{alignTargets.length}</strong> tanesi var.</>
+                                <> Seçiminde bunlardan <strong>{alignTargets.length}</strong> tanesi var.</>
                             )}
                             {selectedIds.size === 0 && unalignedRows.length > MAX_ALIGN && (
                                 <> Tek turda en fazla <strong>{MAX_ALIGN}</strong> tanesi taranır —
-                                aday seçerek daraltabilirsiniz.</>
+                                aday seçerek daraltabilirsin.</>
                             )}
                         </span>
                         <button
@@ -951,7 +951,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                 <button
                                     onClick={() => setEvalModalOpen(true)}
                                     disabled={Boolean(scanProgress)}
-                                    title="Seçili adayları uyum analizi ve detay linkleriyle iş arkadaşlarınıza e-postalayın (kendi hesabınızdan)"
+                                    title="Seçili adayları uyum analizi ve detay linkleriyle iş arkadaşlarına e-postala (kendi hesabından)"
                                     className="flex items-center gap-1.5 h-8 text-[12px] font-medium bg-n0/10 hover:bg-n0/20 disabled:opacity-60 px-3 rounded-full transition-colors"
                                 >
                                     <Mail className="w-3.5 h-3.5" /> Değerlendirmeye gönder
@@ -1135,7 +1135,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                             ) : (
                                                 <span
                                                     className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-warn-text bg-warn-bg border border-transparent whitespace-nowrap"
-                                                    title="Henüz otonom tarama yapılmadı — seçip 'Otonom tarama' ile başlatabilirsiniz"
+                                                    title="Henüz otonom tarama yapılmadı — seçip 'Otonom tarama' ile başlatabilirsin"
                                                 >
                                                     Taranmadı
                                                 </span>

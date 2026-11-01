@@ -359,7 +359,7 @@ export default function LoginPage() {
                                 background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px',
                                 padding: '10px 12px', fontSize: '12px', color: '#1E40AF', lineHeight: 1.5,
                             }}>
-                                Demo hesabı hazır — <strong>Sisteme Giriş Yap</strong>'a basmanız yeterli.
+                                Demo hesabı hazır — <strong>Sisteme Giriş Yap</strong>'a basman yeterli.
                             </div>
                         )}
 

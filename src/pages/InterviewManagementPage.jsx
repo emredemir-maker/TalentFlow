@@ -695,7 +695,7 @@ export default function InterviewManagementPage() {
     const handleAutoPlan = async () => {
         if (!selectedCandidate) return;
         if (!isGoogleConnected) {
-            alert("Lütfen önce takviminizi senkronize edin.");
+            alert("Önce takvimini senkronize et.");
             return;
         }
 
@@ -710,7 +710,7 @@ export default function InterviewManagementPage() {
             // Jeton sunucuda tutulup gerekirse orada yenileniyor; burada yalnızca
             // bağlantının varlığına bakılıyor.
             if (!isGoogleConnected) {
-                alert("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
+                alert("Google bağlantısı kurulamadı. Ayarlar → Sistem bölümünden yeniden bağlan.");
                 return;
             }
             
@@ -853,11 +853,11 @@ export default function InterviewManagementPage() {
 
     const openEmailPreview = () => {
         if (!selectedCandidate) {
-            alert("Lütfen önce bir aday seçin.");
+            alert("Önce bir aday seç.");
             return;
         }
         if (!isGoogleConnected) {
-            alert("Lütfen önce Google hesabınızı bağlayın.");
+            alert("Önce Google hesabını bağla.");
             return;
         }
 
@@ -874,7 +874,7 @@ export default function InterviewManagementPage() {
         setIsSendingEmail(true);
         try {
             if (!isGoogleConnected) {
-                throw new Error("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
+                throw new Error("Google bağlantısı kurulamadı. Ayarlar → Sistem bölümünden yeniden bağlan.");
             }
 
             const { html: htmlBody } = await getInviteEmail(branding, {
@@ -957,8 +957,8 @@ export default function InterviewManagementPage() {
     const addExternalParticipant = () => {
         const email = externalEmail.trim().toLowerCase();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!email) { setExternalEmailError('E-posta adresi girin.'); return; }
-        if (!emailRegex.test(email)) { setExternalEmailError('Geçerli bir e-posta adresi girin.'); return; }
+        if (!email) { setExternalEmailError('E-posta adresi gir.'); return; }
+        if (!emailRegex.test(email)) { setExternalEmailError('Geçerli bir e-posta adresi gir.'); return; }
         const extId = `external_${email}`;
         if (selectedParticipants.some(p => p.id === extId)) {
             setExternalEmailError('Bu e-posta zaten eklendi.'); return;
@@ -1456,7 +1456,7 @@ export default function InterviewManagementPage() {
     };
 
     const handleDeleteSession = async (candidateId, sessionId) => {
-        if (!window.confirm("Bu mülakat seansını silmek istediğinize emin misiniz?")) return;
+        if (!window.confirm("Bu mülakat seansını silmek istediğine emin misin?")) return;
         
         const candidate = enrichedCandidates.find(c => c.id === candidateId);
         if (!candidate) return;
@@ -1644,7 +1644,7 @@ export default function InterviewManagementPage() {
                         <button
                             onClick={sonucGirilebilir && gecti ? sonucGir : openSession}
                             title={sonucGirilebilir && gecti
-                                ? 'Görüşme yapıldıysa sonucunu buradan girin — başka bir uygulamada yapılmış olabilir'
+                                ? 'Görüşme yapıldıysa sonucunu buradan gir — başka bir uygulamada yapılmış olabilir'
                                 : undefined}
                             className={`tf-btn h-8 ${
                                 isLive
@@ -1716,7 +1716,7 @@ export default function InterviewManagementPage() {
                                         <button
                                             onClick={async () => {
                                                 setOpenMenuId(null);
-                                                if (window.confirm('Bu mülakatı iptal etmek istediğinize emin misiniz?')) {
+                                                if (window.confirm('Bu mülakatı iptal etmek istediğine emin misin?')) {
                                                     await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'cancelled');
                                                 }
                                             }}
@@ -1882,7 +1882,7 @@ export default function InterviewManagementPage() {
                         </button>
                         <div>
                             <h1 className="text-xl font-semibold text-n900">Yeni Mülakat Planla</h1>
-                            <p className="text-xs text-n500 mt-0.5 font-medium">4 adımda tamamlayın</p>
+                            <p className="text-xs text-n500 mt-0.5 font-medium">4 adımda tamamla</p>
                         </div>
                         {(wizardStep >= 2) && selectedCandidate && manualDate && (
                             <div className="ml-auto text-xs text-n500 bg-n0 border border-n200 rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm">
@@ -1942,7 +1942,7 @@ export default function InterviewManagementPage() {
                                             onChange={e => setWizardPosition(openPositions.find(p => p.id === e.target.value) || null)}
                                             className="w-full border border-n200 rounded-md px-3 py-2.5 text-[12px] text-n900 outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 bg-n0"
                                         >
-                                            <option value="">Pozisyon seçin...</option>
+                                            <option value="">Pozisyon seç...</option>
                                             {openPositions.map(p => (
                                                 <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
                                             ))}
@@ -1950,7 +1950,7 @@ export default function InterviewManagementPage() {
                                     ) : (
                                         <input
                                             type="text"
-                                            placeholder="Pozisyon adı girin..."
+                                            placeholder="Pozisyon adı gir..."
                                             value={wizardPosition?.title || ''}
                                             onChange={e => setWizardPosition(e.target.value ? { title: e.target.value } : null)}
                                             className="w-full border border-n200 rounded-md px-3 py-2.5 text-[12px] text-n900 outline-none focus:border-brand focus:ring-2 focus:ring-brand/10 bg-n0 placeholder:text-n400"
@@ -1958,7 +1958,7 @@ export default function InterviewManagementPage() {
                                     )}
                                 </div>
                                 {/* Candidate list */}
-                                <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em] mb-3">Görüşeceğiniz adayı seçin</p>
+                                <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em] mb-3">Görüşeceğin adayı seç</p>
                                 {enrichedCandidates.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16 text-n400">
                                         <User className="w-8 h-8 mb-2 opacity-30" />
@@ -2003,7 +2003,7 @@ export default function InterviewManagementPage() {
                         {/* STEP 2: KATILIMCILAR */}
                         {wizardStep === 2 && (
                             <div className="p-6 overflow-y-auto custom-scrollbar" style={{ maxHeight: 440 }}>
-                                <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em] mb-1">Mülakate katılacak ekip üyelerini seçin</p>
+                                <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em] mb-1">Mülakate katılacak ekip üyelerini seç</p>
                                 <p className="text-[11px] text-n400 mb-3">
                                     {manualDate && manualTime
                                         ? `${new Date(manualDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} · ${manualTime} için müsaitlik kontrol ediliyor`
@@ -2124,7 +2124,7 @@ export default function InterviewManagementPage() {
                                     {externalEmailError && (
                                         <p className="text-[11px] text-bad mt-1.5 font-medium">{externalEmailError}</p>
                                     )}
-                                    <p className="text-[10px] text-n400 mt-2">Sistemde kayıtlı olmayan kişilere de mülakat daveti gönderebilirsiniz.</p>
+                                    <p className="text-[10px] text-n400 mt-2">Sistemde kayıtlı olmayan kişilere de mülakat daveti gönderebilirsin.</p>
                                 </div>
 
                                 {selectedParticipants.length > 0 && (
@@ -2236,7 +2236,7 @@ export default function InterviewManagementPage() {
                                         <p className="text-[11px] font-semibold text-n900">
                                             {manualDate
                                                 ? new Date(manualDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
-                                                : 'Önce tarih seçin'}
+                                                : 'Önce tarih seç'}
                                         </p>
                                         <p className="text-[10px] text-n400 font-medium mb-4 mt-0.5">GMT+3 — İstanbul</p>
 
@@ -2250,7 +2250,7 @@ export default function InterviewManagementPage() {
                                         {!manualDate ? (
                                             <div className="flex flex-col items-center justify-center h-40 text-n300">
                                                 <Clock className="w-7 h-7 mb-2 opacity-40" />
-                                                <p className="text-[11px] font-medium">Soldan tarih seçin</p>
+                                                <p className="text-[11px] font-medium">Soldan tarih seç</p>
                                             </div>
                                         ) : isCheckingDay ? (
                                             <div className="flex items-center justify-center h-40 gap-2 text-n400">
@@ -2372,7 +2372,7 @@ export default function InterviewManagementPage() {
                         {/* STEP 4: ONAYLA & GÖNDER */}
                         {wizardStep === 4 && (
                             <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar" style={{ minHeight: 360 }}>
-                                <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em]">Mülakat detaylarını kontrol edin</p>
+                                <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em]">Mülakat detaylarını kontrol et</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     {/* Candidate card */}
                                     <div className="bg-n25 rounded-[14px] border border-n200 p-3 space-y-2.5">
@@ -2557,7 +2557,7 @@ export default function InterviewManagementPage() {
                                         <button
                                             onClick={() => {
                                                 if (conflictWarning) {
-                                                    if (window.confirm(`⚠️ Çakışma: ${conflictWarning.message}\n\nYine de planlamak istiyor musunuz?`)) {
+                                                    if (window.confirm(`⚠️ Çakışma: ${conflictWarning.message}\n\nYine de planlamak istiyor musun?`)) {
                                                         createInterviewRecord({ date: manualDate, time: manualTime }, false);
                                                     }
                                                 } else {
@@ -2906,8 +2906,8 @@ export default function InterviewManagementPage() {
                                         </div>
                                         <p className="text-[11px] text-n500 max-w-[260px] m-0">
                                             {ivSearch
-                                                ? 'Aday adını veya pozisyonu farklı yazmayı deneyin.'
-                                                : 'Yeni Mülakat menüsünden bir seans planlayarak başlayabilirsiniz.'}
+                                                ? 'Aday adını veya pozisyonu farklı yazmayı dene.'
+                                                : 'Yeni Mülakat menüsünden bir seans planlayarak başlayabilirsin.'}
                                         </p>
                                     </div>
                                 ) : ivView === 'agenda' ? (
@@ -3113,7 +3113,7 @@ export default function InterviewManagementPage() {
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-semibold text-n900 uppercase tracking-tight">Mülakatı Ertele</h3>
-                                    <p className="text-[11px] text-n500">Yeni tarih ve saat belirleyin</p>
+                                    <p className="text-[11px] text-n500">Yeni tarih ve saat belirle</p>
                                 </div>
                             </div>
                             <button
@@ -3282,7 +3282,7 @@ export default function InterviewManagementPage() {
                                         onChange={e => setQuickPosition(openPositions.find(p => p.id === e.target.value) || null)}
                                         className="w-full border border-n200 rounded-md px-3 py-2.5 text-[12px] text-n700 outline-none focus:border-ok focus:ring-2 focus:ring-ok-bg bg-n0"
                                     >
-                                        <option value="">Pozisyon seçin...</option>
+                                        <option value="">Pozisyon seç...</option>
                                         {openPositions.map(p => (
                                             <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
                                         ))}
@@ -3290,7 +3290,7 @@ export default function InterviewManagementPage() {
                                 ) : (
                                     <input
                                         type="text"
-                                        placeholder="Pozisyon adı girin..."
+                                        placeholder="Pozisyon adı gir..."
                                         value={quickPosition?.title || ''}
                                         onChange={e => setQuickPosition(e.target.value ? { title: e.target.value } : null)}
                                         className="w-full border border-n200 rounded-md px-3 py-2.5 text-[12px] text-n700 outline-none focus:border-ok focus:ring-2 focus:ring-ok-bg bg-n0 placeholder:text-n400"

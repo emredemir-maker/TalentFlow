@@ -37,7 +37,7 @@ export default function MicrosoftCallbackPage() {
             }
 
             try {
-                setMessage('Microsoft hesabınız bağlanıyor...');
+                setMessage('Microsoft hesabın bağlanıyor...');
                 const idToken = await user?.getIdToken();
                 const redirectUri = `${window.location.origin}/auth/microsoft/callback`;
 
@@ -117,7 +117,7 @@ export default function MicrosoftCallbackPage() {
                     {status === 'error' && 'Bağlantı Başarısız'}
                 </h2>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                    {message || (status === 'loading' ? 'Microsoft hesabınız doğrulanıyor...' : '')}
+                    {message || (status === 'loading' ? 'Microsoft hesabın doğrulanıyor...' : '')}
                 </p>
                 {status !== 'loading' && (
                     <p className="text-[10px] text-slate-400 mt-3">Bu pencere otomatik kapanacak...</p>

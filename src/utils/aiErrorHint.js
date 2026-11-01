@@ -58,41 +58,41 @@ export function aiErrorHint(message) {
     if (OWN_BUDGET.test(text)) {
         return {
             kind: 'budget',
-            hint: 'Bu kurulum için belirlenmiş günlük AI bütçesi dolmuş — Google kotanızla '
+            hint: 'Bu kurulum için belirlenmiş günlük AI bütçesi dolmuş — Google kotanla '
                 + 'ilgisi yok. Sayaç UTC gece yarısı sıfırlanır; daha yüksek bir sınır '
-                + 'gerekiyorsa kurulumu işleten kişiye söyleyin.',
+                + 'gerekiyorsa kurulumu işleten kişiye söyle.',
         };
     }
     if (SPEND_CAP.test(text)) {
         return {
             kind: 'spend-cap',
-            hint: 'Google AI hesabınızın aylık harcama tavanı dolmuş. Beklemek bunu çözmez — '
-                + 'AI Studio → Billing sayfasından tavanı yükseltmeniz gerekiyor.',
+            hint: 'Google AI hesabının aylık harcama tavanı dolmuş. Beklemek bunu çözmez — '
+                + 'AI Studio → Billing sayfasından tavanı yükseltmen gerekiyor.',
         };
     }
     if (QUOTA.test(text)) {
         return {
             kind: 'quota',
-            hint: 'Günlük/aylık kota dolmuş görünüyor. Kota sıfırlanana kadar beklemeniz '
-                + 'ya da planı yükseltmeniz gerekir.',
+            hint: 'Günlük/aylık kota dolmuş görünüyor. Kota sıfırlanana kadar beklemen '
+                + 'ya da planı yükseltmen gerekir.',
         };
     }
     if (RATE_LIMIT.test(text)) {
         return {
             kind: 'rate-limit',
-            hint: 'Dakikalık istek sınırına takılmış olabilirsiniz; 1 dakika bekleyip tekrar deneyin.',
+            hint: 'Dakikalık istek sınırına takılmış olabilirsin; 1 dakika bekleyip tekrar dene.',
         };
     }
     if (AUTH.test(text)) {
         return {
             kind: 'auth',
-            hint: 'API anahtarı geçersiz ya da yetkisiz. Ayarlar → API bölümünden anahtarı kontrol edin.',
+            hint: 'API anahtarı geçersiz ya da yetkisiz. Ayarlar → API bölümünden anahtarı kontrol et.',
         };
     }
     if (GATEWAY.test(text)) {
         return {
             kind: 'gateway',
-            hint: 'Servise ulaşılamadı (geçici). Birkaç dakika sonra tekrar deneyin.',
+            hint: 'Servise ulaşılamadı (geçici). Birkaç dakika sonra tekrar dene.',
         };
     }
     return { kind: null, hint: '' };
