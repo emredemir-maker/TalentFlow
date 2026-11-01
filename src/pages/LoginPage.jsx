@@ -470,11 +470,13 @@ export default function LoginPage() {
                     </button>
                     )}
 
-                    {/* Toggle mode */}
+                    {/* Kayıt davetle (Emre kararı, 31 Ekim): "Hesabın yok mu? Kayıt ol" kaldırıldı. Kayıt formu yalnız davet
+                        bağlantısıyla (?invite=) açılır; oradan girişe dönüş bağlantısı kalır. */}
+                    {mode === 'register' && (
                     <div style={{ marginTop: '28px', textAlign: 'center' }}>
                         <button
                             type="button"
-                            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setSuccess(null); }}
+                            onClick={() => { setMode('login'); setSuccess(null); }}
                             style={{
                                 background: 'none', border: 'none', cursor: 'pointer',
                                 fontSize: '13px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -482,10 +484,11 @@ export default function LoginPage() {
                             onMouseEnter={e => e.currentTarget.style.color = '#0F766E'}
                             onMouseLeave={e => e.currentTarget.style.color = '#64748B'}
                         >
-                            {mode === 'login' ? 'Hesabın yok mu? Kayıt ol' : 'Zaten hesabın var mı? Giriş yap'}
+                            Zaten hesabın var mı? Giriş yap
                             <ArrowRight size={13} />
                         </button>
                     </div>
+                    )}
 
                     {/* Giriş yapamayan ziyaretçi de ürünün ne yaptığını görebilsin:
                         tanıtım sayfası herkese açık ve hiçbir veri okumuyor. */}
