@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
         }
 
         if (!isFirebaseConfigured || !auth) {
-            setError('Firebase yapılandırılmamış. Lütfen VITE_FIREBASE_* ortam değişkenlerini ayarlayın.');
+            setError('Firebase yapılandırılmamış. VITE_FIREBASE_* ortam değişkenlerini ayarla.');
             setLoading(false);
             return;
         }
@@ -134,7 +134,7 @@ export function AuthProvider({ children }) {
                         const profileData = docSnap.data();
                         if (profileData.status === 'disabled') {
                             signOut(auth);
-                            setError('Hesabınız dondurulmuştur. Lütfen sistem yöneticisi ile iletişime geçin.');
+                            setError('Hesabın donduruldu. Sistem yöneticisiyle iletişime geç.');
                             setUser(null);
                             setUserProfile(null);
                             return;
@@ -218,7 +218,7 @@ export function AuthProvider({ children }) {
                         setUserProfile(newProfile);
                     } else {
                         await signOut(auth);
-                        setError('Erişim yetkiniz bulunmuyor.');
+                        setError('Erişim yetkin yok.');
                     }
                 }
             } catch (err) {
@@ -263,13 +263,13 @@ export function AuthProvider({ children }) {
         try {
             await signInWithEmailAndPassword(auth, email, password);
         } catch (err) {
-            let msg = "Giriş yapılamadı. Lütfen tekrar deneyin.";
+            let msg = "Giriş yapılamadı. Tekrar dene.";
             if (err.code === 'auth/user-not-found')       msg = "Bu e-posta ile kayıtlı bir hesap bulunamadı.";
-            if (err.code === 'auth/wrong-password')       msg = "Hatalı şifre. Lütfen tekrar deneyin.";
+            if (err.code === 'auth/wrong-password')       msg = "Hatalı şifre. Tekrar dene.";
             if (err.code === 'auth/invalid-credential')   msg = "E-posta veya şifre hatalı.";
             if (err.code === 'auth/invalid-email')        msg = "Geçersiz e-posta adresi.";
             if (err.code === 'auth/user-disabled')        msg = "Bu hesap devre dışı bırakıldı.";
-            if (err.code === 'auth/too-many-requests')    msg = "Çok fazla başarısız deneme. Lütfen birkaç dakika bekleyin.";
+            if (err.code === 'auth/too-many-requests')    msg = "Çok fazla başarısız deneme. Birkaç dakika bekle.";
             setError(msg);
             setLoading(false);
             throw err;
@@ -386,14 +386,14 @@ export function AuthProvider({ children }) {
                     } catch (resetErr) {
                         console.warn('[Registration] Reinvite: password reset failed:', resetErr.message);
                     }
-                    msg = '__EMAIL_REINVITE__Bu e-posta daha önce sisteme kayıtlıydı — davet kabul edildi. Şifre sıfırlama bağlantısı e-postanıza gönderildi. E-postanızı kontrol edin, yeni şifrenizi belirleyin ve giriş yapın.';
+                    msg = '__EMAIL_REINVITE__Bu e-posta daha önce sisteme kayıtlıydı — davet kabul edildi. Şifre sıfırlama bağlantısı e-postana gönderildi. E-postanı kontrol et, yeni şifreni belirle ve giriş yap.';
                 } else {
-                    msg = '__EMAIL_IN_USE__Bu e-posta adresi zaten kayıtlı. Mevcut hesabınızla giriş yapmayı deneyin veya şifrenizi sıfırlayın.';
+                    msg = '__EMAIL_IN_USE__Bu e-posta adresi zaten kayıtlı. Mevcut hesabınla giriş yapmayı dene ya da şifreni sıfırla.';
                 }
             } else if (err.code === 'auth/invalid-email') {
                 msg = 'Geçersiz e-posta adresi.';
             } else if (err.code === 'auth/weak-password') {
-                msg = 'Şifre çok kısa — en az 6 karakter kullanın.';
+                msg = 'Şifre çok kısa — en az 6 karakter kullan.';
             } else if (err.code === 'auth/operation-not-allowed') {
                 msg = 'E-posta ile kayıt şu an devre dışı.';
             }
