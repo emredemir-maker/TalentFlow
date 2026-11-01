@@ -9,7 +9,7 @@ import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
 // Alan adı değişince VITE_HUB_INN_URL ile.
-const HUB_INN_URL = import.meta.env.VITE_HUB_INN_URL || 'https://agentinn-nyqpx.web.app';
+const HUB_INN_URL = import.meta.env.VITE_HUB_INN_URL || 'https://hub.clyrolabs.com';
 
 async function exchangeCode(code) {
     const res = await fetch(`${HUB_INN_URL}/api/apps/exchange`, {
