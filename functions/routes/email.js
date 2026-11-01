@@ -60,12 +60,12 @@ export function resolveAppUrl(env = process.env) {
 }
 
 // ─── Email HTML Template Builder ─────────────────────────────────────────────
-function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role, invitedByName = '' }) {
+function buildInviteEmailHtml({ companyName = 'Clyro Talent' }, { inviteLink, role, invitedByName = '' }) {
     const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
     const TI_COLOR = '#1E3A8A';
     const TI_LIGHT = '#EEF2FF';
     return `<!DOCTYPE html>
-<html lang="tr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Talent-Inn Daveti</title></head>
+<html lang="tr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Clyro Talent Daveti</title></head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:'Segoe UI',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:32px 16px;"><tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(30,58,138,0.10);">
@@ -84,16 +84,16 @@ function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role
     <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 28px 0;">
       ${invitedByName ? `<strong style="color:#0F172A;">${invitedByName}</strong> sizi ` : 'Siz '}
       <strong style="color:#0F172A;">${companyName}</strong> adına
-      <strong>Talent-Inn</strong> platformuna
+      <strong>Clyro Talent</strong> platformuna
       <span style="display:inline-block;background:${TI_LIGHT};color:${TI_COLOR};font-weight:700;font-size:13px;padding:2px 10px;border-radius:6px;border:1px solid #C7D2FE;">${roleLabel}</span>
       olarak davet etti.
     </p>
 
     <!-- WHAT IS TALENT-INN -->
     <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:22px 26px;margin-bottom:28px;">
-      <p style="color:#64748B;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 14px 0;">Talent-Inn nedir?</p>
+      <p style="color:#64748B;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 14px 0;">Clyro Talent nedir?</p>
       <p style="color:#334155;font-size:14px;line-height:1.65;margin:0 0 16px 0;">
-        Talent-Inn; yapay zeka destekli bir <strong>İnsan Kaynakları yönetimi ve işe alım platformudur</strong>.
+        Clyro Talent; yapay zeka destekli bir <strong>İnsan Kaynakları yönetimi ve işe alım platformudur</strong>.
         CV analizi, aday pipeline takibi ve <strong>otonom mülakat koçu</strong> sayesinde işe alım süreçlerinizi uçtan uca dijitalleştirir.
       </p>
       <table cellpadding="0" cellspacing="0" width="100%">
@@ -137,7 +137,7 @@ function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role
         <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;width:110px;">Şirket</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${companyName}</td></tr>
         <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Rol</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${roleLabel}</td></tr>
         ${invitedByName ? `<tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Davet Eden</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${invitedByName}</td></tr>` : ''}
-        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Platform</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">Talent-Inn</td></tr>
+        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Platform</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">Clyro Talent</td></tr>
       </table>
     </div>
 
@@ -156,8 +156,8 @@ function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role
 
   <!-- FOOTER -->
   <tr><td style="background:#F8FAFC;padding:20px 40px;border-top:1px solid #E2E8F0;text-align:center;">
-    <p style="color:#64748B;font-size:12px;font-weight:700;margin:0 0 4px 0;">Talent-Inn &mdash; AI Destekli İK &amp; Mülakat Platformu</p>
-    <p style="color:#94A3B8;font-size:11px;margin:0;">Bu e-posta <strong>${companyName}</strong> adına Talent-Inn tarafından gönderilmiştir.</p>
+    <p style="color:#64748B;font-size:12px;font-weight:700;margin:0 0 4px 0;">Clyro Talent &mdash; AI Destekli İK &amp; Mülakat Platformu</p>
+    <p style="color:#94A3B8;font-size:11px;margin:0;">Bu e-posta <strong>${companyName}</strong> adına Clyro Talent tarafından gönderilmiştir.</p>
   </td></tr>
 
 </table>
@@ -201,13 +201,13 @@ router.post('/api/send-invite', generalLimiter, requireAuth(['super_admin']), as
         });
 
         const brandingData = branding || {};
-        const companyName = brandingData.companyName || 'Talent-Inn';
+        const companyName = brandingData.companyName || 'Clyro Talent';
         const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
 
         const mailOptions = {
-            from: `"Talent-Inn" <${process.env.EMAIL_USER}>`,
+            from: `"Clyro Talent" <${process.env.EMAIL_USER}>`,
             to: email,
-            subject: `Talent-Inn'e Davet Edildiniz — ${roleLabel} | ${companyName}`,
+            subject: `Clyro Talent'a Davet Edildin — ${roleLabel} | ${companyName}`,
             html: buildInviteEmailHtml({ companyName }, { inviteLink, role, invitedByName })
         };
 
@@ -255,8 +255,8 @@ router.post('/api/send-feedback', generalLimiter, verifyFirebaseToken, async (re
 
     // Derive subject/from fields at function scope so they're available to sendMail
     // regardless of whether pre-built HTML or the fallback builder is used.
-    const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
-    const fromName = b.companyName || 'Talent-Inn';
+    const b = branding || { companyName: 'Clyro Talent', primaryColor: '#1E3A8A' };
+    const fromName = b.companyName || 'Clyro Talent';
     const outcomeLabel = outcome === 'positive' ? 'Olumlu' : outcome === 'negative' ? 'Olumsuz' : 'Beklemede';
 
     // Use the branded HTML generated by the frontend template service when available;
@@ -325,8 +325,8 @@ router.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, a
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
     }
-    const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
-    const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
+    const b = branding || { companyName: 'Clyro Talent', primaryColor: '#1E3A8A' };
+    const fromName = (b.companyName || 'Clyro Talent').slice(0, 100);
     try {
         const transporter = nodemailer.createTransport({
             host: 'smtp.gmail.com', port: 465, secure: true,
@@ -370,8 +370,8 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
     }
-    const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
-    const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
+    const b = branding || { companyName: 'Clyro Talent', primaryColor: '#1E3A8A' };
+    const fromName = (b.companyName || 'Clyro Talent').slice(0, 100);
     try {
         const requestId = clientRequestId || `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const APP_URL = resolveAppUrl();
@@ -403,7 +403,7 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
         const items = Array.isArray(requestedItems) && requestedItems.length
             ? requestedItems.map(i => `<li style="margin:6px 0;">📎 ${i}</li>`).join('') : '';
         const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;color:#334155;max-width:600px;margin:0 auto;padding:32px;">
-            <h2 style="color:${b.primaryColor||'#0E7490'};">${b.companyName || 'Talent-Inn'}</h2>
+            <h2 style="color:${b.primaryColor||'#0E7490'};">${b.companyName || 'Clyro Talent'}</h2>
             <p>Sayın <strong>${candidateName}</strong>,</p>
             ${position ? `<p style="color:#64748B;">Başvurulan Pozisyon: <strong>${position}</strong></p>` : ''}
             <p>Başvurunuzu inceleme sürecimizde sizden bazı ek bilgi veya belgeler talep etmekteyiz.</p>
@@ -692,7 +692,7 @@ router.post('/api/send-participant-invite', generalLimiter, requireAuth(), async
         });
         const results = await Promise.allSettled(participants.map(email =>
             transporter.sendMail({
-                from: `"Talent-Inn" <${process.env.EMAIL_USER}>`,
+                from: `"Clyro Talent" <${process.env.EMAIL_USER}>`,
                 to: email,
                 subject: `Mülakat Daveti — ${candidateName || 'Aday'} ile Görüşme`,
                 html: `
@@ -702,7 +702,7 @@ router.post('/api/send-participant-invite', generalLimiter, requireAuth(), async
                         <p><strong>${recruiterName || 'Mülakatçı'}</strong> sizi <strong>${candidateName || 'aday'}</strong> ile gerçekleştirilecek canlı mülakata davet etti.</p>
                         <p>Aşağıdaki bağlantıya tıklayarak katılabilirsiniz:</p>
                         <a href="${joinLink}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#2563EB;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Mülakata Katıl</a>
-                        <p style="color:#64748B;font-size:12px;margin-top:24px;">Bu e-posta Talent-Inn tarafından otomatik gönderilmiştir.<br>Oturum ID: ${sessionId}</p>
+                        <p style="color:#64748B;font-size:12px;margin-top:24px;">Bu e-posta Clyro Talent tarafından otomatik gönderilmiştir.<br>Oturum ID: ${sessionId}</p>
                     </div>
                 `,
             })
