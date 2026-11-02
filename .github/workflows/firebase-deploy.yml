@@ -98,6 +98,10 @@ jobs:
           if [ -z "$RESEND_API_KEY" ]; then
             echo "::warning::RESEND_API_KEY boş — aday e-postaları gönderilmeyecek."
           fi
+          # Hub köprüsü yoksa Talent'a giriş yapılamaz (K3: giriş yalnız Hub'dan).
+          if [ -z "$HUB_EXCHANGE_SECRET" ]; then
+            echo "::warning::HUB_EXCHANGE_SECRET boş — Hub'dan Talent'a giriş 503 döner."
+          fi
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
@@ -106,6 +110,7 @@ jobs:
           INTEGRATION_ENCRYPTION_KEY: ${{ secrets.INTEGRATION_ENCRYPTION_KEY }}
           AI_DAILY_TOKEN_LIMIT: ${{ secrets.AI_DAILY_TOKEN_LIMIT }}
           AI_DAILY_GROUNDED_LIMIT: ${{ secrets.AI_DAILY_GROUNDED_LIMIT }}
+          HUB_EXCHANGE_SECRET: ${{ secrets.HUB_EXCHANGE_SECRET }}
 
       - name: Install root dependencies
         run: npm install
@@ -158,7 +163,7 @@ jobs:
       # CORS izin listesi (middleware/cors.js).
       - name: Create functions/.env
         run: |
-          printf 'RESEND_API_KEY=%s\nMAIL_FROM_ADDRESS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\n' \
+          printf 'RESEND_API_KEY=%s\nMAIL_FROM_ADDRESS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\nHUB_API_URL=%s\nHUB_EXCHANGE_SECRET=%s\nHUB_EVENTS_SECRET=%s\n' \
             "$RESEND_API_KEY" \
             "${MAIL_FROM_ADDRESS:-noreply@clyrolabs.com}" \
             "$VITE_GEMINI_API_KEY" \
@@ -169,6 +174,9 @@ jobs:
             "$PROJECT_ID" \
             "$STORAGE_BUCKET" \
             "$APP_URL" \
+            "$HUB_API_URL" \
+            "$HUB_EXCHANGE_SECRET" \
+            "$HUB_EVENTS_SECRET" \
             > functions/.env
           echo "✅ functions/.env oluşturuldu:"
           sed 's/=.*/=***/' functions/.env
@@ -193,6 +201,14 @@ jobs:
           # arama destekli çağrılar istek başına faturalanıyor ve token
           # tavanı bu kalemi görmüyor.
           AI_DAILY_GROUNDED_LIMIT: ${{ secrets.AI_DAILY_GROUNDED_LIMIT }}
+          # Clyro Hub köprüsü (functions/routes/hub.js). Tanımlı değilse Hub'dan
+          # giriş 503 döner (uç kapalı). HUB_API_URL sır değil: Hub API kökü
+          # (…/api, https). HUB_EXCHANGE_SECRET: Hub'daki APP_EXCHANGE_SECRETS
+          # içindeki `talent=` değeri. HUB_EVENTS_SECRET: Hub'daki
+          # TALENT_EVENTS_SECRET ile aynı; değişim değerinden FARKLI olmalı.
+          HUB_API_URL: ${{ secrets.HUB_API_URL }}
+          HUB_EXCHANGE_SECRET: ${{ secrets.HUB_EXCHANGE_SECRET }}
+          HUB_EVENTS_SECRET: ${{ secrets.HUB_EVENTS_SECRET }}
 
       # Anahtar dosyası env üzerinden yazılıyor (önceden `echo '${{ … }}'`):
       # JSON'daki bir tek tırnak kabuğu bozabiliyordu. Ardından anahtarın

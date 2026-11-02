@@ -9,7 +9,7 @@ globalThis.React = React;
 
 vi.mock('../config/firebase', () => ({ auth: null, db: {}, isFirebaseConfigured: false }));
 
-const { default: AuthContext, forgetRememberedTenant, LAST_TENANT_KEY } = await import('../context/AuthContext.jsx');
+const { default: AuthContext, forgetRememberedTenant, LAST_TENANT_KEY, hubVerificationExpired } = await import('../context/AuthContext.jsx');
 const { tenantGateScreen } = await import('./TenantGate.jsx');
 
 const base = {
@@ -30,6 +30,21 @@ const render = (ctx) =>
     renderToString(<AuthContext.Provider value={ctx}>{tenantGateScreen(ctx)}</AuthContext.Provider>);
 
 describe('TenantGate', () => {
+    it('Hub doğrulaması dolan üyeye Hub\'dan yeniden açmasını söyler (PR 4)', () => {
+        const html = render({ ...base, hubVerificationExpired: true });
+        expect(html).toContain('Clyro Hub');
+        expect(html).toContain('yeniden açın');
+        expect(html).not.toContain('Bu şirkette erişiminiz yok');
+    });
+    it('hubVerificationExpired: yalnız etkin, destek dışı, süresi geçmiş üyelik', () => {
+        const now = 1_000_000;
+        expect(hubVerificationExpired({ status: 'active', role: 'recruiter', expiresAt: now - 1 }, now)).toBe(true);
+        expect(hubVerificationExpired({ status: 'active', role: 'recruiter', expiresAt: now + 1 }, now)).toBe(false);
+        expect(hubVerificationExpired({ status: 'active', role: 'support', expiresAt: now - 1 }, now)).toBe(false);
+        expect(hubVerificationExpired({ status: 'removed', role: 'recruiter', expiresAt: now - 1 }, now)).toBe(false);
+        expect(hubVerificationExpired({ status: 'active', role: 'admin' }, now)).toBe(false);
+        expect(hubVerificationExpired(null, now)).toBe(false);
+    });
     it('üyeliği olmayan / askıdaki şirkette başka şirkete geçiş düğmesi gösterir', () => {
         const noAccess = render(base);
         expect(noAccess).toContain('Bu şirkette erişiminiz yok');
