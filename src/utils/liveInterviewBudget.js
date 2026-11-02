@@ -79,12 +79,14 @@ export function createRateGate({ cap, windowMs = HOUR_MS, cooldownMs = 0 }) {
 
     return {
         /**
-         * @returns {{ok: boolean, reason?: 'cap'|'cooldown', retryAt?: number, remaining: number}}
+         * `reason: 'server'`: sunucu 429 ile reddetti (blockUntilNextHour);
+         * arayüz o durumda sunucunun kendi metnini gösterir.
+         * @returns {{ok: boolean, reason?: 'cap'|'cooldown'|'server', retryAt?: number, remaining: number}}
          */
         check(now = Date.now()) {
             prune(now);
             const remaining = Math.max(0, cap - stamps.length);
-            if (now < blockedUntil) return { ok: false, reason: 'cap', retryAt: blockedUntil, remaining: 0 };
+            if (now < blockedUntil) return { ok: false, reason: 'server', retryAt: blockedUntil, remaining: 0 };
             if (stamps.length >= cap) {
                 return { ok: false, reason: 'cap', retryAt: stamps[0] + windowMs, remaining: 0 };
             }
@@ -138,13 +140,24 @@ export function minutesAgoText(then, now = Date.now()) {
     return mins < 1 ? 'az önce' : `${mins} dk önce`;
 }
 
-/** Sınır doldu/bekleme mesajı — düğmenin yanında ve title'ında gösterilir. */
-export function gateMessage(state, { capLabel, now = Date.now() } = {}) {
+/**
+ * Sınır doldu/bekleme mesajı — düğmenin yanında ve title'ında gösterilir.
+ *
+ * Sunucu reddettiyse (`reason: 'server'`) sunucunun metni gösterilir:
+ * sayfa yenilenmiş olabilir, yerel sayaç 1'de iken "sınır (20) doldu"
+ * demek kullanıcıya yanlış bir sayı söylerdi. Sunucu sayacı mülakat
+ * başına tutuyor; doğru açıklama onun.
+ */
+export function gateMessage(state, { capLabel, serverMessage = '', now = Date.now() } = {}) {
     if (!state || state.ok) return '';
     if (state.reason === 'cooldown') {
         const secs = Math.max(1, Math.ceil((state.retryAt - now) / 1000));
         return `${secs} sn sonra tekrar deneyebilirsin.`;
     }
     const at = new Date(state.retryAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    if (state.reason === 'server' && serverMessage) {
+        const text = serverMessage.trim().replace(/[.!]?$/, '.');
+        return `${text} ${at} itibarıyla yeniden açılır.`;
+    }
     return `${capLabel} doldu; ${at} itibarıyla yeniden açılır.`;
 }

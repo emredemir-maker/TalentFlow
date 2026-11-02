@@ -117,6 +117,16 @@ describe('createRateGate — analiz sınırı', () => {
         expect(gate.check(6 * HOUR_MS - 1).ok).toBe(false);
         expect(gate.check(6 * HOUR_MS).ok).toBe(true);
     });
+
+    it('marks a server refusal as reason "server", not the local cap', () => {
+        const gate = createRateGate({ cap: 20 });
+        const now = 5 * HOUR_MS + 25 * 60 * 1000;
+        gate.record(now);
+        gate.blockUntilNextHour(now);
+        const st = gate.check(now);
+        expect(st.reason).toBe('server');
+        expect(st.retryAt).toBe(6 * HOUR_MS);
+    });
 });
 
 describe('takeLiveAnalysisTurn — otomatik tur ve "Şimdi analiz et" tek kapı', () => {
@@ -200,5 +210,33 @@ describe('metinler', () => {
         expect(gateMessage({ ok: false, reason: 'cooldown', retryAt: 45_000 }, { now: 0 })).toMatch(/45 sn sonra/);
         expect(gateMessage({ ok: false, reason: 'cap', retryAt: Date.UTC(2026, 10, 1, 10, 0) }, { capLabel: 'Saatlik canlı analiz sınırı (20)' }))
             .toMatch(/^Saatlik canlı analiz sınırı \(20\) doldu; .+ itibarıyla yeniden açılır\.$/);
+    });
+
+    // Sunucu 429 sonrası istemci sayacı 1'de olabilir; "sınır (20) doldu"
+    // yanlış bir sayı söylerdi. Sunucunun metni gösterilmeli, saat korunmalı.
+    it('shows the server message after a server 429, still with the reopen time', () => {
+        const gate = createRateGate({ cap: 20 });
+        const now = Date.UTC(2026, 10, 1, 9, 25);
+        gate.record(now);
+        gate.blockUntilNextHour(now);
+        const msg = gateMessage(gate.check(now), {
+            capLabel: 'Saatlik canlı analiz sınırı (20)',
+            serverMessage: 'Bu mülakat için saatlik canlı analiz sınırına ulaşıldı.',
+            now,
+        });
+        expect(msg).toMatch(/^Bu mülakat için saatlik canlı analiz sınırına ulaşıldı\. .+ itibarıyla yeniden açılır\.$/);
+        expect(msg).not.toMatch(/\(20\) doldu/);
+    });
+
+    it('falls back to the cap text when the server gave no message', () => {
+        const msg = gateMessage({ ok: false, reason: 'server', retryAt: Date.UTC(2026, 10, 1, 10, 0) }, { capLabel: 'Saatlik takip sorusu sınırı (10)' });
+        expect(msg).toMatch(/^Saatlik takip sorusu sınırı \(10\) doldu; /);
+    });
+
+    it('keeps the cap text when only the local cap is hit', () => {
+        const msg = gateMessage({ ok: false, reason: 'cap', retryAt: Date.UTC(2026, 10, 1, 10, 0) }, {
+            capLabel: 'Saatlik canlı analiz sınırı (20)', serverMessage: 'sunucu metni',
+        });
+        expect(msg).toMatch(/^Saatlik canlı analiz sınırı \(20\) doldu; /);
     });
 });
