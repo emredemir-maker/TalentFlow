@@ -58,7 +58,7 @@ export async function removeMembership({ db: fdb, paths, tenantId, uid, by, now 
             );
             if (admins.size <= 1) return { status: 409 };
         }
-        tx.update(memberRef, { status: 'removed', removedAt: now.toISOString(), removedBy: by });
+        tx.update(memberRef, { status: 'removed', removedAt: now.toISOString(), removedBy: by, removedVia: 'admin' });
         tx.set(
             fdb.doc(PLATFORM_PATHS.userTenants(uid)),
             { tenants: { [tenantId]: admin.firestore.FieldValue.delete() } },
@@ -164,6 +164,51 @@ router.patch('/api/admin/members/:uid', requireTenantAdmin, async (req, res) => 
         if (err?.name === 'TenantPathError') return res.status(400).json({ error: err.message });
         log.error({ err: err.message }, '[admin/members PATCH]');
         res.status(500).json({ error: 'Üyelik güncellenemedi.' });
+    }
+});
+
+// ── Kaldırılan üyeliği yeniden açma (PR 4) ──────────────────────────────────
+// Yöneticinin kaldırdığı üyeliği Hub girişi yeniden AÇMAZ (services/hubBridge.js
+// decideHubLogin → 'blocked'). Yönetici burada yeniden açar; rol ve departman
+// korunur. Hub doğrulaması SÜRESİ DOLMUŞ olarak açılır (`expiresAt = şimdi`):
+// kişi Talent'ı Hub'dan yeniden açmadan giremez — Hub'ın o kişiyi hâlâ alanın
+// üyesi saydığı böylece denetlenir (Signals 0059 ile aynı ilke). Destek üyeliği
+// buradan açılamaz (K11: yalnız Hub yönetim konsolu).
+export async function restoreMembership({ db: fdb, paths, uid, by, now = new Date() }) {
+    const memberRef = fdb.doc(paths.member(uid));
+    return fdb.runTransaction(async (tx) => {
+        const snap = await tx.get(memberRef);
+        const cur = snap.exists ? snap.data() : null;
+        if (!cur || cur.status !== 'removed' || cur.role === 'support') return { status: 404 };
+        tx.update(memberRef, {
+            status: 'active',
+            expiresAt: now,
+            removedAt: admin.firestore.FieldValue.delete(),
+            removedBy: admin.firestore.FieldValue.delete(),
+            removedVia: admin.firestore.FieldValue.delete(),
+            restoredAt: now.toISOString(),
+            restoredBy: by,
+        });
+        return { status: 200 };
+    });
+}
+
+router.post('/api/admin/members/:uid/restore', requireTenantAdmin, async (req, res) => {
+    try {
+        const r = await restoreMembership({ db, paths: req.paths, uid: req.params.uid, by: req.user.uid });
+        if (r.status === 404) return res.status(404).json({ error: 'Üye bulunamadı.' });
+        await db.collection(req.paths.accessLogs()).add({
+            action: 'member_restored',
+            uid: req.user.uid,
+            email: req.user.email || '',
+            target: req.params.uid,
+            at: new Date().toISOString(),
+        });
+        res.json({ success: true, note: 'Kişi Talent\'ı Clyro Hub\'dan yeniden açınca erişimi geri gelir.' });
+    } catch (err) {
+        if (err?.name === 'TenantPathError') return res.status(400).json({ error: err.message });
+        log.error({ err: err.message }, '[admin/members restore]');
+        res.status(500).json({ error: 'Üyelik açılamadı.' });
     }
 });
 

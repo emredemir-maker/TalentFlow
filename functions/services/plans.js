@@ -11,7 +11,10 @@
 //
 // ── NEREDE TUTULUR ──────────────────────────────────────────────────────────
 // `tenants/{t}` belgesinde (istemciye yazma kapalı; yalnız sunucu / platform):
-//   plan:        'trial' | 'baslangic' | 'profesyonel' | 'kurumsal'
+//   talentPlan:  'trial' | 'baslangic' | 'profesyonel' | 'kurumsal'
+//                — `plan` DEĞİL: o alanı Hub köprüsü (PR 4, hubBridge.js) Hub'daki
+//                plan durumuyla ('active' | 'trial') her girişte yazar; aynı ad
+//                olsaydı her Hub girişi atanmış Talent paketini ezerdi.
 //   planLimits:  { monthlyPrescreens, monthlyInterviewEvals, monthlyInterviewHours }
 //                — pakete göre istisna (platform yöneticisi / Hub konsolu)
 //   aiLimits:    { dailyTokens, dailyGroundedCalls, userSharePct, anonSharePct,
@@ -122,7 +125,7 @@ export function resolveAiLimits(tenant) {
 
 /** Şirketin paketi; bilinmeyen değer 'trial'. */
 export function planOf(tenant) {
-    const p = typeof tenant?.plan === 'string' ? tenant.plan : '';
+    const p = typeof tenant?.talentPlan === 'string' ? tenant.talentPlan : '';
     return Object.prototype.hasOwnProperty.call(PLAN_CATALOG, p) ? p : 'trial';
 }
 
@@ -164,7 +167,7 @@ export function validateLimitsPatch(body) {
         if (typeof body.plan !== 'string' || !Object.prototype.hasOwnProperty.call(PLAN_CATALOG, body.plan)) {
             return { ok: false, error: `Bilinmeyen paket. Geçerli: ${Object.keys(PLAN_CATALOG).join(', ')}` };
         }
-        patch.plan = body.plan;
+        patch.talentPlan = body.plan;
     }
     if (body.aiLimits !== undefined) {
         if (body.aiLimits === null) {

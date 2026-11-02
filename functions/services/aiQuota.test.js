@@ -135,17 +135,21 @@ describe('plans — sınırların çözümü', () => {
     });
 
     it('paket: bilinmeyen paket denemeye düşer; istisnada null açıkça "sınır yok"', () => {
-        expect(resolvePlanLimits({ plan: 'yok-boyle' }).plan).toBe('trial');
-        expect(resolvePlanLimits({ plan: 'baslangic' }).monthlyPrescreens).toBe(200);
-        expect(resolvePlanLimits({ plan: 'profesyonel' }).monthlyPrescreens).toBe(600);
-        expect(resolvePlanLimits({ plan: 'baslangic', planLimits: { monthlyPrescreens: null } }).monthlyPrescreens).toBeNull();
-        expect(resolvePlanLimits({ plan: 'baslangic', planLimits: { monthlyPrescreens: 250 } }).monthlyPrescreens).toBe(250);
+        expect(resolvePlanLimits({ talentPlan: 'yok-boyle' }).plan).toBe('trial');
+        expect(resolvePlanLimits({ talentPlan: 'baslangic' }).monthlyPrescreens).toBe(200);
+        expect(resolvePlanLimits({ talentPlan: 'profesyonel' }).monthlyPrescreens).toBe(600);
+        expect(resolvePlanLimits({ talentPlan: 'baslangic', planLimits: { monthlyPrescreens: null } }).monthlyPrescreens).toBeNull();
+        expect(resolvePlanLimits({ talentPlan: 'baslangic', planLimits: { monthlyPrescreens: 250 } }).monthlyPrescreens).toBe(250);
         // Deneme paketinde sınır yok (cömert başlangıç).
         expect(resolvePlanLimits({}).monthlyPrescreens).toBeNull();
     });
 
     it('platform güncellemesi doğrulanır: bilinmeyen alan/paket ve aralık dışı reddedilir', () => {
-        expect(validateLimitsPatch({ plan: 'profesyonel' })).toEqual({ ok: true, patch: { plan: 'profesyonel' } });
+        // İstek gövdesinde `plan`, şirket belgesinde `talentPlan` (Hub'ın `plan` alanıyla çakışmasın).
+        expect(validateLimitsPatch({ plan: 'profesyonel' })).toEqual({ ok: true, patch: { talentPlan: 'profesyonel' } });
+        // Hub'ın yazdığı plan durumu paket sanılmaz.
+        expect(resolvePlanLimits({ plan: 'active' }).plan).toBe('trial');
+        expect(resolvePlanLimits({ plan: 'active', talentPlan: 'profesyonel' }).monthlyPrescreens).toBe(600);
         expect(validateLimitsPatch({ plan: 'altin' }).ok).toBe(false);
         expect(validateLimitsPatch({ aiLimits: { dailyTokens: 0 } }).ok).toBe(false);
         expect(validateLimitsPatch({ aiLimits: { superUser: 1 } }).ok).toBe(false);
@@ -334,7 +338,7 @@ describe('reserveAi — iki şirket, aşım, ertesi gün', () => {
 
 describe('paket birimleri (ön analiz, mülakat değerlendirmesi)', () => {
     const planCtx = (limit) =>
-        buildAiContext({ tenantId: 'A', uid: 'a1', tenant: { plan: 'baslangic', planLimits: { monthlyPrescreens: limit } } });
+        buildAiContext({ tenantId: 'A', uid: 'a1', tenant: { talentPlan: 'baslangic', planLimits: { monthlyPrescreens: limit } } });
 
     it('sınır yoksa yalnız sayar; sınır varsa aşımı atomik olarak reddeder', async () => {
         const free = buildAiContext({ tenantId: 'A', uid: 'a1', tenant: {} });
@@ -382,7 +386,7 @@ describe('toplu iş ön denetimi', () => {
     });
 
     it('paket hakkı yetmiyorsa da reddedilir', async () => {
-        const c = buildAiContext({ tenantId: 'A', uid: 'a1', tenant: { plan: 'baslangic' } });
+        const c = buildAiContext({ tenantId: 'A', uid: 'a1', tenant: { talentPlan: 'baslangic' } });
         await consumePlanUnit(c, 'prescreen', 195, GUN1);
         expect((await checkBulkBudget(c, 6, GUN1)).code).toBe(PLAN_CODE);
         expect((await checkBulkBudget(c, 5, GUN1)).ok).toBe(true);

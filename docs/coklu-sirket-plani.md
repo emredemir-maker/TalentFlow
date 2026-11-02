@@ -194,6 +194,51 @@ Kurallar `expiresAt`'i kendisi denetler (süre dolunca erişim kendiliğinden ka
 kapanış ve destek kullanıcısının her okuması tenant `accessLogs`'una ve Hub denetim kaydına düşer; şirket yöneticisi
 kendi defterinde görür.
 
+**PR 4 ile uygulanan (2026-11-02) — plandan sapmalar:**
+
+- **Kimlik OIDC değil, paylaşılan gizli değer.** Hub'daki mevcut ve CX/Meet/Signals'ın kullandığı desen izlendi:
+  Talent → Hub kod değişimi `POST {HUB}/api/apps/server-exchange`, `Authorization: Bearer <HUB_EXCHANGE_SECRET>`
+  (Hub'da `APP_EXCHANGE_SECRETS` içindeki `talent=`), Origin yok, yönlendirme izlenmez. Hub → Talent olayları
+  CLYRO-M2M-V1 HMAC imzasıyla (gönderen `hub`, ±120 sn, tek kullanımlık nonce `platform/hub/hubNonces/{nonce}`),
+  gizli değer `HUB_EVENTS_SECRET` (Hub'da `TALENT_EVENTS_SECRET`; değişim değerinden farklı olmalı). OIDC'ye geçiş
+  ileride tüm uygulamalar için birlikte yapılır.
+- **Giriş jetonunu Hub basar** (CX/Meet gibi); Talent hesabına `serviceAccountTokenCreator` verilmedi. Jeton yalnız
+  Talent sunucusundan tarayıcıya geçer, günlüğe yazılmaz.
+- **Hub doğrulamasının süresi:** Hub üyeliği yalnız kod değişiminde denetlediği için Hub üyeliğinin `expiresAt`'i son
+  Hub girişi + `HUB_VERIFY_MAX_AGE_HOURS` (1–24, varsayılan 24) olarak yazılır (Signals'taki `hub_verified_at` kuralının
+  karşılığı; kurallar ve sunucu bu alanı zaten denetliyordu, kural değişikliği gerekmedi). Süre dolunca kişi Hub'dan
+  Talent'ı yeniden açar; ekran bunu söyler. Çıkarma olayı bu süreyi beklemeden kapatır.
+- **Uçlar:** `POST /api/hub/exchange` (tarayıcı → Talent sunucusu), `POST /api/hub/membership-revoked`
+  (`{type:'membership.removed', tenantId, uid, email?, occurredAt?}` — Signals'a giden olayla aynı gövde),
+  `POST /api/hub/support-access` (`{type:'support.grant', tenantId, uid, email, reason, requestedBy, ttlHours?}` ve
+  `{type:'support.revoke', …}`). Ayrıca `POST /api/admin/members/:uid/restore` (yöneticinin kaldırdığı üyeliği açar).
+- **Kaldırma yolu (`removedVia`):** Hub'ın kapattığı üyelik (`hub`) sonraki başarılı Hub girişiyle açılır ve rolü
+  **Hub'dan yeniden alır** (eski Talent rolü, ör. yönetici, geri gelmez; departmanlar sıfırlanır). Kapanıştan önce
+  doğrulanmış (uçuştaki) bir Hub girişi kapanmış üyeliği açmaz (409 `MEMBERSHIP_CHANGED`). Talent
+  yöneticisinin kaldırdığı (`admin`) üyeliği Hub girişi açmaz, yönetici yeniden açar (Hub doğrulaması süresi dolmuş
+  olarak; kişi Hub'dan yeniden girmeli). Geciken çıkarma olayı, `occurredAt`'ten sonra Hub'dan yeniden girmiş üyeliği
+  kapatmaz.
+- **Hub reddi:** Hub kodu reddederse (`workspace_access_denied`) gerekçe `not_member` ya da gerekçesizse (eski Hub)
+  üyelik kapatılır; `trial_expired`, `inactive`, `app_disabled` geri alınabilir olduğu için kapatılmaz. `trial_expired`
+  şirketin yazmasını hemen kapatır (okuma 14 gün daha). Askıdaki ve elle salt okunur yapılmış şirketin durumu Hub
+  senkronunda değişmez.
+- **Destek kaydı gerçek üyeliği ezmez:** kişinin şirkette destek dışı bir üyelik kaydı varsa (kaldırılmış olsa da) 409.
+- **İmza ve Cloud Functions:** çalışma ortamı gövdeyi Express'ten önce okuduğu için imza `req.rawBody` üzerinden
+  doğrulanır (en çok 4 KB).
+- **Bilinen, kabul edilen riskler (izlenecek):** (a) Hub'dan çıkarma bildirimi Hub tarafında henüz yok (Hub-Inn #67'nin
+  olay kuyruğuna bağlı) → çıkarılan kişinin erişimi en çok 24 saat sürer; (b) giriş CSRF'i: saldırgan kendi 60 saniyelik
+  kodunu kurbana açtırırsa kurban saldırganın hesabıyla saldırganın şirketine girer (CX/Signals'ta da aynı; kodu
+  tarayıcıdaki bir durum değerine bağlamak ayrı iş); (c) destek erişimi yöneticinin olağan Hub hesabına açılır — o hesapta
+  iki adımlı doğrulama açık olmalı; (d) `platform/hub/hubNonces` için Firestore TTL politikası (`expireAt`) elle
+  tanımlanmalı.
+- **K5 açık nokta:** Hub, denemesi biten alanda `requireTenant` ile 402 döndürdüğü için kişi Hub'dan Talent'ı
+  açamaz; salt okunur bant yalnız Hub doğrulaması geçerli oturumlarda (≤24 saat) görülür. 14 günlük salt okunur
+  bandın Hub'dan da açılabilmesi Hub'da bir karar ister (Hub-Inn "Deneme" değişmez kuralı) — Emre'ye soruldu.
+- **Destek erişimi:** destek kişisinin Talent'a girmesi için kendi Hub alanından (Clyro) Talent'ı bir kez açmış
+  olması yeterli; destek verilen şirket şirket seçicide görünür. Her okumanın tek tek denetim kaydı (istemci
+  doğrudan Firestore okuduğu için) bu PR'da yok: açılış/kapanış gerekçeyle şirketin `accessLogs`'una ve Hub denetim
+  kaydına yazılır.
+
 ### 2.4 Talent'ın kendi girişleri
 
 - **Talent yalnız Hub'dan açılır** (K3). Talent'ın kendi giriş/kayıt ekranı Hub'a yönlendirir; e-posta/şifre ve
@@ -436,7 +481,7 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
 | 1 | Kurallar | §3.1/§3.2 tenant eşleşmeleri; eski kök kapalı; `token.role` güveni kaldırılır; tam test matrisi. | M | Orta (kural hatası = ya erişim kaybı ya sızıntı; matris bunu yakalar) | Evet |
 | 2 | Sunucu tenant bağlamı | `requireAuth` → `requireTenant(roles)` (üyelikten rol, `req.tenant`, 402/askı); `tenantPaths.js`; tüm `functions/` yolları; mükerrer kontrolü/işçi/bakım/saklama tenant içinde; `/api/users` tenant üyeleri; `auth-user` silme → üyelik kaldırma; `invitation-lookup` ve `send-invite` kaldırılır (K3); `companyIntel` platform önbelleğine ve sunucu ucuna (K6); işçi collection group. Sunucu izolasyon testleri + statik yol denetimi. | M–L | Orta (geniş ama mekanik diff) | Evet |
 | 3 | İstemci tenant bağlamı | `TenantContext` + `userTenants`; tüm `src/` yolları; şirket seçici; Talent giriş/kayıt ekranı Hub'a yönlenir; profil/kayıt yazımı, alan adıyla kayıt ve davet ekranları kaldırılır (K3, K4); salt okunur bant (K5); `SettingsPage` istemci Gemini kaldırılır. | L | Orta (birçok ekran). E2E iki tenant. | Evet |
-| 4 | Hub köprüsü | Talent `POST /api/hub/exchange` (sunucudan sunucuya, OIDC), tenant/üyelik oluşturma ve senkron, rol eşlemesi (K2), deneme süresi senkronu (`writeUntil`/`readUntil`, K5), `membership-revoked` ve `support-access` uçları (K11). **Eşlik eden Hub-Inn PR'ları:** exchange yanıtına tenant + rol + uygulama hakkı + deneme bitişi; OIDC doğrulama; üyelik değişince Talent'a bildirim; **admin konsolunda destek erişimi isteme ekranı** (gerekçe, 24 saat, denetim kaydı). Bağımsız güvenlik incelemesi. | M (+ Hub M) | **Yüksek** (kimlik). Signals desenini birebir izle. | Evet |
+| 4 | Hub köprüsü (**yapıldı**, §2.3 notu) | Talent `POST /api/hub/exchange` (sunucudan sunucuya; OIDC yerine paylaşılan gizli değer + CLYRO-M2M-V1), tenant/üyelik oluşturma ve senkron, rol eşlemesi (K2), deneme süresi senkronu (`writeUntil`/`readUntil`, K5), `membership-revoked` ve `support-access` uçları (K11). **Eşlik eden Hub-Inn PR'ları:** exchange yanıtına tenant + rol + uygulama hakkı + deneme bitişi; OIDC doğrulama; üyelik değişince Talent'a bildirim; **admin konsolunda destek erişimi isteme ekranı** (gerekçe, 24 saat, denetim kaydı). Bağımsız güvenlik incelemesi. | M (+ Hub M) | **Yüksek** (kimlik). Signals desenini birebir izle. | Evet |
 | 5 | Herkese açık bağlantılar | `publicLinks` + `/api/public/resolve`; apply/interview/respond/join sayfaları; anonim `candidates` create kapanır; `positions` liste kapanır; `init-interview-session` tenant'ı bağlantıdan alır; `/api/session` tam taramadan kurtulur. | M | Orta (aday deneyimi) | Evet |
 | 6 | Storage tenant yolları | Yüklemeler `tenants/{t}/…`; Storage kuralları çapraz Firestore; `bulkSources` önek denetimi; jetonlu adres yerine kural denetimli indirme. | S–M | Orta (CLI'nin Storage→Firestore rol onayı) | Evet |
 | 7 | AI bütçesi ve hız sınırları | §5.2; şirket başına günde 2M token, aşınca dur / ertesi gün devam (K8); tenant/kullanıcı payı; anonim serbest istem kapanır; panel. | M | Düşük-orta (yanlış sınır = hizmet durması; varsayılanlar cömert başlar) | Evet |
@@ -480,7 +525,7 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
 - **Yanıtlar:** 429 `{code: AI_DAILY_BUDGET_EXCEEDED | AI_RATE_LIMITED | PLAN_LIMIT_REACHED, error, reason, resetAt}`.
 - **Serbest istem** (`/api/ai/generate`, `/api/ai/ask`) yalnız üyeye; aday tarafı: `/api/ai/stt`, `/api/gemini-stt`,
   `/api/score-screening-answers` (sorular ilandan), `/api/public/apply/parse-cv` (istem sunucuda).
-- **Sınırlar ve paket:** `tenants/{t}.aiLimits`, `.plan`, `.planLimits` (`functions/services/plans.js`); yazan yalnız
+- **Sınırlar ve paket:** `tenants/{t}.aiLimits`, `.talentPlan` (Hub'ın `plan` alanından ayrı), `.planLimits` (`functions/services/plans.js`); yazan yalnız
   platform yöneticisi `PUT /api/platform/tenants/:tenantId/limits` (ileride Hub konsolu). Paket birimleri aylık
   `tenants/{t}/usage/month-YYYY-MM.units` (ön analiz: işe alımcının AI ile işlediği her CV — başvuru formu hariç; mülakat değerlendirmesi).
 
