@@ -525,6 +525,19 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
   (department_user doğrudan okuyamaz). Saklama imhası `cvPath`'i (yoksa eski `cvUrl`'i) şirket önekiyle siler. Şirket
   logosu bilinçli istisna: herkese açık görsel (e-posta, başvuru sayfası), jetonlu adres kalır.
 
+### 6.3 PR 7b sonrası e-posta sözleşmesi
+
+- **Gönderim:** `functions/services/mailer.js` (Resend REST, `RESEND_API_KEY`; yoksa 503 `EMAIL_DISABLED`).
+  `From: "<şirket adı>" <noreply@clyrolabs.com>` (ad: `settings/branding.companyName`, yoksa `tenants/{t}.name`),
+  `Reply-To:` oturumdaki kullanıcının doğrulanmış e-postası. Şirket başına günlük gönderim tavanı
+  (`EMAIL_DAILY_LIMIT_PER_TENANT`, varsayılan 300; `tenants/{t}/usage/{gün}.email.sent`, koşullu artırım).
+- **İçerik:** `functions/services/emailRender.js` — şablon `tenants/{t}/settings/emailTemplates`'ten, yoksa yerleşik;
+  istemciden yalnız değişkenler (`templateKey` + `vars`), HTML'e kaçışlı girer; bağlantılar yalnız `APP_URL` ya da bilinen
+  toplantı hizmeti. İstemcinin `html`, `branding`, `recruiterEmail` alanları yok sayılır.
+- **Yanıtlar:** işe alımcının kutusuna gider; `POST /api/check-info-replies` kişinin bağlı Gmail (gmail.modify) ya da
+  Microsoft 365 (Mail.Read) hesabında `[#ir-…]` konulu mesajları arar; bağlı değilse 409 `MAILBOX_NOT_CONNECTED`.
+  `GET /api/email/status` arayüz uyarısı için. `EMAIL_USER`/`EMAIL_PASS`, nodemailer ve IMAP kaldırıldı.
+
 Toplam kaba efor: **~3–4 hafta** (PR 0–8; davet/kayıt akışlarının kalkması PR 3'ü küçültüyor, e-posta (7b) ve destek
 üyeliği ekleniyor — toplam değişmedi), Hub tarafı ek ~1–1,5 hafta (köprü + admin konsolunda destek erişimi). Kritik yol:
 0 → 1 → 2 → (3, 4, 5, 6, 7, 7b paralel olabilir) → 8.

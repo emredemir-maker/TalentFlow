@@ -112,8 +112,8 @@ bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"
 | `VITE_FIREBASE_APP_ID` | Firebase app ID |
 | `GEMINI_API_KEY` | Google Gemini API anahtarı (yalnızca sunucu okur) |
 | `INTEGRATION_ENCRYPTION_KEY` | OAuth jetonlarını şifreleyen anahtar (base64, 32 bayt; yalnızca sunucu) |
-| `EMAIL_USER` | Gmail hesabı (Nodemailer) |
-| `EMAIL_PASS` | Gmail uygulama şifresi |
+| `RESEND_API_KEY` | Aday e-postaları (Resend); boşsa gönderim kapalı |
+| `MAIL_FROM_ADDRESS` | Gönderen adres (varsayılan `noreply@clyrolabs.com`) |
 | `GITHUB_PERSONAL_ACCESS_TOKEN_NEW` | GitHub push tokeni |
 
 ---

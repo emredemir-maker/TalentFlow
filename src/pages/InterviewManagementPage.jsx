@@ -1076,16 +1076,6 @@ export default function InterviewManagementPage() {
                     // Nodemailer fallback when Google token is unavailable
                     if (selectedCandidate?.email) {
                         try {
-                            const { html: fbHtml } = await getInviteEmail(branding, {
-                                candidateName: selectedCandidate.name,
-                                recruiterName: userProfile?.displayName || '',
-                                position:      selectedCandidate.position,
-                                interviewType: newSession.title,
-                                date:          slot.date,
-                                time:          slot.time,
-                                joinLink:      platformJoinLink,
-                                companyEmail:  userProfile?.email || null,
-                            });
                             const fbICS = buildICS({
                                 date:        slot.date,
                                 time:        slot.time,
@@ -1100,13 +1090,22 @@ export default function InterviewManagementPage() {
                             const fbRes = await fetch('/api/send-interview-invite', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTok}` },
+                                // İçerik sunucuda şirketin şablonundan üretilir
+                                // (noreply@clyrolabs.com, gönderen adı şirket,
+                                // yanıtlar işe alımcıya); burada yalnız değişkenler.
                                 body: JSON.stringify({
                                     to: selectedCandidate.email,
-                                    subject: `Mülakat Davetiniz: ${newSession.title}`,
-                                    html: fbHtml,
+                                    templateKey: 'invite',
+                                    vars: {
+                                        candidateName: selectedCandidate.name,
+                                        recruiterName: userProfile?.displayName || '',
+                                        position:      selectedCandidate.position,
+                                        interviewType: newSession.title,
+                                        date:          slot.date,
+                                        time:          slot.time,
+                                        joinLink:      platformJoinLink,
+                                    },
                                     ics: fbICS,
-                                    candidateName: selectedCandidate.name,
-                                    branding,
                                 }),
                             });
                             if (!fbRes.ok) throw new Error(await fbRes.text());
@@ -1222,16 +1221,6 @@ export default function InterviewManagementPage() {
             // Nodemailer fallback: send candidate invite when Google is NOT connected
             if (slot && !startNow && !isGoogleConnected && selectedCandidate?.email) {
                 try {
-                    const { html: candidateHtml } = await getInviteEmail(branding, {
-                        candidateName: selectedCandidate.name,
-                        recruiterName: userProfile?.displayName || '',
-                        position:      selectedCandidate.position,
-                        interviewType: newSession.title,
-                        date:          slot.date,
-                        time:          slot.time,
-                        joinLink:      platformJoinLink,
-                        companyEmail:  userProfile?.email || null,
-                    });
                     const candidateICS = buildICS({
                         date:        slot.date,
                         time:        slot.time,
@@ -1248,11 +1237,17 @@ export default function InterviewManagementPage() {
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTok2}` },
                         body: JSON.stringify({
                             to: selectedCandidate.email,
-                            subject: `Mülakat Davetiniz: ${newSession.title}`,
-                            html: candidateHtml,
+                            templateKey: 'invite',
+                            vars: {
+                                candidateName: selectedCandidate.name,
+                                recruiterName: userProfile?.displayName || '',
+                                position:      selectedCandidate.position,
+                                interviewType: newSession.title,
+                                date:          slot.date,
+                                time:          slot.time,
+                                joinLink:      platformJoinLink,
+                            },
                             ics: candidateICS,
-                            candidateName: selectedCandidate.name,
-                            branding,
                         }),
                     });
                     if (!inviteResp.ok) throw new Error(await inviteResp.text());
@@ -1561,7 +1556,8 @@ export default function InterviewManagementPage() {
                             const { getAuth } = await import('firebase/auth');
                             const idToken = await getAuth().currentUser?.getIdToken();
                             const API_BASE = import.meta.env.VITE_SERVER_URL || '';
-                            await fetch(`${API_BASE}/api/send-feedback`, {
+                            // Sunucu şablonu: reschedule (iptal / yeni tarih).
+                            await fetch(`${API_BASE}/api/send-interview-invite`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -1569,9 +1565,18 @@ export default function InterviewManagementPage() {
                                 },
                                 body: JSON.stringify({
                                     to: candidate.email,
-                                    subject: rescheduleSubject,
-                                    body: rescheduleBody,
-                                    html: rescheduleHtml,
+                                    templateKey: 'reschedule',
+                                    vars: {
+                                        candidateName: candidate.name,
+                                        recruiterName: userProfile?.displayName || '',
+                                        position:      candidate.position,
+                                        oldDate:       originalSession.date || '',
+                                        oldTime:       originalSession.time || '',
+                                        newDate:       newDate || null,
+                                        newTime:       newTime || null,
+                                        joinLink:      (newDate || newTime) ? (originalSession.meetLink || null) : null,
+                                        isCancelled,
+                                    },
                                 }),
                             });
                             console.log('[RescheduleEmail] Sent via SMTP fallback');
