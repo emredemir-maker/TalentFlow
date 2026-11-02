@@ -1,5 +1,13 @@
 // AI proxy routes — every Gemini call goes through here so the API key
-// never reaches the browser bundle. Rate-limited by aiLimiter (20 req/min/IP).
+// never reaches the browser bundle. Rate-limited by aiLimiter (20 req/min,
+// şirket:kullanıcı anahtarlı) + şirket bütçesi (services/aiQuota.js).
+//
+// SERBEST İSTEM YALNIZ ŞİRKET ÜYESİNE (plan §5.2): /api/ai/generate ve
+// /api/ai/ask anonim (aday) oturuma KAPALI. Eskiden başvuru formunun anonim
+// oturumu buradan istediği istemi gönderebiliyordu: bağlantıyı bulan herkes
+// platformun Gemini anahtarını kendi işi için kullanabilirdi. Aday tarafı
+// yalnız amaca özel uçları açar (STT burada; ön eleme puanı screening.js;
+// CV ile form doldurma publicAi.js) — istemleri sunucuda kurulur.
 //
 //   POST /api/ai/generate   — generic prompt-in, text-out (with retry/backoff
 //                              on 429/503, configurable maxOutputTokens up to 32k,
@@ -12,9 +20,10 @@ import { Router } from 'express';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
-import { verifyFirebaseToken } from '../middleware/auth.js';
+import { requireAiCaller } from '../middleware/aiCaller.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { getApiKeyDetailed, generateText, generateGrounded } from '../services/gemini.js';
+import { sendQuotaError } from '../services/aiQuota.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('ai');
 
@@ -23,10 +32,8 @@ const multer = require('multer');
 
 const router = Router();
 
-// verifyFirebaseToken: anonim oturumlar da geçer (başvuru formu ve canlı
-// mülakat adayı anon Firebase oturumuyla gelir) — ama tokensız dış çağrılar
-// (açık Gemini proxy kötüye kullanımı) 401 alır.
-router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res) => {
+// Yalnız şirket üyesi; bütçe `şirket:kullanıcı` kovasından.
+router.post('/api/ai/generate', requireAiCaller(), aiLimiter, async (req, res) => {
     const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens, label } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
@@ -65,6 +72,7 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
         });
         res.json({ text });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err?.message, modelId, label, anahtarKaynagi: keyInfo.source }, '[ai/generate] başarısız');
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
@@ -76,7 +84,7 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
 // returns the sources it used, so the UI can show where a claim came from.
 // Kept separate because the response shape differs (text + sources) and
 // because grounded calls are slower and cost more: the caller opts in.
-router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/ai/ask', requireAiCaller(), aiLimiter, async (req, res) => {
     const { prompt, modelId = 'gemini-2.5-flash', maxOutputTokens } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
@@ -108,12 +116,16 @@ router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
         const result = await generateGrounded(prompt, { modelId, maxOutputTokens: tokenCap });
         res.json(result);
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err?.message, modelId, anahtarKaynagi: keyInfo.source }, '[ai/ask] başarısız');
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
 });
 
-router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
+// STT: sabit istem + ses. Yüz yüze/canlı mülakat sayfaları aday bağlantısında
+// (anonim oturum) da açıldığı için aday tarafına açık; bütçe şirketin 'anon'
+// kovasından.
+router.post('/api/ai/stt', requireAiCaller({ allowAnonymous: true }), aiLimiter, async (req, res) => {
     const { audio, mimeType = 'audio/webm' } = req.body || {};
     if (!audio || typeof audio !== 'string') {
         return res.status(400).json({ error: 'audio (base64) is required' });
@@ -128,6 +140,7 @@ router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
         ], { useCache: false });
         res.json({ text });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, 'STT Error');
         res.status(500).json({ error: err.message });
     }
@@ -136,7 +149,7 @@ router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
 // Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
-router.post('/api/gemini-stt', aiLimiter, verifyFirebaseToken, (req, res, next) => {
+router.post('/api/gemini-stt', requireAiCaller({ allowAnonymous: true }), aiLimiter, (req, res, next) => {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
         wrapMulter(audioUpload.single('audio'))(req, res, next);
@@ -195,6 +208,7 @@ Kurallar:
         log.info(`✅ STT: "${text.substring(0, 60)}" | emotion: ${JSON.stringify(emotion)}`);
         res.json({ success: true, text, emotion });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, '💥 Gemini STT Error');
         res.status(500).json({ error: err.message });
     }

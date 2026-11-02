@@ -21,6 +21,7 @@ import { computePrescore } from '../services/prescore.js';
 import { planMatchRepairs, collectJobIdsNeedingLookup } from '../services/matchRepair.js';
 import { needsEnrichment, extractExperiences } from '../services/enrich.js';
 import { childLogger } from '../services/logger.js';
+import { QuotaError, sendQuotaError } from '../services/aiQuota.js';
 
 const log = childLogger('maintenance');
 const router = Router();
@@ -442,9 +443,12 @@ router.post('/api/maintenance/enrich-profiles', requireTenant(ROLES), async (req
         let updated = 0;
         let failed = 0;
         let idx = 0;
+        // Kota dolunca parti durur: kalan adaylar için çağrı başlatmak yalnız
+        // ret üretir, istemci zinciri de sonsuza dek "kalan" görürdü.
+        let quotaErr = null;
         await Promise.all(
             Array.from({ length: Math.min(4, batchDocs.length) }, async () => {
-                while (idx < batchDocs.length) {
+                while (idx < batchDocs.length && !quotaErr) {
                     if (Date.now() - startedAt > DEADLINE_MS) break;
                     const docSnap = batchDocs[idx];
                     idx += 1;
@@ -463,6 +467,10 @@ router.post('/api/maintenance/enrich-profiles', requireTenant(ROLES), async (req
                         await docSnap.ref.update(patch);
                         updated += 1;
                     } catch (err) {
+                        if (err instanceof QuotaError) {
+                            quotaErr = err;
+                            break;
+                        }
                         failed += 1;
                         log.warn(`[maintenance/enrich] candidate ${docSnap.id} failed: ${err.message}`);
                     }
@@ -470,7 +478,10 @@ router.post('/api/maintenance/enrich-profiles', requireTenant(ROLES), async (req
             })
         );
 
-        const attempted = Math.min(idx, batchDocs.length);
+        if (quotaErr && updated === 0) return sendQuotaError(res, quotaErr);
+        // Kotada durulduysa yalnız güncellenenler "denendi" sayılır; kalanlar
+        // bir sonraki çağrıda (kota yenilenince) yeniden seçilir.
+        const attempted = quotaErr ? updated + failed : Math.min(idx, batchDocs.length);
         log.info(`[maintenance/enrich] batch done: ${updated} updated, ${failed} failed, ${pendingRefs.length - attempted} remaining`);
         res.json({
             processed: attempted,

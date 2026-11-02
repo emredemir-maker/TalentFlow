@@ -74,7 +74,10 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `AI isteği başarısız: ${res.status}`);
+                // Makine kodu (AI_DAILY_BUDGET_EXCEEDED, PLAN_LIMIT_REACHED…) mesajın
+                // başında kalsın: aiErrorHint doğru tavsiyeyi ona göre seçer.
+                const msg = errData.error || `AI isteği başarısız: ${res.status}`;
+                throw new Error(errData.code ? `${errData.code}: ${msg}` : msg);
             }
 
             const { text } = await res.json();

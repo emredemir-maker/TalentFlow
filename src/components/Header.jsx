@@ -18,6 +18,7 @@ import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { useUserSettings } from '../context/UserSettingsContext';
 import { roleLabel } from '../utils/roles';
+import { getAuthHeaders } from '../services/ai/config';
 
 
 const PAGES = [
@@ -183,13 +184,15 @@ ${summaries}
 YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
 {"matchedIds":["id1","id2","id3"]}`;
 
+                // Kimlik başlığı şart: AI ucu yalnız şirket üyesine açık ve
+                // çağrı kullanıcının şirket kotasından düşer.
                 const res  = await fetch('/api/ai/generate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt }),
+                    headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+                    body: JSON.stringify({ prompt, label: 'assistant' }),
                 });
                 const data = await res.json();
-                const text = (data.result || data.response || '').trim();
+                const text = (data.text || data.result || data.response || '').trim();
                 const m    = text.match(/\{[\s\S]*\}/);
                 if (m) {
                     const parsed = JSON.parse(m[0]);

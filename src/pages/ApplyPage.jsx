@@ -6,8 +6,6 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
 import { getAuthHeaders } from '../services/ai/config';
-import { parseCandidateFromText, analyzeCandidateMatch } from '../services/geminiService';
-import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
 import { calculateMatchScore } from '../services/matchService';
 import { detectSource } from '../services/applicationService';
 import {
@@ -25,6 +23,25 @@ const SOURCE_ICONS = {
 };
 
 const POSITIONS_COLLECTION = () => tc('positions');
+
+/**
+ * CV metnini SUNUCUDA ayrıştırır (POST /api/public/apply/parse-cv).
+ *
+ * Başvuru formu anonim oturumla açılır; serbest istemli AI ucu adaya kapalı
+ * (functions/routes/ai.js). İstem sunucuda kurulur, bütçe şirketin aday
+ * kovasından düşer. Kota dolduysa ya da hata olursa null: başvuru AI'sız da
+ * kaydedilir, değerlendirmeyi işe alımcı sonra yapar.
+ */
+async function parseCvOnServer(positionId, cvText) {
+    const res = await fetch('/api/public/apply/parse-cv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+        body: JSON.stringify({ positionId, cvText: String(cvText || '').slice(0, 60000), tenantId: getActiveTenantId() }),
+    });
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => ({}));
+    return body?.candidate || null;
+}
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -77,6 +94,8 @@ export default function ApplyPage() {
     const [autoFilled, setAutoFilled] = useState({ name: false, email: false, phone: false, linkedin: false });
     const [cvParseError, setCvParseError] = useState(false);
     const [cvParseNoData, setCvParseNoData] = useState(false);
+    // Dosya seçilince yapılan sunucu ayrıştırmasının sonucu (gönderimde yeniden kullanılır).
+    const parsedRef = useRef(null);
 
     const [step, setStep] = useState('form');   // form | processing | success | error
     const [progress, setProgress] = useState('');
@@ -196,7 +215,9 @@ export default function ApplyPage() {
             const text = await extractTextFromFile(file);
             console.log('[CV auto-fill] extracted text length:', text?.length);
             if (text && text.length >= 40) {
-                const parsed = await parseCandidateFromText(text);
+                const parsed = await parseCvOnServer(positionId, text);
+                // Gönderimde aynı CV ikinci kez ayrıştırılmasın (iki ön analiz yazılmasın).
+                parsedRef.current = { file, parsed };
                 console.log('[CV auto-fill] parsed result:', parsed);
                 if (parsed) {
                     const newForm = {};
@@ -263,7 +284,9 @@ export default function ApplyPage() {
                 const parseTimeout = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('CV parse timed out after 25s')), 25000)
                 );
-                parsedCandidate = await Promise.race([parseCandidateFromText(cvText), parseTimeout]);
+                parsedCandidate = parsedRef.current?.file === cvFile && parsedRef.current?.parsed
+                    ? parsedRef.current.parsed
+                    : await Promise.race([parseCvOnServer(position?.id || positionId, cvText), parseTimeout]);
             } catch {
                 parsedCandidate = null;
             }
@@ -282,34 +305,11 @@ export default function ApplyPage() {
                 }
             }
 
-            // Step 3b — STAR Analysis (Phase 2: AI-powered deep CV evaluation)
-            setProgress('CV STAR analizi yapılıyor...');
-            let starAiAnalysis = null;
-            if (parsedCandidate && position) {
-                try {
-                    const jobText = buildJobDescription(position);
-                    const timeoutPromise = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('STAR analysis timed out after 30s')), 30000)
-                    );
-                    const aiResult = await Promise.race([
-                        analyzeCandidateMatch(jobText, parsedCandidate, 'gemini-2.5-flash', {
-                            requirements: requirementsOf(position),
-                        }),
-                        timeoutPromise,
-                    ]);
-                    starAiAnalysis = {
-                        score: aiResult.score,
-                        summary: aiResult.summary,
-                        starAnalysis: aiResult.starAnalysis,
-                        reasons: aiResult.reasons,
-                        lastAnalyzedAt: new Date().toISOString(),
-                    };
-                    // Use the AI score as the primary score if available
-                    if (aiResult.score > 0) score = aiResult.score;
-                } catch (starErr) {
-                    console.warn('Phase 2 STAR analysis failed (non-blocking):', starErr.message);
-                }
-            }
+            // Step 3b — STAR analizi BURADA YAPILMIYOR. Eskiden aday tarayıcısı
+            // serbest istemli AI ucuyla derin analiz çalıştırıyordu; o uç adaya
+            // kapandı (plan §5.2) ve sonuç zaten yalnız istemcinin
+            // gönderdiği (güvenilmeyen) skoru etkiliyordu. Derin analizi işe
+            // alımcı aday ekranından şirket kotasıyla çalıştırır.
 
             // Step 3c — AI scoring of screening answers via backend (non-blocking)
             // Raw answers are always persisted; AI scoring augments them if available.
@@ -325,9 +325,11 @@ export default function ApplyPage() {
                         fetch('/api/score-screening-answers', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+                            // Sorular ve başlık sunucuda ilandan okunur; yalnız cevaplar gider.
                             body: JSON.stringify({
-                                positionTitle: position.title,
-                                answers: rawScreeningAnswers,
+                                positionId: position.id || positionId,
+                                tenantId: getActiveTenantId(),
+                                answers: rawScreeningAnswers.map((a) => a.answer),
                             }),
                         }),
                         new Promise((_, reject) => setTimeout(() => reject(new Error('Screening AI timeout')), 20000)),

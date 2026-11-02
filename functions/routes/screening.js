@@ -9,20 +9,47 @@
 import { Router } from 'express';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
-import { verifyFirebaseToken, requireTenant, WRITER_ROLES } from '../middleware/auth.js';
+import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
+import { requireAiCaller } from '../middleware/aiCaller.js';
 import { generateText } from '../services/gemini.js';
+import { sendQuotaError } from '../services/aiQuota.js';
+import { isValidDocId } from '../services/tenantPaths.js';
+import { db } from '../config/firebaseAdmin.js';
 import { buildStructuredPrompt, sanitizeForPrompt } from '../services/promptGuard.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('screening');
 
 const router = Router();
 
-// Başvuru formu (anon oturum) çağırır → verifyFirebaseToken yeterli.
-router.post('/api/score-screening-answers', aiLimiter, verifyFirebaseToken, async (req, res) => {
-    const { positionTitle, answers } = req.body || {};
-    if (!Array.isArray(answers) || answers.length === 0) {
+// Başvuru formu (anon oturum) çağırır. Amaca özel uç: istem sunucuda kurulur,
+// sorular ve ilan başlığı istemciden değil İLANDAN okunur (açık ilan şart);
+// istemciden yalnız cevaplar gelir. Bütçe şirketin 'anon' kovasından.
+router.post('/api/score-screening-answers', requireAiCaller({ allowAnonymous: true }), aiLimiter, async (req, res) => {
+    const { positionId, answers: rawAnswers } = req.body || {};
+    if (!Array.isArray(rawAnswers) || rawAnswers.length === 0) {
         return res.status(400).json({ error: 'answers[] is required.' });
     }
+    if (typeof positionId !== 'string' || !isValidDocId(positionId)) {
+        return res.status(400).json({ error: 'positionId gereklidir.' });
+    }
+    const paths = req.publicTenant?.paths || req.paths;
+    let position;
+    try {
+        const snap = await db.doc(paths.position(positionId)).get();
+        position = snap.exists ? snap.data() : null;
+    } catch (err) {
+        log.error({ err: err.message }, '[score-screening-answers] ilan okunamadı');
+        return res.status(500).json({ error: 'İlan okunamadı.' });
+    }
+    if (!position || position.status !== 'open') return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+    const questions = Array.isArray(position.screeningQuestions) ? position.screeningQuestions.slice(0, 20) : [];
+    if (questions.length === 0) return res.status(400).json({ error: 'Bu ilanda ön eleme sorusu yok.' });
+    const positionTitle = position.title;
+    // Cevap sırası ilandaki soru sırası; fazlası yok sayılır.
+    const answers = questions.map((q, i) => {
+        const a = rawAnswers[i];
+        return { question: String(q || ''), answer: typeof a === 'string' ? a : String(a?.answer ?? '') };
+    });
 
     // Cevaplar aday tarafından yazılır (halka açık başvuru formu) — puanı
     // dayatmaya çalışan enjeksiyon denemelerine karşı veri bloğuna alınır.
@@ -49,13 +76,14 @@ router.post('/api/score-screening-answers', aiLimiter, verifyFirebaseToken, asyn
             : (scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length) : null);
         res.json({ scores, aggregateScore, summary: parsed.summary || '' });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, '[score-screening-answers] Error');
         res.status(500).json({ error: err.message });
     }
 });
 
 // Pozisyon editörü (recruiter) çağırır → rol kapısı.
-router.post('/api/suggest-screening-questions', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
+router.post('/api/suggest-screening-questions', requireTenant(WRITER_ROLES), aiLimiter, async (req, res) => {
     const { positionTitle, requirements } = req.body || {};
     if (!positionTitle && !requirements) {
         return res.status(400).json({ error: 'positionTitle or requirements is required.' });
@@ -73,12 +101,13 @@ router.post('/api/suggest-screening-questions', aiLimiter, requireTenant(WRITER_
         const questions = (parsed.questions || []).slice(0, 5).filter(q => q && q.trim());
         res.json({ questions });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, '[suggest-screening-questions] Error');
         res.status(500).json({ error: err.message });
     }
 });
 
-router.post('/api/improve-screening-question', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
+router.post('/api/improve-screening-question', requireTenant(WRITER_ROLES), aiLimiter, async (req, res) => {
     const { question, positionTitle, requirements } = req.body || {};
     if (!question?.trim()) return res.status(400).json({ error: 'question is required.' });
     const prompt = buildStructuredPrompt(
@@ -96,6 +125,7 @@ router.post('/api/improve-screening-question', aiLimiter, requireTenant(WRITER_R
         const parsed = JSON.parse(match[0]);
         res.json({ improved: parsed.improved || question });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, '[improve-screening-question] Error');
         res.status(500).json({ error: err.message });
     }

@@ -42,6 +42,7 @@ import {
 } from '../middleware/auth.js';
 import { isValidDocId } from '../services/tenantPaths.js';
 import { generateText } from '../services/gemini.js';
+import { consumePlanUnit, QuotaError, sendQuotaError } from '../services/aiQuota.js';
 import { sanitizeForPrompt } from '../services/promptGuard.js';
 import {
     buildGradingPrompt,
@@ -372,8 +373,8 @@ YALNIZCA aşağıdaki JSON formatında yanıt ver, başka hiçbir şey yazma:
 
 router.post(
     '/api/create-manual-interview',
-    aiLimiter,
     requireTenant(WRITER_ROLES),
+    aiLimiter,
     async (req, res) => {
         const {
             candidateId,
@@ -451,7 +452,10 @@ router.post(
         // madde metinleriyle damga üretirdi.
         const gradingContext = await loadGradingContext(req.paths, positionId, safeQuestions);
 
-        const [evalResult, verdictResult] = await Promise.allSettled([
+        // Paket birimi: mülakat değerlendirmesi (plans.js). Hak dolduysa AI
+        // çalışmaz ama kayıt yine DÜŞMEZ — sebep kayda girer, ay başında ya da
+        // paket yükselince yeniden değerlendirilebilir.
+        const [evalResult, verdictResult] = await evaluateWithinPlan(req.aiContext, () => [
             runManualEvaluation({
                 positionTitle, candidateName, interviewType, date, time,
                 questions: safeQuestions, transcript, notes,
@@ -539,6 +543,23 @@ async function loadGradingContext(paths, positionId, safeQuestions) {
         log.warn({ err: err.message }, '[create-manual-interview] position read failed');
         return empty;
     }
+}
+
+/**
+ * Mülakat değerlendirmesi paket birimini düşer, sonra AI çağrılarını çalıştırır.
+ * Hak dolduysa çağrılar HİÇ başlatılmaz ve her biri aynı QuotaError ile
+ * "rejected" döner (Promise.allSettled biçimi korunur).
+ */
+async function evaluateWithinPlan(ctx, start) {
+    try {
+        await consumePlanUnit(ctx, 'interviewEval');
+    } catch (err) {
+        return [
+            { status: 'rejected', reason: err },
+            { status: 'rejected', reason: err },
+        ];
+    }
+    return Promise.allSettled(start());
 }
 
 /** Damga çağrısı — küçük çıktı, skoru belirleyen kısım. */
@@ -848,8 +869,8 @@ async function persistManualInterview({
  */
 router.post(
     '/api/reevaluate-interview',
-    aiLimiter,
     requireTenant(WRITER_ROLES),
+    aiLimiter,
     async (req, res) => {
         const { sessionId, questions } = req.body || {};
         if (!sessionId || typeof sessionId !== 'string') {
@@ -881,7 +902,7 @@ router.post(
 
         const gradingContext = await loadGradingContext(req.paths, record.positionId, safeQuestions);
 
-        const [evalResult, verdictResult] = await Promise.allSettled([
+        const [evalResult, verdictResult] = await evaluateWithinPlan(req.aiContext, () => [
             runManualEvaluation({
                 positionTitle: record.positionTitle || '',
                 candidateName: record.candidateName || '',
@@ -894,6 +915,13 @@ router.post(
             }),
             runRequirementGrading(gradingContext, record.positionTitle || ''),
         ]);
+
+        // Yeniden değerlendirmede yeni bir şey yazılamayacaksa kota sebebi
+        // doğrudan söylenir (kayıt zaten var, üzerine boş sonuç yazılmaz).
+        const quotaErr = [evalResult, verdictResult].map((r) => r.reason).find((e) => e instanceof QuotaError);
+        if (quotaErr && evalResult.status === 'rejected' && verdictResult.status === 'rejected') {
+            return sendQuotaError(res, quotaErr);
+        }
 
         const aiAnalysis = evalResult.status === 'fulfilled' ? evalResult.value : null;
         const requirementVerdicts = verdictResult.status === 'fulfilled' ? verdictResult.value : [];

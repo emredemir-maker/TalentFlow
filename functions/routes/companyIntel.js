@@ -14,6 +14,7 @@ import { aiLimiter } from '../middleware/rateLimit.js';
 import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
 import { db } from '../config/firebaseAdmin.js';
 import { generateGrounded } from '../services/gemini.js';
+import { sendQuotaError } from '../services/aiQuota.js';
 import { sanitizeForPrompt } from '../services/promptGuard.js';
 import { PLATFORM_PATHS } from '../services/tenantPaths.js';
 import {
@@ -88,6 +89,7 @@ router.post('/api/company-intel/resolve', aiLimiterUnlessCacheOnly, requireTenan
         await cacheRef.set(record);
         res.json({ key: ref.key, source: 'live', answer: record.answer, resolvedAt: record.resolvedAt });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.warn({ err: err?.message }, '[company-intel/resolve]');
         res.status(500).json({ error: 'Şirket bilgisi alınamadı.' });
     }

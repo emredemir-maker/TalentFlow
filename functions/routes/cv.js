@@ -27,6 +27,7 @@ import { storagePaths } from '../services/tenantPaths.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
+import { consumePlanUnit, sendQuotaError, QuotaError } from '../services/aiQuota.js';
 import { db, getStorageBucket } from '../config/firebaseAdmin.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('cv');
@@ -132,7 +133,7 @@ export async function storeCvFile(file, tenantId) {
     }
 }
 
-router.post('/api/direct-add', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
+router.post('/api/direct-add', requireTenant(WRITER_ROLES), aiLimiter, async (req, res) => {
     try {
         const { text, url } = req.body;
         log.info(`📥 Direct Add request for: ${url}`);
@@ -140,6 +141,8 @@ router.post('/api/direct-add', aiLimiter, requireTenant(WRITER_ROLES), async (re
         // Use parseProfile's default model — controlled via CV_PARSING_MODEL
         // env var (defaults to gemini-2.5-flash; can be flipped to gemma-3-27b-it
         // or any other Google AI Studio model id without code changes).
+        // Her AI ile işlenen aday bir "ön analiz" paket birimi (plans.js).
+        await consumePlanUnit(req.aiContext, 'prescreen');
         const candidate = await parseProfile(text);
         if (candidate && candidate.name) {
             candidate.linkedinUrl = url;
@@ -152,11 +155,12 @@ router.post('/api/direct-add', aiLimiter, requireTenant(WRITER_ROLES), async (re
             res.status(400).json({ error: 'Could not parse candidate data.' });
         }
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         res.status(500).json({ error: err.message });
     }
 });
 
-router.post('/api/process-cv', aiLimiter, requireTenant(WRITER_ROLES), wrapMulter(upload.array('cvs', 20)), async (req, res) => {
+router.post('/api/process-cv', requireTenant(WRITER_ROLES), aiLimiter, wrapMulter(upload.array('cvs', 20)), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Dosya seçilmedi' });
 
@@ -187,6 +191,7 @@ router.post('/api/process-cv', aiLimiter, requireTenant(WRITER_ROLES), wrapMulte
                 // Same CV_PARSING_MODEL env var as /api/direct-add — see
                 // services/gemini.js getDefaultCvParsingModel() for the
                 // resolution order.
+                await consumePlanUnit(req.aiContext, 'prescreen');
                 const candidate = await parseProfile(text);
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
@@ -194,6 +199,10 @@ router.post('/api/process-cv', aiLimiter, requireTenant(WRITER_ROLES), wrapMulte
 
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {
+                // Kota: dosya başına Türkçe sebep + makine kodu (arayüz ayırt eder).
+                if (err instanceof QuotaError) {
+                    return { fileName: file.originalname, error: err.userMessage, code: err.code };
+                }
                 log.error({ err: err }, `Error processing ${file.originalname}`);
                 return { fileName: file.originalname, error: err.message };
             }

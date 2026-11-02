@@ -38,12 +38,35 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     admin: {},
 }));
 
+// AI bağlamı (aiContext.js) ve şirket kotası (aiQuota.js): bu dosya Gemini
+// hunisini test ediyor; kota kendi dosyasında (aiQuota.test.js). Burada
+// yalnız huninin kotayı DOĞRU SIRADA çağırdığı denetleniyor.
+const aiCtx = vi.hoisted(() => ({
+    current: { tenantId: 'A', userKey: 'u1', anonymous: false, limits: { dailyTokens: 1 }, planLimits: {} },
+}));
+vi.mock('./aiContext.js', () => ({ currentAiContext: () => aiCtx.current }));
+const quota = vi.hoisted(() => ({
+    reserveAi: vi.fn(async () => ({ lease: true })),
+    settleAi: vi.fn(async () => {}),
+    releaseAi: vi.fn(async () => {}),
+    recordCacheHit: vi.fn(async () => {}),
+}));
+vi.mock('./aiQuota.js', async (orig) => {
+    const real = await orig();
+    return { ...real, ...quota };
+});
+
 // Now safe to import the module.
 const { generateText, generateGrounded, parseProfile, getDefaultCvParsingModel } = await import('./gemini.js');
 const { resetBudgetCache } = await import('./aiBudget.js');
 
 beforeEach(() => {
     mockGenerateContent.mockReset();
+    quota.reserveAi.mockReset().mockResolvedValue({ lease: true });
+    quota.settleAi.mockClear();
+    quota.releaseAi.mockClear();
+    quota.recordCacheHit.mockClear();
+    aiCtx.current = { tenantId: 'A', userKey: 'u1', anonymous: false, limits: { dailyTokens: 1 }, planLimits: {} };
     // Force env-key path so getApiKey() succeeds without firestore lookup
     process.env.GEMINI_API_KEY = 'test-key-for-vitest';
     // Günlük bütçe sayacı modül düzeyinde — testler birbirinin sayısını
@@ -489,5 +512,66 @@ describe('günlük AI bütçesi', () => {
         mockGenerateContent.mockResolvedValue(cevap('duz', 10));
         await generateGrounded('aramali');
         await expect(generateText('duz istek')).resolves.toBe('duz');
+    });
+});
+
+describe('şirket kotası — huni sırası (PR 7)', () => {
+    it('BAĞLAMSIZ ÇAĞRI REDDEDİLİR: hiçbir şirkete yazılmayan AI çağrısı olmaz', async () => {
+        aiCtx.current = null;
+        await expect(generateText(`bağlamsız-${Math.random()}`)).rejects.toThrow(/AI_TENANT_REQUIRED/);
+        expect(mockGenerateContent).not.toHaveBeenCalled();
+    });
+
+    it('önce ayırır, sonra çağırır, gerçek tüketimle kapatır', async () => {
+        mockGenerateContent.mockResolvedValue({
+            response: { text: () => 'ok', usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 } },
+        });
+        await generateText(`sira-${Math.random()}`, { label: 'coverage' });
+        expect(quota.reserveAi).toHaveBeenCalledTimes(1);
+        expect(quota.reserveAi.mock.calls[0][0].tenantId).toBe('A');
+        expect(quota.settleAi).toHaveBeenCalledWith({ lease: true }, expect.objectContaining({ label: 'coverage', usage: expect.objectContaining({ totalTokens: 15 }) }));
+        expect(quota.releaseAi).not.toHaveBeenCalled();
+    });
+
+    it('kota reddinde model HİÇ çağrılmaz ve hata olduğu gibi yükselir', async () => {
+        const { QuotaError } = await import('./aiQuota.js');
+        quota.reserveAi.mockRejectedValueOnce(new QuotaError('AI_DAILY_BUDGET_EXCEEDED', 'doldu'));
+        await expect(generateText(`ret-${Math.random()}`)).rejects.toThrow(/AI_DAILY_BUDGET_EXCEEDED/);
+        expect(mockGenerateContent).not.toHaveBeenCalled();
+    });
+
+    it('çağrı başarısızsa ayrılan tutar geri bırakılır', async () => {
+        mockGenerateContent.mockRejectedValue(new Error('400 invalid argument'));
+        await expect(generateText(`hata-${Math.random()}`)).rejects.toThrow();
+        expect(quota.releaseAi).toHaveBeenCalledTimes(1);
+        expect(quota.settleAi).not.toHaveBeenCalled();
+    });
+
+    it('önbellek anahtarı şirkete özel: B, A\'nın önbelleğinden cevap almaz (yan kanal yok)', async () => {
+        mockGenerateContent.mockResolvedValue({ response: { text: () => 'A cevabı' } });
+        const prompt = `ortak-cv-${Math.random()}`;
+        await generateText(prompt);
+        aiCtx.current = { ...aiCtx.current, tenantId: 'B' };
+        mockGenerateContent.mockResolvedValue({ response: { text: () => 'B cevabı' } });
+        expect(await generateText(prompt)).toBe('B cevabı');
+        expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+        // A için yine önbellek (kota ayırmadan).
+        aiCtx.current = { ...aiCtx.current, tenantId: 'A' };
+        quota.reserveAi.mockClear();
+        expect(await generateText(prompt)).toBe('A cevabı');
+        expect(quota.reserveAi).not.toHaveBeenCalled();
+        expect(quota.recordCacheHit).toHaveBeenCalled();
+    });
+
+    it('aramalı çağrı grounded:true ile ayırır', async () => {
+        mockGenerateContent.mockResolvedValue({ response: { text: () => 'x', candidates: [{}] } });
+        await generateGrounded(`arama-${Math.random()}`);
+        expect(quota.reserveAi.mock.calls[0][1]).toEqual(expect.objectContaining({ grounded: true }));
+    });
+
+    it('parseProfile kota hatasını yutmaz (çağıran 429 dönebilsin)', async () => {
+        const { QuotaError } = await import('./aiQuota.js');
+        quota.reserveAi.mockRejectedValueOnce(new QuotaError('AI_DAILY_BUDGET_EXCEEDED', 'doldu'));
+        await expect(parseProfile(`Ali Veli ${Math.random()} yazılım mühendisi`.repeat(3))).rejects.toThrow(/AI_DAILY_BUDGET_EXCEEDED/);
     });
 });

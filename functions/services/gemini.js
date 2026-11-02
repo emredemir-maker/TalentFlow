@@ -34,6 +34,8 @@ import { recordUsage, readUsage } from './usage.js';
 import { PLATFORM_PATHS } from './tenantPaths.js';
 import { extractPiiFromText, redactPiiFromText } from './pii.js';
 import { assertWithinBudget, noteSpend } from './aiBudget.js';
+import { currentAiContext } from './aiContext.js';
+import { reserveAi, settleAi, releaseAi, recordCacheHit, estimateTokens, QuotaError } from './aiQuota.js';
 
 const log = childLogger('gemini');
 
@@ -80,8 +82,13 @@ export function modeliCozumle(modelId) {
     return yedek;
 }
 
-function cacheKey(prompt, modelId, generationConfig) {
+function cacheKey(prompt, modelId, generationConfig, tenantId = '') {
     const h = crypto.createHash('sha256');
+    // ŞİRKET ANAHTARA GİRİYOR. Önbellek süreç genelinde; şirket kimliği
+    // olmasaydı A şirketi, aynı metni (ör. aynı CV) B'nin daha önce
+    // gönderip göndermediğini yanıt süresinden anlayabilirdi (yan kanal).
+    h.update(tenantId);
+    h.update('\0');
     h.update(modelId);
     h.update('\0');
     h.update(typeof prompt === 'string' ? prompt : JSON.stringify(prompt));
@@ -165,8 +172,9 @@ const MAX_RETRIES = 4;
 export async function generateText(prompt, options = {}) {
     const { modelId: istenenModel = 'gemini-2.5-flash', generationConfig, useCache = true, label = 'other' } = options;
     const modelId = modeliCozumle(istenenModel);
+    const ctx = requireAiContext();
 
-    const key = useCache ? cacheKey(prompt, modelId, generationConfig) : null;
+    const key = useCache ? cacheKey(prompt, modelId, generationConfig, ctx.tenantId) : null;
     if (key) {
         const cached = cacheGet(key);
         if (cached !== null) {
@@ -175,6 +183,7 @@ export async function generateText(prompt, options = {}) {
             // yaramadığını gösteren tek sayı bu oran; isabetleri kaydetmezsek
             // ölçüm "hiç çağrı yapılmamış" gibi görünür.
             void recordUsage({ label, modelId, cached: true }).catch(() => {});
+            void recordCacheHit(ctx, { label, modelId }).catch(() => {});
             return cached;
         }
     }
@@ -182,10 +191,13 @@ export async function generateText(prompt, options = {}) {
     // FREN ÖNBELLEKTEN SONRA. Önbellek isabeti token yakmıyor; bütçe dolduğu
     // için elimizdeki hazır cevabı vermemek, hiçbir şey kazandırmadan
     // kullanıcıyı durdurmak olurdu.
+    //   (1) platform güvenlik tavanı, (2-4) şirket / kullanıcı payı — atomik
+    //   ayırma (services/aiQuota.js). Ayırma başarılıysa çağrı ne olursa olsun
+    //   ya settle ya release ile kapanır.
     await assertWithinBudget();
-
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error('AI service unavailable — API key missing');
+    const lease = await reserveAi(ctx, { estimate: estimateTokens(prompt, generationConfig?.maxOutputTokens) });
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
@@ -216,6 +228,7 @@ export async function generateText(prompt, options = {}) {
             // iki tazeleme arasında freni ayakta tutan tek şey bu toplam.
             noteSpend({ totalTokens: tuketim.totalTokens });
             void recordUsage({ label, modelId, usage: tuketim }).catch(() => {});
+            void settleAi(lease, { label, modelId, usage: tuketim });
             if (key) cacheSet(key, text);
             return text;
         } catch (err) {
@@ -230,7 +243,22 @@ export async function generateText(prompt, options = {}) {
             await new Promise(r => setTimeout(r, backoffMs));
         }
     }
+    void releaseAi(lease);
     throw lastErr;
+}
+
+/**
+ * AI çağrısının şirket bağlamı (services/aiContext.js). Bağlamsız çağrı
+ * REDDEDİLİR: hiçbir şirketin bütçesinden düşmeyen bir AI çağrısı olmamalı.
+ */
+function requireAiContext() {
+    const ctx = currentAiContext();
+    if (!ctx || !ctx.tenantId || !ctx.limits) {
+        const err = new Error('AI_TENANT_REQUIRED: AI çağrısı bir şirket bağlamı olmadan yapılamaz.');
+        err.code = 'AI_TENANT_REQUIRED';
+        throw err;
+    }
+    return ctx;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -327,8 +355,9 @@ function readGrounding(response) {
 export async function generateGrounded(prompt, options = {}) {
     const { modelId: istenenModel = 'gemini-2.5-flash', maxOutputTokens = 1024, useCache = true } = options;
     const modelId = modeliCozumle(istenenModel);
+    const ctx = requireAiContext();
 
-    const key = useCache ? cacheKey(('grounded-search:' + prompt), modelId, { maxOutputTokens }) : null;
+    const key = useCache ? cacheKey(('grounded-search:' + prompt), modelId, { maxOutputTokens }, ctx.tenantId) : null;
     if (key) {
         const cached = cacheGet(key);
         if (cached !== null) {
@@ -349,6 +378,8 @@ export async function generateGrounded(prompt, options = {}) {
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error('AI service unavailable — API key missing');
     const genAI = new GoogleGenerativeAI(apiKey);
+    // Şirketin aramalı çağrı ADEDİ de bu ayırmada denetlenir (grounded: true).
+    const lease = await reserveAi(ctx, { estimate: estimateTokens(prompt, maxOutputTokens), grounded: true });
 
     let lastErr = null;
     for (const tools of SEARCH_TOOLS) {
@@ -367,6 +398,7 @@ export async function generateGrounded(prompt, options = {}) {
             const tuketim = readUsage(result.response);
             noteSpend({ totalTokens: tuketim.totalTokens, grounded: true });
             void recordUsage({ label: 'grounded', modelId, usage: tuketim }).catch(() => {});
+            void settleAi(lease, { label: 'grounded', modelId, usage: tuketim });
             if (key) cacheSet(key, value);
             return value;
         } catch (err) {
@@ -377,6 +409,10 @@ export async function generateGrounded(prompt, options = {}) {
             log.warn({ error: (err?.message || '').slice(0, 160) }, 'search tool rejected, trying next shape');
         }
     }
+
+    // Aramalı ayırma kapanır; aramasız son çare generateText içinde kendi
+    // ayırmasını yapar.
+    await releaseAi(lease);
 
     // Son çare: aramasız cevap. Kullanıcıya "kaynaksız" olarak gösterilir —
     // sessizce kaynaklıymış gibi sunmak en kötüsü olurdu.
@@ -460,6 +496,9 @@ export async function parseProfile(text, modelId) {
         log.info({ modelId: effectiveModelId }, '✅ Parsed profile');
         return mergeContact(json, contact);
     } catch (e) {
+        // Kota hatası "ayrıştırılamadı"ya dönüşmesin: çağıran 429 ile doğru
+        // sebebi (kota, yarın yenilenir) gösterebilsin.
+        if (e instanceof QuotaError || e?.code === 'AI_TENANT_REQUIRED') throw e;
         log.error({ err: e, modelId: effectiveModelId }, 'Profile parse error');
         return null;
     }

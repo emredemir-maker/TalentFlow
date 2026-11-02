@@ -468,6 +468,22 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
 - **AI ölçümü:** platform toplamı `platformUsage/{day}`; şirket başına ölçüm PR 7. Storage: CV yüklemesi
   `tenants/{t}/cvs/`, toplu kaynak öneki `tenants/{t}/bulk-imports/{uid}/`.
 
+### 6.2 PR 7 sonrası AI sözleşmesi
+
+- **Bağlam zorunlu:** her Gemini çağrısı bir şirket bağlamında (`functions/services/aiContext.js`, AsyncLocalStorage):
+  `requireTenant` (iç kullanıcı, kova `uid`), `requireAiCaller({allowAnonymous})` (aday, kova `anon`), toplu iş işçisi
+  (işi açan kişi). Bağlamsız çağrı `AI_TENANT_REQUIRED` ile reddedilir; önbellek anahtarında şirket kimliği var.
+- **Atomik sayaç:** `functions/services/aiQuota.js` — ayırma (`reserveAi`) tek Firestore işleminde koşul + artırım
+  (`tenants/{t}/usage/{gün}.quota.reserved`, `byUser.{k}`, `tenants/{t}/rate/{dakika}`); kapatma (`settleAi`) gerçek
+  tüketimi `increment` ile yazar ve tahmini geri alır. Sıra: platform tavanı → şirket token → aramalı adet → kişi payı
+  (+ dakikalık şirket sınırı). İşlem çakışması geçici 429 (`AI_RATE_LIMITED`), altyapı hatası ölçümle devam.
+- **Yanıtlar:** 429 `{code: AI_DAILY_BUDGET_EXCEEDED | AI_RATE_LIMITED | PLAN_LIMIT_REACHED, error, reason, resetAt}`.
+- **Serbest istem** (`/api/ai/generate`, `/api/ai/ask`) yalnız üyeye; aday tarafı: `/api/ai/stt`, `/api/gemini-stt`,
+  `/api/score-screening-answers` (sorular ilandan), `/api/public/apply/parse-cv` (istem sunucuda).
+- **Sınırlar ve paket:** `tenants/{t}.aiLimits`, `.plan`, `.planLimits` (`functions/services/plans.js`); yazan yalnız
+  platform yöneticisi `PUT /api/platform/tenants/:tenantId/limits` (ileride Hub konsolu). Paket birimleri aylık
+  `tenants/{t}/usage/month-YYYY-MM.units` (ön analiz: AI ile işlenen her CV; mülakat değerlendirmesi).
+
 Toplam kaba efor: **~3–4 hafta** (PR 0–8; davet/kayıt akışlarının kalkması PR 3'ü küçültüyor, e-posta (7b) ve destek
 üyeliği ekleniyor — toplam değişmedi), Hub tarafı ek ~1–1,5 hafta (köprü + admin konsolunda destek erişimi). Kritik yol:
 0 → 1 → 2 → (3, 4, 5, 6, 7, 7b paralel olabilir) → 8.

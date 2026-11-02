@@ -28,7 +28,9 @@ import { generateText } from './gemini.js';
 import { childLogger } from './logger.js';
 import { positionRequirements } from './positionRequirements.js';
 import { expandJobSources } from './bulkExpand.js';
-import { storagePaths, tenantIdFromPath, tenantPaths } from './tenantPaths.js';
+import { storagePaths, tenantIdFromPath, tenantPaths, tenantDocPath } from './tenantPaths.js';
+import { buildAiContext, runWithAiContext } from './aiContext.js';
+import { QuotaError, RATE_CODE, consumePlanUnit, checkBulkBudget } from './aiQuota.js';
 import { decideTenantAccess, WRITER_ROLES } from '../middleware/auth.js';
 const log = childLogger('bulk-worker');
 
@@ -622,6 +624,21 @@ const WRITE_RECHECK_MS = 60 * 1000;
 export async function executeJob(jobPath) {
     const tenantId = tenantIdFromPath(jobPath);
     if (!tenantId) throw new Error('İş şirket ağacında değil.');
+    // AI çağrıları işi açan kişinin ve şirketin bütçesinden düşer
+    // (services/aiContext.js). İstek dışında çalıştığımız için bağlam burada.
+    const [tenantSnap, jobSnap] = await db.getAll(
+        db.doc(tenantDocPath(tenantId)),
+        db.doc(tenantPaths(tenantId).bulkJob(jobPath.split('/').pop()))
+    );
+    const ctx = buildAiContext({
+        tenantId,
+        tenant: tenantSnap.exists ? tenantSnap.data() : {},
+        uid: jobSnap.exists ? jobSnap.data()?.createdBy : '',
+    });
+    return runWithAiContext(ctx, () => executeJobInContext(jobPath, tenantId, ctx));
+}
+
+async function executeJobInContext(jobPath, tenantId, aiCtx) {
     const paths = tenantPaths(tenantId);
     const jobId = jobPath.split('/').pop();
     const jobRef = db.doc(paths.bulkJob(jobId));
@@ -646,6 +663,19 @@ export async function executeJob(jobPath) {
 
         const itemsSnap = await itemsRef.orderBy('index').get();
         const total = itemsSnap.size;
+
+        // Kesin sayıyla bütçe denetimi — iş hiç başlamadıysa (ilk çalıştırma).
+        // Yetmiyorsa hiçbir kayıt işlenmeden hata ile kapanır: yarım iş yok.
+        if (!jobData.budgetChecked) {
+            const pending = itemsSnap.docs.filter((d) => !['done', 'error', 'duplicate'].includes(d.data().status)).length;
+            const budget = await checkBulkBudget(aiCtx, pending);
+            if (!budget.ok) throw new Error(`${budget.code}: ${budget.message}`);
+            await jobRef.update({ budgetChecked: true });
+        }
+        // Kota (günlük bütçe ya da paket hakkı) iş ortasında biterse kalan
+        // kayıtlar aynı sebeple kapanır; iş kuyruğa geri dönüp sonsuza dek
+        // reddedilmez.
+        let stopError = null;
         let processedCount = 0;
         let failedCount = 0;
         let duplicateCount = 0;
@@ -726,6 +756,10 @@ export async function executeJob(jobPath) {
                     }
                     const cooldownWait = quotaCooldownUntil - Date.now();
                     if (cooldownWait > 0) await new Promise((r) => setTimeout(r, cooldownWait));
+                    if (stopError) throw stopError;
+                    // Bir CV = bir "ön analiz" paket birimi (plans.js); yeniden
+                    // denemelerde ikinci kez düşülmez.
+                    if (retries === 0) await consumePlanUnit(aiCtx, 'prescreen');
                     let parsed = await parseTextWithGemini(cvText, positionTitle, openPositionTitles);
                     if (!parsed) {
                         // Bozuk/yarım JSON 1 saatlik önbelleğe takılı kalabiliyor —
@@ -814,7 +848,17 @@ export async function executeJob(jobPath) {
                     await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
                     break;
                 } catch (err) {
-                    const isQuota = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
+                    // Şirket kotası: dakikalık sınır geçicidir (aşağıdaki
+                    // bekleme + yeniden deneme); günlük bütçe / paket hakkı
+                    // bugün geri gelmez → bu ve kalan kayıtlar sebebiyle kapanır.
+                    if (err instanceof QuotaError && err.code !== RATE_CODE) {
+                        stopError = stopError || err;
+                        failedCount++;
+                        await itemDoc.ref.update({ status: 'error', error: err.userMessage, errorCode: err.code });
+                        await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                        break;
+                    }
+                    const isQuota = err instanceof QuotaError || err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
                     retries++;
                     if (retries > MAX_RETRIES || !isQuota) {
                         failedCount++;

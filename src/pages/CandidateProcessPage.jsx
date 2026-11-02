@@ -34,6 +34,7 @@ import ScoreBreakdownPanel, { RequirementTiers } from '../components/ScoreBreakd
 import InterviewPlanPanel from '../components/InterviewPlanPanel';
 import InterviewOutcomePanel from '../components/InterviewOutcomePanel';
 import { aiErrorHint } from '../utils/aiErrorHint';
+import { getAuthHeaders } from '../services/ai/config';
 import MustHaveBadge from '../components/MustHaveBadge';
 import StarEvidenceCards from '../components/StarEvidenceCards';
 import VerificationPanel from '../components/VerificationPanel';
@@ -439,11 +440,12 @@ export default function CandidateProcessPage() {
             // Sunucu üzerinden Gemini proxy'sini kullan — API anahtarı tarayıcıya sızmaz
             const res = await fetch('/api/ai/generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, mimeType: 'text/plain' })
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+                body: JSON.stringify({ prompt, mimeType: 'text/plain', label: 'assistant' })
             });
             if (!res.ok) {
-                throw new Error(`AI isteği başarısız: ${res.status}`);
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.code ? `${body.code}: ${body.error}` : `AI isteği başarısız: ${res.status}`);
             }
             const { text } = await res.json();
             if (text) setFeedbackText(String(text).trim());
