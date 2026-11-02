@@ -56,7 +56,11 @@ async function call(method, path, { uid, tenant, body } = {}) {
     const headers = { 'Content-Type': 'application/json' };
     if (uid) headers.Authorization = `Bearer ${token(uid)}`;
     if (tenant) headers['X-Tenant-Id'] = tenant;
-    const res = await realFetch(`${base}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const res = await realFetch(`${base}${path}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+    });
     let json = null;
     try {
         json = await res.json();
@@ -67,9 +71,12 @@ async function call(method, path, { uid, tenant, body } = {}) {
 }
 
 beforeAll(async () => {
-    await realFetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, {
-        method: 'DELETE',
-    });
+    await realFetch(
+        `http://127.0.0.1:8080/emulator/v1/projects/${PROJECT}/databases/(default)/documents`,
+        {
+            method: 'DELETE',
+        }
+    );
     // Yalnız Resend yakalanır; emülatör ve uygulama çağrıları gerçek fetch.
     globalThis.fetch = async (url, init) => {
         if (String(url).startsWith('https://api.resend.com/')) {
@@ -97,14 +104,21 @@ beforeAll(async () => {
         [`${T('B')}/members/bRec`]: { role: 'recruiter', status: 'active' },
         // A'nın kendi şablonu ve markası; B yerleşik şablonu kullanır.
         [`${T('A')}/settings/emailTemplates`]: {
-            feedback: { subject: '{{companyName}} sonucu', html: '<p>A-ŞABLON {{candidateName}}: {{feedbackText}}</p>' },
+            feedback: {
+                subject: '{{companyName}} sonucu',
+                html: '<p>A-ŞABLON {{candidateName}}: {{feedbackText}}</p>',
+            },
         },
         [`${T('A')}/settings/branding`]: { companyName: 'Alfa Tek.' },
     };
     const batch = db.batch();
     for (const [p, d] of Object.entries(docs)) batch.set(db.doc(p), d);
     await batch.commit();
-    for (const uid of ['aRec', 'bRec']) await admin.auth().createUser({ uid }).catch(() => {});
+    for (const uid of ['aRec', 'bRec'])
+        await admin
+            .auth()
+            .createUser({ uid })
+            .catch(() => {});
 }, 60_000);
 
 afterEach(() => {
@@ -120,7 +134,9 @@ afterAll(async () => {
 describe('gönderici kuralları (K7)', () => {
     it('RESEND_API_KEY yoksa 503 EMAIL_DISABLED; hiçbir şey gönderilmez', async () => {
         const r = await call('POST', '/api/send-feedback', {
-            uid: 'aRec', tenant: 'A', body: { to: 'aday@x.test', candidateName: 'Ali', feedbackText: 'teşekkürler' },
+            uid: 'aRec',
+            tenant: 'A',
+            body: { to: 'aday@x.test', candidateName: 'Ali', feedbackText: 'teşekkürler' },
         });
         expect(r.status).toBe(503);
         expect(r.body.code).toBe('EMAIL_DISABLED');
@@ -156,7 +172,14 @@ describe('gönderici kuralları (K7)', () => {
     it("B: kendi adıyla ve yerleşik şablonla; A'nın şablonu/markası sızmaz", async () => {
         process.env.RESEND_API_KEY = 're_test';
         const r = await call('POST', '/api/send-feedback', {
-            uid: 'bRec', tenant: 'B', body: { to: 'aday@x.test', candidateName: 'Veli', feedbackText: 'olumlu', outcome: 'positive' },
+            uid: 'bRec',
+            tenant: 'B',
+            body: {
+                to: 'aday@x.test',
+                candidateName: 'Veli',
+                feedbackText: 'olumlu',
+                outcome: 'positive',
+            },
         });
         expect(r.status).toBe(200);
         const m = sent[0].body;
@@ -169,7 +192,9 @@ describe('gönderici kuralları (K7)', () => {
     it('A üyesi B başlığıyla gönderemez (403), hiçbir şey gitmez', async () => {
         process.env.RESEND_API_KEY = 're_test';
         const r = await call('POST', '/api/send-feedback', {
-            uid: 'aRec', tenant: 'B', body: { to: 'aday@x.test', candidateName: 'x', feedbackText: 'y' },
+            uid: 'aRec',
+            tenant: 'B',
+            body: { to: 'aday@x.test', candidateName: 'x', feedbackText: 'y' },
         });
         expect(r.status).toBe(403);
         expect(sent).toHaveLength(0);
@@ -179,33 +204,62 @@ describe('gönderici kuralları (K7)', () => {
         process.env.RESEND_API_KEY = 're_test';
         const ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR';
         const ok = await call('POST', '/api/send-interview-invite', {
-            uid: 'aRec', tenant: 'A',
-            body: { to: 'aday@x.test', templateKey: 'invite', vars: { candidateName: 'Ali', joinLink: 'https://talent.clyro.test/join/s1', date: '3 Kasım' }, ics },
+            uid: 'aRec',
+            tenant: 'A',
+            body: {
+                to: 'aday@x.test',
+                templateKey: 'invite',
+                vars: {
+                    candidateName: 'Ali',
+                    joinLink: 'https://talent.clyro.test/join/s1',
+                    date: '3 Kasım',
+                },
+                ics,
+            },
         });
         expect(ok.status).toBe(200);
         expect(sent[0].body.html).toContain('href="https://talent.clyro.test/join/s1"');
         expect(sent[0].body.attachments[0].filename).toBe('mulakat.ics');
         const bad = await call('POST', '/api/send-interview-invite', {
-            uid: 'aRec', tenant: 'A',
-            body: { to: 'aday@x.test', templateKey: 'invite', vars: { candidateName: 'Ali', joinLink: 'https://kotu.test/x' } },
+            uid: 'aRec',
+            tenant: 'A',
+            body: {
+                to: 'aday@x.test',
+                templateKey: 'invite',
+                vars: { candidateName: 'Ali', joinLink: 'https://kotu.test/x' },
+            },
         });
         expect(bad.status).toBe(200);
         expect(sent[1].body.html).not.toContain('kotu.test');
-        const badIcs = await call('POST', '/api/send-interview-invite', { uid: 'aRec', tenant: 'A', body: { to: 'aday@x.test', ics: '<script>' } });
+        const badIcs = await call('POST', '/api/send-interview-invite', {
+            uid: 'aRec',
+            tenant: 'A',
+            body: { to: 'aday@x.test', ics: '<script>' },
+        });
         expect(badIcs.status).toBe(400);
     });
 
     it('bilgi talebi: konuda sunucunun kimliği, kayıtta işe alımcının uid/e-postası (Reply-To ile aynı)', async () => {
         process.env.RESEND_API_KEY = 're_test';
         const r = await call('POST', '/api/send-info-request', {
-            uid: 'aRec', tenant: 'A',
-            body: { to: 'Aday@X.test', candidateName: 'Ali', recruiterEmail: 'saldirgan@kotu.test', requestedItems: ['Diploma'] },
+            uid: 'aRec',
+            tenant: 'A',
+            body: {
+                to: 'Aday@X.test',
+                candidateName: 'Ali',
+                recruiterEmail: 'saldirgan@kotu.test',
+                requestedItems: ['Diploma'],
+            },
         });
         expect(r.status).toBe(200);
         expect(sent[0].body.subject).toMatch(new RegExp(`\\[#${r.body.requestId}\\]$`));
         expect(sent[0].body.reply_to).toBe('aRec@a.test');
         const rec = (await db.doc(`tenants/A/infoRequests/${r.body.requestId}`).get()).data();
-        expect(rec).toMatchObject({ recruiterUid: 'aRec', recruiterEmail: 'aRec@a.test', candidateEmail: 'aday@x.test' });
+        expect(rec).toMatchObject({
+            recruiterUid: 'aRec',
+            recruiterEmail: 'aRec@a.test',
+            candidateEmail: 'aday@x.test',
+        });
         expect(r.body.respondUrl).toMatch(/^https:\/\/talent\.clyro\.test\/respond\/ir-/);
     });
 });
