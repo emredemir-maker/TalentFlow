@@ -73,6 +73,7 @@ export const PLAN_UNITS = Object.freeze({
  *   userSharePct       — tek kullanıcının şirket bütçesinden alabileceği pay
  *   anonSharePct       — aday tarafının (anonim, tek kova) payı
  *   perMinuteCalls     — şirket genelinde dakikalık AI çağrısı (tüm örnekler)
+ *   anonPerMinuteCalls — bunun aday tarafına ayrılan en çok kısmı
  */
 export const DEFAULT_AI_LIMITS = Object.freeze({
     dailyTokens: 2_000_000,
@@ -80,6 +81,7 @@ export const DEFAULT_AI_LIMITS = Object.freeze({
     userSharePct: 40,
     anonSharePct: 40,
     perMinuteCalls: 120,
+    anonPerMinuteCalls: 30,
 });
 
 const AI_LIMIT_BOUNDS = {
@@ -88,6 +90,7 @@ const AI_LIMIT_BOUNDS = {
     userSharePct: [1, 100],
     anonSharePct: [1, 100],
     perMinuteCalls: [1, 100_000],
+    anonPerMinuteCalls: [1, 100_000],
 };
 
 const PLAN_LIMIT_BOUNDS = [0, 10_000_000];

@@ -78,6 +78,8 @@ const {
     consumePlanUnit,
     checkBulkBudget,
     estimateTokens,
+    safeUserKey,
+    resetDegradedSlots,
     minuteKey,
     monthKey,
     nextResetAt,
@@ -113,6 +115,7 @@ async function spend(c, tokens, now) {
 beforeEach(() => {
     store.docs.clear();
     store.failTx = null;
+    resetDegradedSlots();
 });
 
 describe('plans — sınırların çözümü', () => {
@@ -200,7 +203,9 @@ describe('reserveAi — iki şirket, aşım, ertesi gün', () => {
         expect(err.detail.resetAt).toBe('2026-11-03T00:00:00.000Z');
         // Ret sayısı panel için yazılır.
         await new Promise((r) => setTimeout(r, 0));
-        expect(usage('A').quota.rejected).toBe(1);
+        // Ayrı belgede (ayırma belgesinde çakışma yaratmasın).
+        expect(store.docs.get('tenants/A/usage/rejected-2026-11-02').count).toBe(1);
+        expect(usage('A').quota?.rejected).toBeUndefined();
     });
 
     it('ERTESİ GÜN SIFIRLANIR: yeni gün yeni belge, ayrı sıfırlama işi yok', async () => {
@@ -295,6 +300,32 @@ describe('reserveAi — iki şirket, aşım, ertesi gün', () => {
         expect(err.code).toBe(RATE_CODE);
     });
 
+    it('ADAY DAKİKALIK SINIRI: aday akını iç kullanıcının dakikalık hakkını dolduramaz', async () => {
+        const anon = buildAiContext({ tenantId: 'A', anonymous: true, tenant: { aiLimits: { dailyTokens: 1e6, anonPerMinuteCalls: 2, perMinuteCalls: 3 } } });
+        await reserveAi(anon, { estimate: 1, now: GUN1 });
+        await reserveAi(anon, { estimate: 1, now: GUN1 });
+        const err = await reserveAi(anon, { estimate: 1, now: GUN1 }).catch((e) => e);
+        expect(err.detail.reason).toBe('anon-minute');
+        const member = buildAiContext({ tenantId: 'A', uid: 'a1', tenant: { aiLimits: { dailyTokens: 1e6, anonPerMinuteCalls: 2, perMinuteCalls: 3 } } });
+        await expect(reserveAi(member, { estimate: 1, now: GUN1 })).resolves.toBeTruthy();
+    });
+
+    it('altyapı arızasında ADAY çağrısı ölçümsüz geçmez; iç kullanıcıya dakikalık sınırlı istisna', async () => {
+        store.failTx = Object.assign(new Error('UNAVAILABLE'), { code: 14 });
+        const anon = buildAiContext({ tenantId: 'A', anonymous: true, tenant: {} });
+        expect((await reserveAi(anon, { estimate: 1, now: GUN1 }).catch((e) => e)).code).toBe(RATE_CODE);
+        const member = ctx('A');
+        for (let i = 0; i < 30; i++) expect((await reserveAi(member, { estimate: 1, now: GUN1 })).degraded).toBe(true);
+        expect((await reserveAi(member, { estimate: 1, now: GUN1 }).catch((e) => e)).code).toBe(RATE_CODE);
+    });
+
+    it('biçime uymayan uid aday kovasına düşmez', () => {
+        expect(safeUserKey('abc_1')).toBe('abc_1');
+        expect(safeUserKey('anon')).toBe('anon');
+        expect(safeUserKey('a.b@c')).toMatch(/^h_[0-9a-f]{32}$/);
+        expect(safeUserKey('')).toBe('system');
+    });
+
     it('şirket kimliği doğrulanmadan çağrı yok', async () => {
         await expect(reserveAi(null, { estimate: 1 })).rejects.toThrow(/AI_TENANT_REQUIRED/);
         await expect(reserveAi({ tenantId: '../B', limits: DEFAULT_AI_LIMITS }, { estimate: 1 })).rejects.toThrow(/AI_TENANT_REQUIRED/);
@@ -360,8 +391,11 @@ describe('toplu iş ön denetimi', () => {
 
 describe('tahmin', () => {
     it('metin uzunluğu + sınırlı çıktı payı; ses girdisi kaba ama sınırlı', () => {
-        expect(estimateTokens('x'.repeat(3000), 8192)).toBe(1000 + 4096);
+        expect(estimateTokens('x'.repeat(3000), 8192)).toBe(1000 + 8192);
         expect(estimateTokens('x'.repeat(300), 512)).toBe(100 + 512);
-        expect(estimateTokens([{ inlineData: { data: 'a'.repeat(4000) } }, 'yaz'], 8192)).toBeGreaterThan(4096);
+        // Çıktı payı istenen tavanın tamamı (en çok 32k).
+        expect(estimateTokens('x', 100000)).toBe(1 + 32768);
+        // SES BAYTTAN: 5 MB base64 ≈ 3,75 MB → ~61k token (eski hesap ~46k'yı da altta bırakıyordu).
+        expect(estimateTokens([{ inlineData: { data: 'a'.repeat(5_000_000) } }], 1024)).toBeGreaterThan(58_000);
     });
 });

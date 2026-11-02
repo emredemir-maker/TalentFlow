@@ -45,6 +45,7 @@
 // çalışılır. Bilerek: ölçüm sistemi arızası müşterinin işini durdurmamalı
 // (usage.js ile aynı ilke). Maliyet güvencesi bu durumda (1) platform tavanı.
 // Bütçe aşımı ise asla bu yola düşmez: QuotaError işlemin İÇİNDE atılır.
+import crypto from 'node:crypto';
 import { db, admin } from '../config/firebaseAdmin.js';
 import { childLogger } from './logger.js';
 import { dayKey, normalizeLabel } from './usage.js';
@@ -99,32 +100,41 @@ export function nextResetAt(now) {
     return d.toISOString();
 }
 
-/** Kullanıcı anahtarı Firestore alan adına güvenle girsin (uid zaten öyle). */
+/**
+ * Kullanıcı anahtarı Firestore alan adına güvenle girsin. Biçime uymayan uid
+ * aday kovasına DÜŞMEZ (iç kullanıcı aday payını tüketmesin): özetlenir.
+ * Boş anahtar (ör. işi açanı bilinmeyen eski toplu iş) ayrı 'system' kovası.
+ */
 export function safeUserKey(k) {
     const s = String(k || '');
-    return /^[A-Za-z0-9_-]{1,128}$/.test(s) ? s : ANON_KEY;
+    if (s === ANON_KEY || /^[A-Za-z0-9_-]{1,128}$/.test(s)) return s;
+    if (!s) return 'system';
+    return `h_${crypto.createHash('sha256').update(s).digest('hex').slice(0, 32)}`;
 }
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 /**
- * Bir çağrının token tahmini. Girdi metni ~3,5 karakter/token (Türkçe biraz
- * daha pahalı, 3 alıyoruz), çıktı için tavanın tamamı değil 4096'ya kadarı:
- * ayırma yalnız eşzamanlı çağrıların birbirini görmesi için; tahmini aşırı
- * büyük tutmak bütçenin son dilimini gereksiz yere kilitlerdi.
+ * Bir çağrının token tahmini. Girdi metni ~3 karakter/token (Türkçe için
+ * muhafazakâr). Ses/dosya girdisi BAYT üzerinden: Gemini sesi saniyede ~32
+ * token sayar; düşük bit hızlı (16 kbps ≈ 2 KB/sn) seste bile 1 KB ≈ 16
+ * tokendan aşağı düşülmez → çözülmüş bayt / 64 (≈ 2 kat pay). Çıktı payı
+ * istenen tavanın TAMAMI (en çok 32k): düşük tahmin, eşzamanlı çağrılarda
+ * sınırın tahmin farkı kadar aşılması demek.
  */
 export function estimateTokens(prompt, maxOutputTokens = 8192) {
     let chars = 0;
+    let binaryTokens = 0;
     if (typeof prompt === 'string') chars = prompt.length;
     else if (Array.isArray(prompt)) {
         for (const p of prompt) {
             if (typeof p === 'string') chars += p.length;
-            else if (p?.inlineData?.data) chars += Math.ceil(p.inlineData.data.length / 40); // ses: kaba
+            else if (p?.inlineData?.data) binaryTokens += Math.ceil((String(p.inlineData.data).length * 0.75) / 64);
             else if (p?.text) chars += String(p.text).length;
         }
     } else if (prompt != null) chars = JSON.stringify(prompt).length;
-    const out = Math.min(Math.max(num(maxOutputTokens) || 8192, 256), 4096);
-    return Math.ceil(chars / 3) + out;
+    const out = Math.min(Math.max(num(maxOutputTokens) || 8192, 256), 32768);
+    return Math.ceil(chars / 3) + binaryTokens + out;
 }
 
 /**
@@ -149,6 +159,11 @@ export function decideReservation({ usage = {}, rate = {}, limits, userKey, anon
     const userLimit = Math.floor((limits.dailyTokens * sharePct) / 100);
     const deny = (code, reason, detail) => ({ ok: false, code, reason, detail });
 
+    // Aday tarafının KENDİ dakikalık sınırı: bağlantıyı bilen biri şirket
+    // genelindeki dakikalık hakkı doldurup iç kullanıcıları durduramasın.
+    if (anonymous && num(rate?.anon) >= limits.anonPerMinuteCalls) {
+        return deny(RATE_CODE, 'anon-minute', { count: num(rate?.anon), limit: limits.anonPerMinuteCalls });
+    }
     if (num(rate?.count) >= limits.perMinuteCalls) {
         return deny(RATE_CODE, 'tenant-minute', { count: num(rate?.count), limit: limits.perMinuteCalls });
     }
@@ -184,6 +199,8 @@ export function denyMessage(reason, detail = {}) {
         case 'anon-share':
             return 'Aday tarafı için ayrılan bugünkü AI kotası doldu. Başvurunuz yine kaydedilir; '
                 + 'otomatik doldurma ve değerlendirme şu an yapılamıyor.';
+        case 'anon-minute':
+            return 'Şu an çok sayıda başvuru işleniyor. Lütfen bir dakika sonra tekrar deneyin.';
         case 'tenant-minute':
             return 'Şirketiniz için dakikalık AI istek sınırına ulaşıldı. Lütfen bir dakika sonra tekrar deneyin.';
         default:
@@ -191,9 +208,29 @@ export function denyMessage(reason, detail = {}) {
     }
 }
 
-/** Firestore işlem çakışması mı (gRPC ABORTED = 10)? */
+/** Firestore işlem çakışması / zaman aşımı mı (gRPC ABORTED = 10, DEADLINE_EXCEEDED = 4)? */
 export function isContention(err) {
-    return err?.code === 10 || err?.code === 'aborted' || /ABORTED|contention/i.test(String(err?.message || ''));
+    return [10, 4, 'aborted', 'deadline-exceeded'].includes(err?.code)
+        || /ABORTED|contention|DEADLINE_EXCEEDED/i.test(String(err?.message || ''));
+}
+
+/** Ret sayacının belgesi (gün belgesinden ayrı; `day` alanı yok → günlük listeye girmez). */
+export function rejectedKey(day) {
+    return `rejected-${day}`;
+}
+
+const DEGRADED_PER_MINUTE = 30;
+let degraded = { minute: '', n: 0 };
+/** Testler için. */
+export function resetDegradedSlots() {
+    degraded = { minute: '', n: 0 };
+}
+function takeDegradedSlot(now) {
+    const m = minuteKey(now);
+    if (degraded.minute !== m) degraded = { minute: m, n: 0 };
+    if (degraded.n >= DEGRADED_PER_MINUTE) return false;
+    degraded.n += 1;
+    return true;
 }
 
 function inc(n) {
@@ -250,15 +287,17 @@ export async function reserveAi(ctx, { estimate, grounded = false, now = new Dat
             );
             tx.set(
                 rRef,
-                { count: inc(1), expiresAt: new Date(now.getTime() + RATE_DOC_TTL_MS) },
+                { count: inc(1), ...(ctx.anonymous ? { anon: inc(1) } : {}), expiresAt: new Date(now.getTime() + RATE_DOC_TTL_MS) },
                 { merge: true }
             );
         });
     } catch (err) {
         if (err instanceof QuotaError) {
-            // Ret sayısı panel için; beklenmez, hatası yutulur.
-            void uRef
-                .set({ day, quota: { rejected: inc(1) } }, { merge: true })
+            // Ret sayısı panel için — AYRI belgede: reddedilen istek akını
+            // ayırma belgesinde çakışma yaratıp geçerli çağrıları düşürmesin.
+            void db
+                .doc(tenantPaths(ctx.tenantId).usageDay(rejectedKey(day)))
+                .set({ count: inc(1) }, { merge: true })
                 .catch(() => {});
             log.warn({ tenantId: ctx.tenantId, reason: err.detail?.reason }, 'AI çağrısı kotaya takıldı');
             throw err;
@@ -273,6 +312,16 @@ export async function reserveAi(ctx, { estimate, grounded = false, now = new Dat
                 reason: 'contention',
                 resetAt: null,
             });
+        }
+        // Aday tarafı ölçümsüz geçmez: altyapı arızasında da geçici ret.
+        if (ctx.anonymous) {
+            log.warn({ err: err?.message, tenantId: ctx.tenantId }, 'kota ayrılamadı — aday çağrısı reddedildi');
+            throw new QuotaError(RATE_CODE, 'AI hizmeti şu an yoğun. Lütfen biraz sonra tekrar deneyin.', { reason: 'unavailable', resetAt: null });
+        }
+        // İç kullanıcı: süreç başına dakikada en çok DEGRADED_PER_MINUTE ölçümsüz
+        // kira; arıza sürerse o da geçici ret.
+        if (!takeDegradedSlot(now)) {
+            throw new QuotaError(RATE_CODE, 'AI hizmeti şu an yoğun. Lütfen biraz sonra tekrar deneyin.', { reason: 'unavailable', resetAt: null });
         }
         log.warn({ err: err?.message, tenantId: ctx.tenantId }, 'kota ayrılamadı — çağrı ölçümle devam ediyor');
         lease.degraded = true;
@@ -421,7 +470,7 @@ function unitLabel(unit) {
  * @returns {Promise<{ used: number, reserved: number, remaining: number, groundedCalls: number, byUser: object, rejected: number }>}
  */
 export async function tenantUsageToday(tenantId, limits, now = new Date()) {
-    const snap = await usageRef(tenantId, now).get();
+    const [snap, rej] = await db.getAll(usageRef(tenantId, now), db.doc(tenantPaths(tenantId).usageDay(rejectedKey(dayKey(now)))));
     const d = snap.exists ? snap.data() : {};
     const used = num(d?.totals?.totalTokens);
     const reserved = Math.max(0, num(d?.quota?.reserved));
@@ -430,7 +479,7 @@ export async function tenantUsageToday(tenantId, limits, now = new Date()) {
         reserved,
         remaining: Math.max(0, limits.dailyTokens - used - reserved),
         groundedCalls: num(d?.quota?.groundedCalls),
-        rejected: num(d?.quota?.rejected),
+        rejected: num(rej.exists ? rej.data()?.count : 0),
         byUser: d?.byUser || {},
     };
 }

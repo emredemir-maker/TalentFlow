@@ -122,23 +122,63 @@ router.post('/api/ai/ask', requireAiCaller(), aiLimiter, async (req, res) => {
     }
 });
 
+// ── STT GİRDİSİ YALNIZ SES ──────────────────────────────────────────────────
+// Bu uçlar aday tarafına açık. `mimeType` istemciden geliyordu: metin ya da
+// belge gönderen biri, sabit istemli bu ucu serbest istemli bir AI'ya
+// çeviriyordu (model düz metni okuyup ham yanıtını dönüyordu). Artık yalnız
+// `audio/*`, aday için boyut sınırı (2 MB base64 ≈ 1,5 MB ses), ve yanıt
+// sunucuda ayrıştırılıp YALNIZ beklenen alanlar dönüyor.
+const AUDIO_MIME_RE = /^audio\/[a-z0-9.+-]{1,40}$/i;
+const ANON_AUDIO_B64_MAX = 2 * 1024 * 1024;
+const MEMBER_AUDIO_B64_MAX = 34 * 1024 * 1024;
+
+/** @returns {string|null} hata metni */
+export function audioInputError(base64, mimeType, anonymous) {
+    if (!AUDIO_MIME_RE.test(String(mimeType || ''))) return 'Yalnız ses dosyası kabul edilir.';
+    const max = anonymous ? ANON_AUDIO_B64_MAX : MEMBER_AUDIO_B64_MAX;
+    if (typeof base64 !== 'string' || base64.length === 0) return 'Ses dosyası bulunamadı';
+    if (base64.length > max) return 'Ses parçası çok büyük.';
+    return null;
+}
+
+const STT_CONFIG = { temperature: 0, maxOutputTokens: 1024, responseMimeType: 'application/json' };
+
+/** Model yanıtından yalnız transkript + duygu alanları (serbest metin dönmez). */
+export function parseStt(raw) {
+    const clamp = (v) => Math.min(100, Math.max(0, parseInt(v, 10) || 0));
+    try {
+        const m = String(raw || '').match(/\{[\s\S]*\}/);
+        if (!m) return { text: '', emotion: null };
+        const p = JSON.parse(m[0]);
+        return {
+            text: typeof p.text === 'string' ? p.text.slice(0, 4000) : '',
+            emotion: { stress: clamp(p.stress), excitement: clamp(p.excitement), confidence: clamp(p.confidence), hesitation: clamp(p.hesitation) },
+        };
+    } catch {
+        return { text: '', emotion: null };
+    }
+}
+
 // STT: sabit istem + ses. Yüz yüze/canlı mülakat sayfaları aday bağlantısında
 // (anonim oturum) da açıldığı için aday tarafına açık; bütçe şirketin 'anon'
 // kovasından.
 router.post('/api/ai/stt', requireAiCaller({ allowAnonymous: true }), aiLimiter, async (req, res) => {
-    const { audio, mimeType = 'audio/webm' } = req.body || {};
-    if (!audio || typeof audio !== 'string') {
-        return res.status(400).json({ error: 'audio (base64) is required' });
-    }
+    const { audio } = req.body || {};
+    const mimeType = String(req.body?.mimeType || 'audio/webm').split(';')[0];
+    const bad = audioInputError(audio, mimeType, !!req.aiContext?.anonymous);
+    if (bad) return res.status(400).json({ error: bad });
 
     try {
         // useCache: false — every audio chunk is unique, caching would just
         // grow the cache without ever hitting.
-        const text = await generateText([
+        const raw = await generateText([
             { inlineData: { data: audio, mimeType } },
             `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress/excitement/confidence/hesitation: 0-100 tam sayı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
-        ], { useCache: false });
-        res.json({ text });
+        ], { useCache: false, label: 'interview-eval', generationConfig: STT_CONFIG });
+        // İstemci `text`i JSON olarak ayrıştırıyor; biçim korunur ama yalnız
+        // beklenen alanlarla yeniden kurulur.
+        const p = parseStt(raw);
+        res.json({ text: JSON.stringify({ text: p.text, ...(p.emotion || {}) }) });
     } catch (err) {
         if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, 'STT Error');
@@ -174,6 +214,8 @@ router.post('/api/gemini-stt', requireAiCaller({ allowAnonymous: true }), aiLimi
         } else {
             return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
         }
+        const bad = audioInputError(audioBase64, mimeType, !!req.aiContext?.anonymous);
+        if (bad) return res.status(400).json({ error: bad });
 
         // useCache: false — audio inputs are always unique
         const raw = (await generateText([
@@ -188,22 +230,9 @@ Kurallar:
 - hesitation: tereddüt/dolgu sesi seviyesi 0-100
 - Skorlar 0-100 arası tam sayı olmalı.
 - 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
-        ], { useCache: false })).trim();
-        let text = raw;
-        let emotion = null;
-        try {
-            const m = raw.match(/\{[\s\S]*\}/);
-            if (m) {
-                const parsed = JSON.parse(m[0]);
-                text = typeof parsed.text === 'string' ? parsed.text : '';
-                emotion = {
-                    stress: Math.min(100, Math.max(0, parseInt(parsed.stress) || 0)),
-                    excitement: Math.min(100, Math.max(0, parseInt(parsed.excitement) || 0)),
-                    confidence: Math.min(100, Math.max(0, parseInt(parsed.confidence) || 0)),
-                    hesitation: Math.min(100, Math.max(0, parseInt(parsed.hesitation) || 0)),
-                };
-            }
-        } catch { /* fallback: use raw as text */ }
+        ], { useCache: false, label: 'interview-eval', generationConfig: STT_CONFIG })).trim();
+        // Yalnız beklenen alanlar; ayrıştırılamayan ham metin geri dönmez.
+        const { text, emotion } = parseStt(raw);
 
         log.info(`✅ STT: "${text.substring(0, 60)}" | emotion: ${JSON.stringify(emotion)}`);
         res.json({ success: true, text, emotion });

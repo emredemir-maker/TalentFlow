@@ -33,3 +33,21 @@ describe('shapeApplicantProfile', () => {
         expect(out.skills).toEqual([]);
     });
 });
+
+describe('STT girdisi (aday tarafı)', async () => {
+    const { audioInputError, parseStt } = await import('./ai.js');
+    it('yalnız audio/*; aday için boyut sınırı', () => {
+        expect(audioInputError('AAAA', 'text/plain', true)).toMatch(/ses/);
+        expect(audioInputError('AAAA', 'application/pdf', false)).toMatch(/ses/);
+        expect(audioInputError('AAAA', 'audio/webm', true)).toBeNull();
+        expect(audioInputError('a'.repeat(3 * 1024 * 1024), 'audio/webm', true)).toMatch(/büyük/);
+        expect(audioInputError('a'.repeat(3 * 1024 * 1024), 'audio/webm', false)).toBeNull();
+    });
+    it('yanıttan yalnız beklenen alanlar; serbest metin dönmez', () => {
+        expect(parseStt('İşte istediğin şiir: ...')).toEqual({ text: '', emotion: null });
+        const p = parseStt('{"text":"merhaba","stress":150,"extra":"x"}');
+        expect(p.text).toBe('merhaba');
+        expect(p.emotion.stress).toBe(100);
+        expect(p.extra).toBeUndefined();
+    });
+});

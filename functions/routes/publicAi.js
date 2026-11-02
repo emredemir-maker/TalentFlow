@@ -9,7 +9,9 @@
 // istem burada, sunucuda kurulur; istemciden yalnız CV metni gelir ve
 // sınırlandırılmış veri bloğuna konur (promptGuard). Açık bir ilan şart —
 // bağlantıyı bilmeyen biri şirket adına AI harcatamaz. Bütçe şirketin 'anon'
-// kovasından; her çağrı bir "ön analiz" paket birimi sayılır (plans.js).
+// kovasından (kendi günlük payı ve dakikalık sınırıyla). Paket birimi
+// (ön analiz) DÜŞÜLMEZ: anonim bir uçtan düşülseydi bağlantıyı bilen biri
+// şirketin aylık hakkını tüketip işe alımcının CV yüklemesini durdurabilirdi.
 import { Router } from 'express';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
@@ -17,7 +19,7 @@ import { requireAiCaller } from '../middleware/aiCaller.js';
 import { generateText } from '../services/gemini.js';
 import { buildStructuredPrompt, sanitizeForPrompt } from '../services/promptGuard.js';
 import { extractPiiFromText, redactPiiFromText } from '../services/pii.js';
-import { consumePlanUnit, sendQuotaError } from '../services/aiQuota.js';
+import { sendQuotaError } from '../services/aiQuota.js';
 import { isValidDocId } from '../services/tenantPaths.js';
 import { db } from '../config/firebaseAdmin.js';
 import { childLogger } from '../services/logger.js';
@@ -97,7 +99,6 @@ router.post('/api/public/apply/parse-cv', requireAiCaller({ allowAnonymous: true
     }
 
     try {
-        await consumePlanUnit(req.aiContext, 'prescreen');
         // Kimlik bilgisi modele gitmez: regex ile ayıklanır, metinde maskelenir,
         // sonuca geri eklenir (services/pii.js).
         const contact = extractPiiFromText(cvText);

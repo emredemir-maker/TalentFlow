@@ -58,7 +58,7 @@ function resetText(iso) {
 }
 
 const UNIT_ROWS = [
-    { key: 'prescreen', field: 'monthlyPrescreens', title: 'Ön analiz (bu ay)', note: 'AI ile işlenen her aday CV’si: tekil yükleme, toplu içe aktarma, başvuru formu.' },
+    { key: 'prescreen', field: 'monthlyPrescreens', title: 'Ön analiz (bu ay)', note: 'İşe alımcının AI ile işlediği her aday CV’si: tekil yükleme, toplu içe aktarma (başvuru formu sayılmaz).' },
     { key: 'interviewEval', field: 'monthlyInterviewEvals', title: 'Mülakat değerlendirmesi (bu ay)', note: 'Görüşme sonucunun AI ile değerlendirilmesi ve yeniden değerlendirme.' },
 ];
 

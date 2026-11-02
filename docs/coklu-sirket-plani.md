@@ -482,7 +482,7 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
   `/api/score-screening-answers` (sorular ilandan), `/api/public/apply/parse-cv` (istem sunucuda).
 - **Sınırlar ve paket:** `tenants/{t}.aiLimits`, `.plan`, `.planLimits` (`functions/services/plans.js`); yazan yalnız
   platform yöneticisi `PUT /api/platform/tenants/:tenantId/limits` (ileride Hub konsolu). Paket birimleri aylık
-  `tenants/{t}/usage/month-YYYY-MM.units` (ön analiz: AI ile işlenen her CV; mülakat değerlendirmesi).
+  `tenants/{t}/usage/month-YYYY-MM.units` (ön analiz: işe alımcının AI ile işlediği her CV — başvuru formu hariç; mülakat değerlendirmesi).
 
 Toplam kaba efor: **~3–4 hafta** (PR 0–8; davet/kayıt akışlarının kalkması PR 3'ü küçültüyor, e-posta (7b) ve destek
 üyeliği ekleniyor — toplam değişmedi), Hub tarafı ek ~1–1,5 hafta (köprü + admin konsolunda destek erişimi). Kritik yol:
