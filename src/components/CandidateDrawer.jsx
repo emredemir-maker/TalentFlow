@@ -2,6 +2,7 @@
 // Context-aware Candidate Management + Assessment + Reporting
 
 import { normalizeSkills } from '../utils/normalizeSkills';
+import { openCandidateCv } from '../services/candidateCvFile';
 import { analysisScoreFor, analysisScoreForTitle } from '../utils/positionScore';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
@@ -882,15 +883,15 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                 {/* ===== FOOTER ===== */}
                 <div className="shrink-0 p-3 border-t border-border-subtle flex gap-2 print:hidden">
-                    {candidate.cvUrl && (
-                        <a
-                            href={candidate.cvUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                    {(candidate.cvPath || candidate.cvUrl) && (
+                        <button
+                            type="button"
+                            // Dosya sunucudan, yetki denetimiyle (jetonlu adres yok).
+                            onClick={() => openCandidateCv(candidate)}
                             className="py-2.5 px-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[13px] font-bold text-purple-400 hover:bg-purple-500/20 transition-all flex items-center gap-2"
                         >
                             <FileText className="w-4 h-4" /> CV Gör
-                        </a>
+                        </button>
                     )}
 
                     <button onClick={handlePrintReport} className="py-2.5 px-4 rounded-xl bg-bg-primary border border-border-subtle text-[13px] font-black text-text-muted hover:text-text-primary transition-all flex items-center gap-2">

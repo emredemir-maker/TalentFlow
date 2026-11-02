@@ -81,9 +81,9 @@ Ek gözlemler:
 | `branding/{file}` | 98–105 (yazma `token.role`) | `src/pages/BrandingSettingsPage.jsx:60` | T | `tenants/{t}/branding/**` |
 | `avatars/{uid}/**` | 109–116 | (kullanıcı) | U (kişiye ait, şirketler arası ortak kalabilir) | değişmez |
 
-Not: CV'ye kayıttaki `getDownloadURL` adresiyle ulaşılıyor (`cvUrl`). İndirme jetonlu adresler **kuralları atlar**;
-tenant ayrımı yalnız adresi bilmeyenler için geçerli. Hedefte yeni dosyalar için jetonlu adres yerine kural denetimli
-`getBlob`/kısa süreli imzalı adres (sunucudan) önerilir (PR 6).
+Not: CV'ye kayıttaki `getDownloadURL` adresiyle ulaşılıyordu (`cvUrl`). İndirme jetonlu adresler **kuralları atlar**;
+tenant ayrımı yalnız adresi bilmeyenler için geçerliydi. PR 6'da yeni dosyalar jetonsuz yazılır ve sunucudan, yetki
+denetlenerek akıtılır (bkz. §6.1 "CV dosyası").
 
 ### 1.3 Cloud Functions
 
@@ -467,6 +467,12 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
   Yanıt ham kaynaklı yanıt (`answer`); ayrıştırma istemcide (PR 3).
 - **AI ölçümü:** platform toplamı `platformUsage/{day}`; şirket başına ölçüm PR 7. Storage: CV yüklemesi
   `tenants/{t}/cvs/`, toplu kaynak öneki `tenants/{t}/bulk-imports/{uid}/`.
+- **CV dosyası (PR 6):** jetonlu kalıcı adres (`getDownloadURL`, `firebaseStorageDownloadTokens`) üretilmez; aday
+  kaydı yalnız Storage yolunu tutar (`cvPath`, `tenants/{t}/cvs/…`). Dosya `GET /api/candidates/:id/cv` ile verilir:
+  üyelik (tüm roller) + department_user için aday görünürlüğü, yol yalnız şirketin `cvs/` klasöründe, `Cache-Control:
+  private, no-store`, erişim `accessLogs`'a (`cv-download`). Storage kuralında CV `get` yalnız admin/recruiter/destek
+  (department_user doğrudan okuyamaz). Saklama imhası `cvPath`'i (yoksa eski `cvUrl`'i) şirket önekiyle siler. Şirket
+  logosu bilinçli istisna: herkese açık görsel (e-posta, başvuru sayfası), jetonlu adres kalır.
 
 Toplam kaba efor: **~3–4 hafta** (PR 0–8; davet/kayıt akışlarının kalkması PR 3'ü küçültüyor, e-posta (7b) ve destek
 üyeliği ekleniyor — toplam değişmedi), Hub tarafı ek ~1–1,5 hafta (köprü + admin konsolunda destek erişimi). Kritik yol:

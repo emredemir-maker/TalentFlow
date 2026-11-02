@@ -396,7 +396,7 @@ function DataModelSection() {
   skills: string[],
   experience: string,
   source: 'manual' | 'cv' | 'application',   // 'scraper' eski kayıtlarda kalabilir
-  cvUrl: string,            // Firebase Storage URL
+  cvPath: string,           // Storage yolu (tenants/{t}/cvs/…); dosya GET /api/candidates/:id/cv
   interviewSessions: [{
     id: string,             // iv-{uuid}
     title: string,
