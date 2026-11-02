@@ -302,26 +302,32 @@ router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
         const id = link.targetId;
         const now = admin.firestore.FieldValue.serverTimestamp();
         if (type === 'info') {
+            // Durum denetimi, talebin güncellenmesi ve mülakat belgesine ekleme
+            // TEK İŞLEMDE: yarım kalırsa hiçbiri yazılmaz ve aday yeniden
+            // deneyebilir. Tek yanıt: tekrar gönderim mülakat belgesine her
+            // seferinde yeni kayıt ekleyip belgeyi 1 MiB sınırına şişirebilirdi.
             const ref = db.doc(paths.infoRequest(id));
-            const snap = await ref.get();
-            if (!snap.exists) return res.status(404).json({ error: 'Talep bulunamadı.' });
-            // Tek yanıt: tekrar gönderim mülakat belgesine her seferinde yeni
-            // kayıt ekleyip belgeyi 1 MiB sınırına şişirebilirdi.
-            if (snap.data()?.status === 'responded') {
-                return res.status(409).json({ error: 'Bu talep zaten yanıtlandı.' });
-            }
-            await ref.update({ status: 'responded', responseData: String(responseData ?? '').slice(0, 10000), respondedAt: now });
-            const data = snap.data();
-            if (data.sessionId && isValidDocId(data.sessionId)) {
-                await db.doc(paths.interview(data.sessionId)).set({
-                    infoResponses: admin.firestore.FieldValue.arrayUnion({
-                        requestId: id,
-                        candidateName: data.candidateName,
-                        responseData: String(responseData ?? '').slice(0, 10000),
-                        respondedAt: new Date().toISOString(),
-                    }),
-                }, { merge: true });
-            }
+            const text = String(responseData ?? '').slice(0, 10000);
+            const outcome = await db.runTransaction(async (t) => {
+                const snap = await t.get(ref);
+                if (!snap.exists) return 404;
+                const data = snap.data() || {};
+                if (data.status === 'responded') return 409;
+                t.update(ref, { status: 'responded', responseData: text, respondedAt: now });
+                if (data.sessionId && isValidDocId(data.sessionId)) {
+                    t.set(db.doc(paths.interview(data.sessionId)), {
+                        infoResponses: admin.firestore.FieldValue.arrayUnion({
+                            requestId: id,
+                            candidateName: data.candidateName || '',
+                            responseData: text,
+                            respondedAt: new Date().toISOString(),
+                        }),
+                    }, { merge: true });
+                }
+                return 200;
+            });
+            if (outcome === 404) return res.status(404).json({ error: 'Talep bulunamadı.' });
+            if (outcome === 409) return res.status(409).json({ error: 'Bu talep zaten yanıtlandı.' });
         } else if (type === 'invite') {
             const validActions = ['confirm', 'decline'];
             if (!validActions.includes(action)) return res.status(400).json({ error: 'Geçersiz action.' });

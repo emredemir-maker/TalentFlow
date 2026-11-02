@@ -124,6 +124,9 @@ afterAll(async () => {
     await env?.cleanup();
 });
 
+const tenantIdUnderTest = 'T1';
+const positionIdUnderTest = 'p1';
+
 describe('başvuru akışı', () => {
     let linkId;
     it('recruiter ilan bağlantısı alır; bağlantı şirket ya da ilan kimliği taşımaz', async () => {
@@ -135,7 +138,13 @@ describe('başvuru akışı', () => {
         expect(r.status).toBe(200);
         linkId = r.body.linkId;
         expect(r.body.path).toBe(`/apply/${linkId}`);
-        expect(r.body.path).not.toMatch(/T1|p1/);
+        // Yol tek bir rastgele segment; şirket ya da ilan kimliği değil.
+        // (Kimliklerin alt dizgisi olarak aranmaz: base64url kimlik tesadüfen
+        // "p1" içerebilir.)
+        const segments = r.body.path.split('/').filter(Boolean);
+        expect(segments).toEqual(['apply', linkId]);
+        expect(linkId).toMatch(/^[A-Za-z0-9_-]{22}$/);
+        expect([tenantIdUnderTest, positionIdUnderTest]).not.toContain(linkId);
         // Başka şirketin yöneticisi T1'in ilanına bağlantı açamaz.
         expect(
             (

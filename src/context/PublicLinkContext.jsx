@@ -10,7 +10,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
-import { setLinkTenantId } from '../config/tenantPaths';
+import { getLinkTenantId, setLinkTenantId } from '../config/tenantPaths';
+import { isCandidateLinkPath } from './AuthContext';
 import { requestPublicLink, resolvePublicLink } from '../services/publicLinks';
 
 const PublicLinkContext = createContext(null);
@@ -18,6 +19,27 @@ const PublicLinkContext = createContext(null);
 /** Aday sayfasında çözülmüş bağlantı: { linkId, kind, targetId, tenantId } ya da null. */
 export function usePublicLink() {
     return useContext(PublicLinkContext);
+}
+
+/**
+ * Aday bağlantı sayfasından ayrılırken çağrılır. Bağlantı yol kurucuyu
+ * bağlantının şirketine çevirdi; şirkete bağlı sağlayıcılar (ilanlar, adaylar,
+ * üyelik) ise oturumu açık kullanıcının kayıtlı şirketinde abone kalmış
+ * olabilir. Aday sayfası içinde bu sorun değil (aday akışı sağlayıcı verisiyle
+ * yazmaz), ama SPA içinde bir iç ekrana geçilirse okuma A'dan, yazma B'ye
+ * gidebilirdi. Uygulamanın şirket değiştirme kuralı (selectTenant) burada da
+ * geçerli: bağlantı şirketi bırakılır ve sayfa TAM yeniden yüklenir; her şey
+ * kayıtlı şirketle temiz açılır. Başka bir aday bağlantısına geçişte (ya da
+ * aynı sayfada yeniden çizimde) yeniden yükleme yok.
+ *
+ * @returns {boolean} yeniden yükleme istendi mi
+ */
+export function leaveCandidateLink({ nextPath, reload }) {
+    if (!getLinkTenantId()) return false;
+    if (isCandidateLinkPath(nextPath)) return false;
+    setLinkTenantId(null);
+    reload();
+    return true;
 }
 
 export function PublicLinkGate({ kinds, children }) {
@@ -43,6 +65,17 @@ export function PublicLinkGate({ kinds, children }) {
         // kinds her çizimde yeni dizi olabilir; içerik sabit.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [linkId]);
+
+    // Sayfadan ayrılış (kapı sökülünce): adres zaten yeni yolu gösteriyor.
+    useEffect(
+        () => () => {
+            leaveCandidateLink({
+                nextPath: window.location.pathname,
+                reload: () => window.location.reload(),
+            });
+        },
+        []
+    );
 
     if (state.status === 'loading') {
         return (

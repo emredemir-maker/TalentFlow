@@ -924,6 +924,28 @@ describe('herkese açık (aday) uçlar — şirket ve kayıt bağlantıdan', () 
     });
 });
 
+describe('aday yanıtı — tek işlem', () => {
+    it('mülakat belgesine ekleme başarısız olursa talep yanıtlanmış sayılmaz; yeniden deneme geçer', async () => {
+        await db
+            .doc('tenants/B/infoRequests/ir-big')
+            .set({ requestId: 'ir-big', status: 'pending', sessionId: 'iv-big' });
+        // Belge 1 MiB sınırının hemen altında: 10 KB'lık yanıt eklenemez.
+        await db.doc('tenants/B/interviews/iv-big').set({ pad: 'x'.repeat(1_040_000) });
+        await db
+            .doc(`publicLinks/${L('irBig')}`)
+            .set({ tenantId: 'B', kind: 'infoRequest', targetId: 'ir-big' });
+        const body = { link: L('irBig'), type: 'info', responseData: 'y'.repeat(10_000) };
+        const fail = await call('POST', '/api/candidate-respond', { body });
+        expect(fail.status).toBe(500);
+        expect((await get('tenants/B/infoRequests/ir-big')).data().status).toBe('pending');
+        await db.doc('tenants/B/interviews/iv-big').set({ pad: '' });
+        const ok = await call('POST', '/api/candidate-respond', { body });
+        expect(ok.status).toBe(200);
+        expect((await get('tenants/B/infoRequests/ir-big')).data().status).toBe('responded');
+        expect((await get('tenants/B/interviews/iv-big')).data().infoResponses).toHaveLength(1);
+    }, 30_000);
+});
+
 describe('aday yanıtı — K5', () => {
     it('salt okunur / kapalı / askıdaki şirkete aday yanıtı yazılmaz', async () => {
         for (const [t, id, link] of [

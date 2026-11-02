@@ -43,3 +43,25 @@ describe('aday bağlantısı şirketi', () => {
         expect(getLinkTenantId()).toBeNull();
     });
 });
+
+describe('aday bağlantı sayfasından ayrılış', async () => {
+    const { leaveCandidateLink } = await import('./PublicLinkContext.jsx');
+
+    it('iç ekrana geçişte bağlantı şirketi bırakılır ve sayfa tam yeniden yüklenir', () => {
+        setLinkTenantId('B');
+        const reload = vi.fn();
+        expect(leaveCandidateLink({ nextPath: '/panel', reload })).toBe(true);
+        expect(reload).toHaveBeenCalledTimes(1);
+        expect(getLinkTenantId()).toBeNull();
+    });
+
+    it('başka bir aday bağlantısına geçişte ya da bağlantı çözülmemişken yeniden yükleme yok', () => {
+        const reload = vi.fn();
+        setLinkTenantId('B');
+        expect(leaveCandidateLink({ nextPath: '/join/abc', reload })).toBe(false);
+        expect(getLinkTenantId()).toBe('B');
+        setLinkTenantId(null);
+        expect(leaveCandidateLink({ nextPath: '/panel', reload })).toBe(false);
+        expect(reload).not.toHaveBeenCalled();
+    });
+});
