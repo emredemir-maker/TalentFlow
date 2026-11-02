@@ -128,6 +128,8 @@ export const PLATFORM_PATHS = {
     publicLink: (id) => `publicLinks/${did(id)}`,
     /** (şirket, tür, hedef) → bağlantı kimliği dizini; eşzamanlı istekte tek bağlantı. */
     publicLinkIndex: (key) => `publicLinkIndex/${did(key)}`,
+    /** Hub → Talent imzalı olayların tek kullanımlık nonce'u (routes/hub.js). */
+    hubNonce: (nonce) => `platform/hub/hubNonces/${did(nonce)}`,
 };
 
 // ── Storage ────────────────────────────────────────────────────────────────

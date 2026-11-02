@@ -15,6 +15,7 @@ const USERS_PATH = () => tc('members');
 export default function SuperAdminPage() {
     const { user, isSuperAdmin } = useAuth();
     const [users, setUsers] = useState([]);
+    const [removedUsers, setRemovedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState(null);
@@ -52,6 +53,13 @@ export default function SuperAdminPage() {
             },
             () => setLoading(false)
         );
+        // Kaldırılan üyeler (PR 4): yöneticinin kaldırdığı üyeliği Hub girişi yeniden açmaz; buradan açılır.
+        // Destek üyelikleri (K11) yalnız Hub yönetim konsolundan.
+        const unsubRemoved = onSnapshot(
+            query(collection(db, USERS_PATH()), where('status', '==', 'removed')),
+            (snap) => setRemovedUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => u.role !== 'support')),
+            () => setRemovedUsers([])
+        );
         const fetchKeyStatus = async () => {
             try {
                 const token = await user.getIdToken();
@@ -63,7 +71,7 @@ export default function SuperAdminPage() {
             } catch (err) { console.warn("Could not fetch API key status:", err); }
         };
         fetchKeyStatus();
-        return () => { unsubUsers(); };
+        return () => { unsubUsers(); unsubRemoved(); };
     }, [isSuperAdmin, user]);
 
     /** Yönetim ucu çağrısı (sunucu: requireTenant(['admin'])). */
@@ -85,6 +93,19 @@ export default function SuperAdminPage() {
         try {
             await callMemberApi('DELETE', userToDelete.id);
         } catch (err) { alert(`Üyelik kaldırılamadı: ${err.message}`); }
+    };
+
+    const handleRestoreUser = async (u) => {
+        if (!window.confirm(`${u.displayName || u.email} bu şirkete yeniden eklensin mi? Kişi Talent'ı Clyro Hub'dan açınca erişimi geri gelir.`)) return;
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch(`/api/admin/members/${encodeURIComponent(u.id)}/restore`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `Sunucu hatası (${res.status})`);
+        } catch (err) { alert(`Üyelik açılamadı: ${err.message}`); }
     };
 
     const handleOpenEdit = (userToEdit) => {
@@ -258,6 +279,35 @@ export default function SuperAdminPage() {
                             ))}
                         </div>
                     </div>
+
+                    {removedUsers.length > 0 && (
+                        <div className="bg-n0 rounded-[14px] border border-n200 overflow-hidden">
+                            <div className="px-4 py-3 border-b border-n200 flex items-center gap-2">
+                                <h2 className="text-[11px] font-semibold text-n900">Kaldırılan Üyeler</h2>
+                                <span className="ml-auto text-[11px] font-semibold bg-n100 text-n500 px-2 py-0.5 rounded-full">{removedUsers.length}</span>
+                            </div>
+                            <div className="divide-y divide-n100">
+                                {removedUsers.map(u => (
+                                    <div key={u.id} className="px-4 py-3 flex items-center gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-semibold text-n700 truncate">{u.displayName || u.email || u.id}</p>
+                                            <p className="text-[10px] text-n400 truncate">
+                                                {u.removedVia === 'hub' ? 'Clyro Hub\'dan çıkarıldı (Hub\'a yeniden eklenirse kendiliğinden döner)' : 'Bu ekrandan kaldırıldı'}
+                                            </p>
+                                        </div>
+                                        {u.removedVia !== 'hub' && (
+                                            <button
+                                                onClick={() => handleRestoreUser(u)}
+                                                className="tf-btn tf-btn-secondary text-[11px]"
+                                            >
+                                                Yeniden aç
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             )}

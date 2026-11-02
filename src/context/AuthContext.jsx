@@ -115,6 +115,15 @@ export function memberIsActive(member, now = Date.now()) {
     return ['admin', 'recruiter', 'department_user', 'support'].includes(member.role);
 }
 
+/**
+ * Hub'dan gelen üyelik etkin ama `expiresAt` (son Hub girişi + 24 saat) geçmiş mi. Destek üyeliği
+ * (K11) hariç: onun süresi dolunca Hub'dan yeniden açmak erişimi geri getirmez.
+ */
+export function hubVerificationExpired(member, now = Date.now()) {
+    if (!member || member.status !== 'active' || member.role === 'support' || member.expiresAt == null) return false;
+    return !(now < toMillis(member.expiresAt));
+}
+
 /** Etkin şirketi seçer: Hub'ın verdiği > son seçilen > tek şirket. */
 export function pickTenant(tenantIds, { hub, last } = {}) {
     if (hub && tenantIds.includes(hub)) return hub;
@@ -350,6 +359,8 @@ export function AuthProvider({ children }) {
             tenantWritable: access.writable && role !== 'support',
             tenantSuspended: access.suspended,
             membershipMissing: !!user && !anonymous && !!tenantId && member === null,
+            // Hub üyeliği etkin ama Hub doğrulamasının süresi dolmuş (PR 4): kişi Talent'ı Hub'dan yeniden açmalı.
+            hubVerificationExpired: hubVerificationExpired(member),
             selectTenant,
             resetTenantSelection,
             loginWithHub,
