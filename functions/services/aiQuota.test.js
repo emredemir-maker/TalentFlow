@@ -76,6 +76,8 @@ const {
     settleAi,
     releaseAi,
     consumePlanUnit,
+    refundPlanUnit,
+    withPlanUnit,
     checkBulkBudget,
     estimateTokens,
     safeUserKey,
@@ -357,7 +359,7 @@ describe('paket birimleri (ön analiz, mülakat değerlendirmesi)', () => {
         const c = planCtx(1);
         await consumePlanUnit(c, 'prescreen', 1, GUN1);
         await expect(consumePlanUnit(c, 'prescreen', 1, GUN1)).rejects.toThrow(QuotaError);
-        await expect(consumePlanUnit(c, 'prescreen', 1, new Date('2026-12-01T00:00:01Z'))).resolves.toBeUndefined();
+        await expect(consumePlanUnit(c, 'prescreen', 1, new Date('2026-12-01T00:00:01Z'))).resolves.toBe(true);
     });
 
     it('eşzamanlı tüketim sınırı aşmaz', async () => {
@@ -367,6 +369,34 @@ describe('paket birimleri (ön analiz, mülakat değerlendirmesi)', () => {
         expect(r.every((x) => x.status === 'fulfilled')).toBe(true);
         const r2 = await Promise.allSettled(Array.from({ length: 6 }, () => consumePlanUnit(c, 'prescreen', 1, GUN1)));
         expect(r2.filter((x) => x.status === 'fulfilled')).toHaveLength(3);
+    });
+});
+
+describe('paket birimi iadesi (kota reddinde AI çalışmadı)', () => {
+    const planCtx = (limit) =>
+        buildAiContext({ tenantId: 'R', uid: 'r1', tenant: { talentPlan: 'baslangic', planLimits: { monthlyPrescreens: limit } } });
+    const used = () => store.docs.get(`tenants/R/usage/${monthKey(new Date())}`)?.units?.prescreen ?? 0;
+
+    it('iş kota reddiyle düşerse birim geri verilir; başka hata ve başarı birimi tutar', async () => {
+        const c = planCtx(10);
+        const before = used();
+        const quotaErr = new QuotaError(BUDGET_CODE, 'bütçe doldu');
+        await expect(withPlanUnit(c, 'prescreen', async () => { throw quotaErr; })).rejects.toBe(quotaErr);
+        expect(used()).toBe(before);
+        await expect(withPlanUnit(c, 'prescreen', async () => { throw new Error('model'); })).rejects.toThrow('model');
+        expect(used()).toBe(before + 1);
+        await expect(withPlanUnit(c, 'prescreen', async () => 'ok')).resolves.toBe('ok');
+        expect(used()).toBe(before + 2);
+    });
+
+    it('paket hakkı doluysa iş hiç başlamaz; iade sıfırın altına inmez', async () => {
+        const c = planCtx(0);
+        let ran = false;
+        await expect(withPlanUnit(c, 'prescreen', async () => { ran = true; })).rejects.toThrow(QuotaError);
+        expect(ran).toBe(false);
+        const d = buildAiContext({ tenantId: 'Z', uid: 'z1', tenant: {} });
+        await refundPlanUnit(d, 'prescreen');
+        expect(store.docs.get(`tenants/Z/usage/${monthKey(new Date())}`)?.units?.prescreen ?? 0).toBe(0);
     });
 });
 

@@ -575,3 +575,34 @@ describe('şirket kotası — huni sırası (PR 7)', () => {
         await expect(parseProfile(`Ali Veli ${Math.random()} yazılım mühendisi`.repeat(3))).rejects.toThrow(/AI_DAILY_BUDGET_EXCEEDED/);
     });
 });
+
+describe('kota kapanışı yanıttan önce (Cloud Functions askıya alma)', () => {
+    it('generateText, settleAi bitmeden dönmez; settle hatası cevabı düşürmez', async () => {
+        let settled = false;
+        quota.settleAi.mockImplementationOnce(async () => {
+            await new Promise((r) => setTimeout(r, 20));
+            settled = true;
+        });
+        mockGenerateContent.mockResolvedValue({ response: { text: () => 'kapanis-1' } });
+        await expect(generateText('kapanis istemi 1')).resolves.toBe('kapanis-1');
+        expect(settled).toBe(true);
+
+        quota.settleAi.mockImplementationOnce(async () => {
+            throw new Error('firestore yok');
+        });
+        mockGenerateContent.mockResolvedValue({ response: { text: () => 'kapanis-2' } });
+        await expect(generateText('kapanis istemi 2')).resolves.toBe('kapanis-2');
+        expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    });
+
+    it('hata yolunda releaseAi beklenir', async () => {
+        let released = false;
+        quota.releaseAi.mockImplementationOnce(async () => {
+            await new Promise((r) => setTimeout(r, 20));
+            released = true;
+        });
+        mockGenerateContent.mockRejectedValue(new Error('kalıcı hata'));
+        await expect(generateText('kapanis istemi 3')).rejects.toThrow('kalıcı hata');
+        expect(released).toBe(true);
+    });
+});

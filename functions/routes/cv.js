@@ -30,7 +30,7 @@ import { isValidDocId, storagePaths } from '../services/tenantPaths.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
-import { consumePlanUnit, sendQuotaError, QuotaError } from '../services/aiQuota.js';
+import { withPlanUnit, sendQuotaError, QuotaError } from '../services/aiQuota.js';
 import { db, getStorageBucket } from '../config/firebaseAdmin.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('cv');
@@ -206,8 +206,8 @@ router.post('/api/direct-add', requireTenant(WRITER_ROLES), aiLimiter, async (re
         // env var (defaults to gemini-2.5-flash; can be flipped to gemma-3-27b-it
         // or any other Google AI Studio model id without code changes).
         // Her AI ile işlenen aday bir "ön analiz" paket birimi (plans.js).
-        await consumePlanUnit(req.aiContext, 'prescreen');
-        const candidate = await parseProfile(text);
+        // Kota reddinde (AI çalışmadı) birim iade edilir.
+        const candidate = await withPlanUnit(req.aiContext, 'prescreen', () => parseProfile(text));
         if (candidate && candidate.name) {
             candidate.linkedinUrl = url;
             candidate.source = 'Browser Extension';
@@ -255,8 +255,8 @@ router.post('/api/process-cv', requireTenant(WRITER_ROLES), aiLimiter, wrapMulte
                 // Same CV_PARSING_MODEL env var as /api/direct-add — see
                 // services/gemini.js getDefaultCvParsingModel() for the
                 // resolution order.
-                await consumePlanUnit(req.aiContext, 'prescreen');
-                const candidate = await parseProfile(text);
+                // Kota reddinde (AI çalışmadı) birim iade edilir.
+                const candidate = await withPlanUnit(req.aiContext, 'prescreen', () => parseProfile(text));
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
                 Object.assign(candidate, await storeCvFile(file, req.tenant.id));

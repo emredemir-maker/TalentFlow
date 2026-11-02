@@ -30,7 +30,7 @@ import { positionRequirements } from './positionRequirements.js';
 import { expandJobSources } from './bulkExpand.js';
 import { storagePaths, tenantIdFromPath, tenantPaths, tenantDocPath } from './tenantPaths.js';
 import { buildAiContext, runWithAiContext } from './aiContext.js';
-import { QuotaError, RATE_CODE, consumePlanUnit, checkBulkBudget } from './aiQuota.js';
+import { QuotaError, RATE_CODE, consumePlanUnit, refundPlanUnit, checkBulkBudget } from './aiQuota.js';
 import { decideTenantAccess, WRITER_ROLES } from '../middleware/auth.js';
 const log = childLogger('bulk-worker');
 
@@ -728,6 +728,15 @@ async function executeJobInContext(jobPath, tenantId, aiCtx) {
             if (claim === 'busy') return; // başka bir worker üzerinde çalışıyor
             let retries = 0;
             const MAX_RETRIES = 5;
+            // Bu kayıt için ön analiz birimi düşüldü mü (yeniden denemede
+            // ikinci kez düşülmez; kota reddiyle kapanırsa iade edilir).
+            let charged = false;
+            const refundIfQuota = async (err) => {
+                if (charged && err instanceof QuotaError) {
+                    charged = false;
+                    await refundPlanUnit(aiCtx, 'prescreen');
+                }
+            };
             while (retries <= MAX_RETRIES) {
                 try {
                     let cvText = '';
@@ -759,7 +768,7 @@ async function executeJobInContext(jobPath, tenantId, aiCtx) {
                     if (stopError) throw stopError;
                     // Bir CV = bir "ön analiz" paket birimi (plans.js); yeniden
                     // denemelerde ikinci kez düşülmez.
-                    if (retries === 0) await consumePlanUnit(aiCtx, 'prescreen');
+                    if (!charged) charged = await consumePlanUnit(aiCtx, 'prescreen');
                     let parsed = await parseTextWithGemini(cvText, positionTitle, openPositionTitles);
                     if (!parsed) {
                         // Bozuk/yarım JSON 1 saatlik önbelleğe takılı kalabiliyor —
@@ -853,6 +862,7 @@ async function executeJobInContext(jobPath, tenantId, aiCtx) {
                     // bugün geri gelmez → bu ve kalan kayıtlar sebebiyle kapanır.
                     if (err instanceof QuotaError && err.code !== RATE_CODE) {
                         stopError = stopError || err;
+                        await refundIfQuota(err);
                         failedCount++;
                         await itemDoc.ref.update({ status: 'error', error: err.userMessage, errorCode: err.code });
                         await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
@@ -861,6 +871,7 @@ async function executeJobInContext(jobPath, tenantId, aiCtx) {
                     const isQuota = err instanceof QuotaError || err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
                     retries++;
                     if (retries > MAX_RETRIES || !isQuota) {
+                        await refundIfQuota(err);
                         failedCount++;
                         await itemDoc.ref.update({ status: 'error', error: err.message });
                         await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });

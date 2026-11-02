@@ -454,10 +454,47 @@ export async function consumePlanUnit(ctx, unit, n = 1, now = new Date()) {
             }
             tx.set(ref, { month: monthKey(now).slice(6), units: { [unit]: inc(count) } }, { merge: true });
         });
+        return true;
     } catch (err) {
         if (err instanceof QuotaError) throw err;
         // Aynı ilke: sayaç arızası işi durdurmaz.
         log.warn({ err: err?.message, tenantId: ctx.tenantId, unit }, 'paket birimi düşülemedi');
+        return false;
+    }
+}
+
+/**
+ * Düşülen paket birimini geri verir (AI çağrısı kota yüzünden hiç
+ * çalışmadıysa). Sayaç sıfırın altına inmez; arıza işi durdurmaz.
+ */
+export async function refundPlanUnit(ctx, unit, n = 1, now = new Date()) {
+    if (!PLAN_UNITS[unit] || !ctx || !isValidTenantId(ctx.tenantId)) return;
+    const count = Math.max(1, Math.floor(num(n)));
+    const ref = db.doc(tenantPaths(ctx.tenantId).usageDay(monthKey(now)));
+    try {
+        await db.runTransaction(async (tx) => {
+            const snap = await tx.get(ref);
+            const used = num(snap.exists ? snap.data()?.units?.[unit] : 0);
+            const back = Math.min(count, used);
+            if (back > 0) tx.set(ref, { units: { [unit]: inc(-back) } }, { merge: true });
+        });
+    } catch (err) {
+        log.warn({ err: err?.message, tenantId: ctx.tenantId, unit }, 'paket birimi iade edilemedi');
+    }
+}
+
+/**
+ * Birimi düşer, işi çalıştırır; iş KOTA reddiyle (günlük bütçe, dakikalık
+ * sınır — AI hiç çalışmadı) düşerse birimi iade eder ve hatayı yeniden atar.
+ * Paket hakkı dolduysa (consumePlanUnit QuotaError) iş hiç başlamaz.
+ */
+export async function withPlanUnit(ctx, unit, fn) {
+    const charged = await consumePlanUnit(ctx, unit);
+    try {
+        return await fn();
+    } catch (err) {
+        if (charged && err instanceof QuotaError) await refundPlanUnit(ctx, unit);
+        throw err;
     }
 }
 

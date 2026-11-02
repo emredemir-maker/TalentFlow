@@ -42,7 +42,7 @@ import {
 import { isValidDocId } from '../services/tenantPaths.js';
 import { isValidSessionId, resolvePublicLink } from '../services/publicLinks.js';
 import { generateText } from '../services/gemini.js';
-import { consumePlanUnit, QuotaError, sendQuotaError } from '../services/aiQuota.js';
+import { consumePlanUnit, refundPlanUnit, QuotaError, sendQuotaError } from '../services/aiQuota.js';
 import { sanitizeForPrompt } from '../services/promptGuard.js';
 import {
     buildGradingPrompt,
@@ -600,15 +600,21 @@ async function loadGradingContext(paths, positionId, safeQuestions) {
  * "rejected" döner (Promise.allSettled biçimi korunur).
  */
 async function evaluateWithinPlan(ctx, start) {
+    let charged;
     try {
-        await consumePlanUnit(ctx, 'interviewEval');
+        charged = await consumePlanUnit(ctx, 'interviewEval');
     } catch (err) {
         return [
             { status: 'rejected', reason: err },
             { status: 'rejected', reason: err },
         ];
     }
-    return Promise.allSettled(start());
+    const results = await Promise.allSettled(start());
+    // Bütün çağrılar kota yüzünden reddedildiyse (AI hiç çalışmadı) birim iade.
+    if (charged && results.every((r) => r.status === 'rejected' && r.reason instanceof QuotaError)) {
+        await refundPlanUnit(ctx, 'interviewEval');
+    }
+    return results;
 }
 
 /** Damga çağrısı — küçük çıktı, skoru belirleyen kısım. */

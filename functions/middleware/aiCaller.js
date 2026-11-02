@@ -32,12 +32,16 @@ export function requireAiCaller({ allowAnonymous = false, linkKinds = [], roles 
     const memberGate = requireTenant(roles, { write: false });
     return (req, res, next) =>
         verifyFirebaseToken(req, res, async () => {
-            if (req.authUser.provider !== 'anonymous') return memberGate(req, res, next);
+            const linkId = allowAnonymous ? String(req.headers[PUBLIC_LINK_HEADER] || req.body?.link || '') : '';
+            // Bağlantı varsa KİMLİK TÜRÜNDEN BAĞIMSIZ bağlantı yolu: oturumu
+            // açık bir üye kendi şirketinin başvuru bağlantısını açtığında da
+            // ilan bağlantıdan gelir ve bütçe aday kovasından düşer (form
+            // aynı form). Bağlantısız üye çağrısı üyelik kapısından geçer.
+            if (!linkId && req.authUser.provider !== 'anonymous') return memberGate(req, res, next);
             if (!allowAnonymous) {
                 return res.status(403).json({ error: 'Bu işlem için hesapla giriş yapılmalıdır.' });
             }
             try {
-                const linkId = String(req.headers[PUBLIC_LINK_HEADER] || req.body?.link || '');
                 const link = await resolvePublicLink(linkId, { kinds: linkKinds, write: true });
                 if (!link) return res.status(404).json({ error: 'Bağlantı geçersiz.', code: 'LINK_REQUIRED' });
                 const tenant = link.tenant;

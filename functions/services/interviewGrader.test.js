@@ -276,6 +276,6 @@ describe('GRADER_INSTRUCTION', async () => {
         // Paket birimi kapısı (evaluateWithinPlan) iki çağrıyı yine
         // Promise.allSettled ile birlikte başlatır.
         expect(route).toMatch(/evaluateWithinPlan\(req\.aiContext, \(\) => \[\s*runManualEvaluation/);
-        expect(route).toMatch(/async function evaluateWithinPlan[\s\S]*?return Promise\.allSettled\(start\(\)\);/);
+        expect(route).toMatch(/async function evaluateWithinPlan[\s\S]*?await Promise\.allSettled\(start\(\)\);/);
     });
 });

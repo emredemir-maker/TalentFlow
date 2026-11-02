@@ -182,8 +182,11 @@ export async function generateText(prompt, options = {}) {
             // Önbellek isabeti de SAYILIR (token'sız). Önbelleğin işe yarayıp
             // yaramadığını gösteren tek sayı bu oran; isabetleri kaydetmezsek
             // ölçüm "hiç çağrı yapılmamış" gibi görünür.
-            void recordUsage({ label, modelId, cached: true }).catch(() => {});
-            void recordCacheHit(ctx, { label, modelId }).catch(() => {});
+            // Yanıttan önce beklenir (Cloud Functions askıya alma).
+            await Promise.all([
+                recordUsage({ label, modelId, cached: true }).catch(() => {}),
+                Promise.resolve(recordCacheHit(ctx, { label, modelId })).catch(() => {}),
+            ]);
             return cached;
         }
     }
@@ -221,14 +224,19 @@ export async function generateText(prompt, options = {}) {
             if (finishReason && finishReason !== 'STOP') {
                 log.warn({ label, modelId, finishReason, chars: text.length }, 'model output did not finish cleanly');
             }
-            // Ölçüm beklenmez (await yok): fatura kaydı yüzünden kullanıcı
-            // bekletilmez ve hata yutulur.
             const tuketim = readUsage(result.response);
-            // Yerel sayaç ANINDA artıyor: Firestore yazması beklenmiyor ve
-            // iki tazeleme arasında freni ayakta tutan tek şey bu toplam.
+            // Yerel sayaç ANINDA artıyor: iki tazeleme arasında freni ayakta
+            // tutan tek şey bu toplam.
             noteSpend({ totalTokens: tuketim.totalTokens });
-            void recordUsage({ label, modelId, usage: tuketim }).catch(() => {});
-            void settleAi(lease, { label, modelId, usage: tuketim });
+            // Ölçüm ve kota kapanışı yanıttan ÖNCE beklenir: Cloud Functions
+            // yanıt bitince örneği askıya alabilir; yarım kalan bir ayırma
+            // ertesi güne kadar şirketin kotasını kilitlerdi. Hata yutulur
+            // (ölçüm arızası kullanıcının cevabını düşürmez, yeniden deneme
+            // tetiklemez).
+            await Promise.all([
+                recordUsage({ label, modelId, usage: tuketim }).catch(() => {}),
+                Promise.resolve(settleAi(lease, { label, modelId, usage: tuketim })).catch(() => {}),
+            ]);
             if (key) cacheSet(key, text);
             return text;
         } catch (err) {
@@ -243,7 +251,8 @@ export async function generateText(prompt, options = {}) {
             await new Promise(r => setTimeout(r, backoffMs));
         }
     }
-    void releaseAi(lease);
+    // Ayırma yanıttan önce bırakılır (aynı askıya alma gerekçesi).
+    await Promise.resolve(releaseAi(lease)).catch(() => {});
     throw lastErr;
 }
 
@@ -397,8 +406,11 @@ export async function generateGrounded(prompt, options = {}) {
             };
             const tuketim = readUsage(result.response);
             noteSpend({ totalTokens: tuketim.totalTokens, grounded: true });
-            void recordUsage({ label: 'grounded', modelId, usage: tuketim }).catch(() => {});
-            void settleAi(lease, { label: 'grounded', modelId, usage: tuketim });
+            // Yanıttan önce beklenir (bkz. generateText).
+            await Promise.all([
+                recordUsage({ label: 'grounded', modelId, usage: tuketim }).catch(() => {}),
+                Promise.resolve(settleAi(lease, { label: 'grounded', modelId, usage: tuketim })).catch(() => {}),
+            ]);
             if (key) cacheSet(key, value);
             return value;
         } catch (err) {
@@ -412,7 +424,7 @@ export async function generateGrounded(prompt, options = {}) {
 
     // Aramalı ayırma kapanır; aramasız son çare generateText içinde kendi
     // ayırmasını yapar.
-    await releaseAi(lease);
+    await Promise.resolve(releaseAi(lease)).catch(() => {});
 
     // Son çare: aramasız cevap. Kullanıcıya "kaynaksız" olarak gösterilir —
     // sessizce kaynaklıymış gibi sunmak en kötüsü olurdu.

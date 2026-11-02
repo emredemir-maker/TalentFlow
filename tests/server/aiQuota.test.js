@@ -318,6 +318,26 @@ describe('aday tarafı amaca özel uçlar — şirket ve ilan bağlantıdan', ()
         expect(cross.status).toBe(404);
     });
 
+    it('oturumu açık üye başvuru bağlantısını açınca da ilan bağlantıdan gelir (aday kovası)', async () => {
+        // bRec B'nin üyesi; A'nın ilan bağlantısıyla çağırır → bağlantı yolu,
+        // A'nın (dolu) bütçesi → 429. Bağlantı yolu kurulmasaydı positionId
+        // olmadığı için 400 dönerdi.
+        const r = await call('POST', '/api/public/apply/parse-cv', {
+            uid: 'bRec',
+            tenant: 'B',
+            link: L('posA'),
+            body: { cvText: 'Deneyimli yazılım geliştirici. '.repeat(5) },
+        });
+        expect(r.status).toBe(429);
+        // Bağlantısız üye çağrısı üyelik kapısından geçer; ilan gövdeden.
+        const m = await call('POST', '/api/public/apply/parse-cv', {
+            uid: 'bRec',
+            tenant: 'B',
+            body: { cvText: 'x'.repeat(100) },
+        });
+        expect(m.status).toBe(400);
+    });
+
     it('paket hakkı 0 olan şirkette CV ayrıştırma PLAN_LIMIT_REACHED ile durur', async () => {
         const r = await call('POST', '/api/direct-add', {
             uid: 'pRec',
