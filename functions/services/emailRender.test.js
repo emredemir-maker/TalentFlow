@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../config/firebaseAdmin.js', () => ({ db: {}, admin: {} }));
-const { renderEmail, cleanVars, safeLink, escapeHtml, applyVars, brandingOf } = await import('./emailRender.js');
+const { renderEmail, cleanVars, safeLink, escapeHtml, applyVars, brandingOf, sanitizeTemplateHtml } = await import('./emailRender.js');
 
 const APP = 'https://talent.clyro.test';
 
@@ -74,5 +74,30 @@ describe('renderEmail', () => {
         const r = renderEmail('infoRequest', cleanVars('infoRequest', { requestedItems: ['<b>Diploma</b>', 5] }), {});
         expect(r.html).toContain('&lt;b&gt;Diploma&lt;/b&gt;');
         expect(escapeHtml(`"'`)).toBe('&quot;&#39;');
+    });
+});
+
+describe('sanitizeTemplateHtml — kayıtlı şablon ortak alan adından gider', () => {
+    it('betik/form/olay öznitelikleri atılır; izin dışı bağlantı ölür; değişken ve mailto kalır', () => {
+        const out = sanitizeTemplateHtml(
+            '<script>x</script><form action="https://kotu.test"><input name=p></form>'
+            + '<a href="https://kotu.test/giris" onclick="x()">Giriş</a>'
+            + `<a href="${APP}/join/1">Katıl</a><a href="{{joinLink}}">K</a><a href="mailto:ik@a.test">İK</a>`
+            + '<img src="http://x.test/a.png"><img src="https://cdn.test/l.png" onerror=alert(1)>',
+            APP
+        );
+        expect(out).not.toMatch(/<script|<form|<input|onclick|onerror|kotu\.test|http:\/\/x\.test/);
+        expect(out).toContain('href="#"');
+        expect(out).toContain(`href="${APP}/join/1"`);
+        expect(out).toContain('href="{{joinLink}}"');
+        expect(out).toContain('href="mailto:ik@a.test"');
+        expect(out).toContain('src="https://cdn.test/l.png"');
+        // Metin değişkeniyle bağlantı kurulamaz.
+        expect(sanitizeTemplateHtml('<a href="{{position}}">x</a>', APP)).toBe('<a href="#">x</a>');
+    });
+
+    it('renderEmail kayıtlı şablonu temizleyerek kullanır', () => {
+        const r = renderEmail('feedback', {}, { templates: { feedback: { html: '<a href="https://kotu.test">x</a>' } }, appUrl: APP });
+        expect(r.html).toBe('<a href="#">x</a>');
     });
 });

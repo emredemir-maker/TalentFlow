@@ -36,7 +36,7 @@ import { randomUUID } from 'crypto';
 import { requireTenant, loadPublicTenant, WRITER_ROLES, SELF_WRITER_ROLES } from '../middleware/auth.js';
 import { isValidDocId } from '../services/tenantPaths.js';
 import { db, admin } from '../config/firebaseAdmin.js';
-import { sendEmail, sendMailerError, mailerConfig, isEmail } from '../services/mailer.js';
+import { sendEmail, sendMailerError, mailerConfig, isEmail, MailerDisabledError } from '../services/mailer.js';
 import { renderEmail, cleanVars, loadEmailSettings } from '../services/emailRender.js';
 import { tokenStore } from '../services/integrationTokenStore.js';
 import { IntegrationError } from '../services/integrationTokens.js';
@@ -89,7 +89,8 @@ async function mailContext(req) {
     const settings = await loadEmailSettings(db, req.paths);
     const companyName = String(settings.branding?.companyName || req.tenant.name || '').trim();
     return {
-        settings: { ...settings, tenantName: req.tenant.name || '' },
+        settings: { ...settings, tenantName: req.tenant.name || '', appUrl: resolveAppUrl() },
+        trial: req.tenant.status === 'trial',
         fromName: companyName,
         replyTo: isEmail(req.user.email) ? req.user.email : null,
     };
@@ -133,7 +134,9 @@ router.post('/api/send-feedback', generalLimiter, requireTenant(WRITER_ROLES), a
         const ctx = await mailContext(req);
         const vars = varsFor('feedback', req.body, req);
         const { subject, html } = renderEmail('feedback', vars, ctx.settings);
-        await sendEmail({ tenantId: req.tenant.id, fromName: ctx.fromName, replyTo: ctx.replyTo, to, subject, html, text: feedbackText, kind: 'feedback' });
+        // Düz metin parçası gönderilmez: istemci metni e-posta istemcilerinde
+        // bağlantıya dönüşebilirdi; HTML şablonda kaçışlı.
+        await sendEmail({ tenantId: req.tenant.id, trial: ctx.trial, fromName: ctx.fromName, replyTo: ctx.replyTo, to, subject, html, kind: 'feedback' });
         res.json({ success: true });
     } catch (error) {
         if (sendMailerError(res, error)) return;
@@ -162,6 +165,7 @@ router.post('/api/send-interview-invite', generalLimiter, requireTenant(WRITER_R
         const { subject, html } = renderEmail(templateKey, vars, ctx.settings);
         await sendEmail({
             tenantId: req.tenant.id,
+            trial: ctx.trial,
             fromName: ctx.fromName,
             replyTo: ctx.replyTo,
             to,
@@ -189,6 +193,8 @@ router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES
     const { to, candidateName, sessionId, candidateId } = req.body || {};
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     if (!isEmail(String(to).trim())) return res.status(400).json({ error: 'Geçersiz email adresi.' });
+    // Gönderim kapalıysa kayıt da açılmaz (asılı "bekliyor" talebi yok).
+    if (!mailerConfig().enabled) return sendMailerError(res, new MailerDisabledError());
     try {
         const requestId = `ir-${randomUUID()}`;
         const APP_URL = resolveAppUrl();
@@ -223,7 +229,13 @@ router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES
         const rendered = renderEmail('infoRequest', vars, ctx.settings);
         // Konudaki kimlik eşleştirmenin anahtarı — şablon ne olursa olsun eklenir.
         const subject = `${rendered.subject} [#${requestId}]`;
-        await sendEmail({ tenantId: req.tenant.id, fromName: ctx.fromName, replyTo: ctx.replyTo, to, subject, html: rendered.html, kind: 'info-request' });
+        try {
+            await sendEmail({ tenantId: req.tenant.id, trial: ctx.trial, fromName: ctx.fromName, replyTo: ctx.replyTo, to, subject, html: rendered.html, kind: 'info-request' });
+        } catch (sendErr) {
+            // Gönderilemeyen talep "bekliyor" diye asılı kalmasın.
+            await db.doc(req.paths.infoRequest(requestId)).delete().catch(() => {});
+            throw sendErr;
+        }
         log.info({ requestId }, '✉️ Info request sent');
         res.json({ success: true, requestId, respondUrl });
     } catch (error) {
@@ -294,85 +306,126 @@ router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
 
 const REQUEST_TAG_RE = /\[#(ir-[0-9a-f-]{36})\]/i;
 
+/** Ayrıştırılacak gövdenin üst sınırı — düzenli ifadeler sınırlı girdide çalışır (ReDoS yok). */
+export const REPLY_BODY_MAX = 20_000;
+
+/** İlk alıntı imini bulur (düzenli ifade değil, indexOf). */
+function cutAtQuote(html) {
+    const lower = html.toLowerCase();
+    const marks = ['class="gmail_quote', "class='gmail_quote", 'id="divrplyfwdmsg', 'id=divrplyfwdmsg', '<blockquote'];
+    let cut = html.length;
+    for (const m of marks) {
+        const k = lower.indexOf(m);
+        if (k >= 0) {
+            const tagStart = lower.lastIndexOf('<', k);
+            cut = Math.min(cut, tagStart >= 0 ? tagStart : k);
+        }
+    }
+    return html.slice(0, cut);
+}
+
 /** HTML gövdeden yalnız yeni yazılan kısmı düz metne indirger. */
 export function stripHtmlReply(html) {
-    return String(html || '')
-        .replace(/<div[^>]*class="[^"]*gmail_quote[^"]*"[\s\S]*?<\/div\s*>/gi, '')
-        .replace(/<div[^>]*id="?divRplyFwdMsg"?[\s\S]*$/gi, '')
-        .replace(/<blockquote[\s\S]*?<\/blockquote\s*>/gi, '')
-        .replace(/<(style|script)[\s\S]*?<\/\1\s*>/gi, '')
-        .replace(/<\/?(p|div|br|h[1-6]|li|tr)[^>]*>/gi, '\n')
-        .replace(/<[^>]+>/g, '')
+    const head = cutAtQuote(String(html || '').slice(0, REPLY_BODY_MAX));
+    return head
+        .replace(/<(style|script)\b[^>]*>[^<]*(?:<(?!\/\1)[^<]*)*<\/\1\s*>/gi, '')
+        .replace(/<\/?(p|div|br|h[1-6]|li|tr)\b[^>]*>/gi, '\n')
+        .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
         .replace(/[ \t]+/g, ' ').replace(/\n[ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n')
-        .trim();
+        .trim()
+        .slice(0, 5000);
 }
 
 /** Düz metin gövdeden alıntıyı atar. */
 export function stripPlainReply(str) {
-    let s = String(str || '');
-    const onWroteIdx = s.search(/^(On .{0,200}wrote:|.{0,200} tarihinde .{0,200} şunu yazdı:)\s*$/m);
+    let s = String(str || '').slice(0, REPLY_BODY_MAX);
+    const onWroteIdx = s.search(/^(On [^\n]{0,200}wrote:|[^\n]{0,200} tarihinde [^\n]{0,200} şunu yazdı:)[ \t]*$/m);
     if (onWroteIdx > 0) s = s.slice(0, onWroteIdx);
-    return s.split('\n').filter((ln) => !ln.trimStart().startsWith('>')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    return s.split('\n').filter((ln) => !ln.trimStart().startsWith('>')).join('\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 5000);
 }
 
 /** "Ad <a@b.c>" → a@b.c */
 function addressOf(from) {
-    const m = String(from || '').match(/<([^>]+@[^>]+)>/) || String(from || '').match(/([^\s<>"]+@[^\s<>"]+)/);
+    const f = String(from || '').slice(0, 500);
+    const m = f.match(/<([^<>\s]+@[^<>\s]+)>/) || f.match(/([^\s<>"]+@[^\s<>"]+)/);
     return m ? m[1].trim().toLowerCase() : '';
 }
 
+const MAILBOX_TIMEOUT_MS = 10_000;
+
 async function jsonFetch(url, token, fetchImpl) {
-    const r = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) {
-        const err = new Error(`HTTP ${r.status}`);
-        err.status = r.status;
-        throw err;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), MAILBOX_TIMEOUT_MS);
+    try {
+        const r = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` }, signal: ac.signal });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            const err = new Error(`HTTP ${r.status}`);
+            err.status = r.status;
+            throw err;
+        }
+        return data;
+    } finally {
+        clearTimeout(timer);
     }
-    return data;
 }
 
-/** Gmail: son 14 gündeki, konusunda talep kimliği olan mesajlar. */
-export async function fetchGmailReplies(token, fetchImpl = fetch) {
+/**
+ * Gmail: son 14 gündeki, konusunda talep kimliği olan mesajlar.
+ *
+ * GÖVDE EN SON: önce yalnız başlıklar (metadata) okunur; gövde yalnız
+ * `accept(requestId, from)` true dönen — yani bu şirkette var olan ve adayın
+ * adresinden gelen — mesaj için indirilir ve sınırlı uzunlukta ayrıştırılır.
+ * Kutuya `[#ir-…]` konulu rastgele e-posta atan biri sunucuya iş yükletemez.
+ */
+export async function fetchGmailReplies(token, fetchImpl = fetch, { accept = async () => true, max = 25 } = {}) {
     const base = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
-    const list = await jsonFetch(`${base}?q=${encodeURIComponent('newer_than:14d subject:ir')}&maxResults=50`, token, fetchImpl);
+    const list = await jsonFetch(`${base}?q=${encodeURIComponent('newer_than:14d subject:ir')}&maxResults=${max}`, token, fetchImpl);
     const out = [];
-    for (const m of list.messages || []) {
-        const msg = await jsonFetch(`${base}/${encodeURIComponent(m.id)}?format=full`, token, fetchImpl);
-        const headers = msg.payload?.headers || [];
-        const h = (n) => headers.find((x) => String(x.name).toLowerCase() === n)?.value || '';
+    for (const m of (list.messages || []).slice(0, max)) {
+        const meta = await jsonFetch(`${base}/${encodeURIComponent(m.id)}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, token, fetchImpl);
+        const headers = meta.payload?.headers || [];
+        const h = (n) => String(headers.find((x) => String(x.name).toLowerCase() === n)?.value || '').slice(0, 500);
         const tag = REQUEST_TAG_RE.exec(h('subject'));
         if (!tag) continue;
+        const requestId = tag[1].toLowerCase();
+        const from = addressOf(h('from'));
+        if (!(await accept(requestId, from))) continue;
+        const msg = await jsonFetch(`${base}/${encodeURIComponent(m.id)}?format=full`, token, fetchImpl);
         const parts = [];
-        const walk = (p) => {
-            if (!p) return;
+        const walk = (p, depth = 0) => {
+            if (!p || depth > 6 || parts.length > 10) return;
             if (p.body?.data && /^text\/(plain|html)/.test(p.mimeType || '')) parts.push(p);
-            (p.parts || []).forEach(walk);
+            (p.parts || []).slice(0, 20).forEach((c) => walk(c, depth + 1));
         };
         walk(msg.payload);
-        const decode = (d) => Buffer.from(String(d).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+        const decode = (d) => Buffer.from(String(d).slice(0, REPLY_BODY_MAX * 2).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
         const plain = parts.find((p) => p.mimeType.startsWith('text/plain'));
         const html = parts.find((p) => p.mimeType.startsWith('text/html'));
         const replyBody = plain ? stripPlainReply(decode(plain.body.data)) : html ? stripHtmlReply(decode(html.body.data)) : '';
-        out.push({ requestId: tag[1].toLowerCase(), from: addressOf(h('from')), subject: h('subject'), replyBody });
+        out.push({ requestId, from, subject: h('subject'), replyBody });
     }
     return out;
 }
 
-/** Microsoft Graph: konusunda talep kimliği olan mesajlar (Mail.Read). */
-export async function fetchGraphReplies(token, fetchImpl = fetch) {
+/** Microsoft Graph: konusunda talep kimliği olan mesajlar (Mail.Read). Gövde yalnız kabul edilen mesajda ayrıştırılır. */
+export async function fetchGraphReplies(token, fetchImpl = fetch, { accept = async () => true, max = 25 } = {}) {
     const url = 'https://graph.microsoft.com/v1.0/me/messages'
-        + `?$search=${encodeURIComponent('"subject:ir"')}&$top=50&$select=subject,from,body`;
+        + `?$search=${encodeURIComponent('"subject:ir"')}&$top=${max}&$select=subject,from,body`;
     const list = await jsonFetch(url, token, fetchImpl);
     const out = [];
-    for (const m of list.value || []) {
-        const tag = REQUEST_TAG_RE.exec(m.subject || '');
+    for (const m of (list.value || []).slice(0, max)) {
+        const subject = String(m.subject || '').slice(0, 500);
+        const tag = REQUEST_TAG_RE.exec(subject);
         if (!tag) continue;
-        const content = m.body?.content || '';
+        const requestId = tag[1].toLowerCase();
+        const from = String(m.from?.emailAddress?.address || '').slice(0, 320).toLowerCase();
+        if (!(await accept(requestId, from))) continue;
+        const content = String(m.body?.content || '');
         const replyBody = m.body?.contentType === 'html' ? stripHtmlReply(content) : stripPlainReply(content);
-        out.push({ requestId: tag[1].toLowerCase(), from: String(m.from?.emailAddress?.address || '').toLowerCase(), subject: m.subject || '', replyBody });
+        out.push({ requestId, from, subject, replyBody });
     }
     return out;
 }
@@ -396,10 +449,34 @@ export function replyPatch(existing, reply, now = new Date()) {
     return patch;
 }
 
+// Kişi başına bekleme: her tıklama dış API'ye onlarca istek demek.
+const REPLY_CHECK_COOLDOWN_MS = 30_000;
+const lastReplyCheck = new Map();
+
 router.post('/api/check-info-replies', generalLimiter, requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     // Yalnız oturumdaki kişinin kendi bağlı kutusu. İkisi de bağlı değilse
     // 409 MAILBOX_NOT_CONNECTED: ekran "Gmail ya da Microsoft hesabınızı
     // bağlayın" der.
+    const key = `${req.tenant.id}:${req.user.uid}`;
+    const last = lastReplyCheck.get(key) || 0;
+    if (Date.now() - last < REPLY_CHECK_COOLDOWN_MS) {
+        return res.status(429).json({ success: false, code: 'TOO_SOON', error: 'Yanıtlar az önce kontrol edildi. Lütfen yarım dakika sonra tekrar deneyin.' });
+    }
+    lastReplyCheck.set(key, Date.now());
+    if (lastReplyCheck.size > 5000) lastReplyCheck.clear();
+
+    // Yalnız bu şirkette var olan ve adayın adresinden gelen yanıtlar kabul
+    // edilir; gövde ancak ondan sonra indirilir/ayrıştırılır.
+    const snaps = new Map();
+    const accept = async (requestId, from) => {
+        if (!isValidDocId(requestId)) return false;
+        if (!snaps.has(requestId)) {
+            const snap = await db.doc(req.paths.infoRequest(requestId)).get().catch(() => null);
+            snaps.set(requestId, snap?.exists ? snap.data() : null);
+        }
+        const rec = snaps.get(requestId);
+        return !!rec && replyPatch(rec, { from, subject: '', replyBody: '' }) !== null;
+    };
     let replies = null;
     let provider = null;
     let reauth = false;
@@ -412,7 +489,7 @@ router.post('/api/check-info-replies', generalLimiter, requireTenant(SELF_WRITER
             continue;
         }
         try {
-            replies = p === 'google' ? await fetchGmailReplies(token) : await fetchGraphReplies(token);
+            replies = p === 'google' ? await fetchGmailReplies(token, fetch, { accept }) : await fetchGraphReplies(token, fetch, { accept });
             provider = p;
             break;
         } catch (err) {
@@ -467,7 +544,7 @@ router.post('/api/send-participant-invite', generalLimiter, requireTenant(WRITER
         const { subject, html } = renderEmail('participant', vars, ctx.settings);
         const results = await Promise.allSettled(
             participants.map((email) =>
-                sendEmail({ tenantId: req.tenant.id, fromName: ctx.fromName, replyTo: ctx.replyTo, to: email, subject, html, kind: 'participant' })
+                sendEmail({ tenantId: req.tenant.id, trial: ctx.trial, fromName: ctx.fromName, replyTo: ctx.replyTo, to: email, subject, html, kind: 'participant' })
             )
         );
         const failed = results.filter((r) => r.status === 'rejected');

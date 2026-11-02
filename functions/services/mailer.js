@@ -62,11 +62,14 @@ export function mailerConfig(env = process.env) {
     const apiKey = String(env.RESEND_API_KEY || '').trim();
     const fromAddress = String(env.MAIL_FROM_ADDRESS || DEFAULT_FROM_ADDRESS).trim().toLowerCase();
     const n = Number(env.EMAIL_DAILY_LIMIT_PER_TENANT);
+    const t = Number(env.EMAIL_DAILY_LIMIT_TRIAL);
     return {
         enabled: apiKey.length > 0 && isEmail(fromAddress),
         apiKey,
         fromAddress,
         dailyLimit: Number.isFinite(n) && n > 0 ? Math.floor(n) : 300,
+        // Deneme şirketi (herkes Hub'dan açabilir) daha düşük tavanla başlar.
+        trialDailyLimit: Number.isFinite(t) && t > 0 ? Math.floor(t) : 50,
     };
 }
 
@@ -76,8 +79,10 @@ export function mailerConfig(env = process.env) {
  */
 export function sanitizeDisplayName(name) {
     const clean = String(name ?? '')
+        // '@' ve ':' de atılır: ad "guvenlik@banka.com" gibi bir adres
+        // ya da bağlantı görünümüne bürünemesin (ortak alan adından oltalama).
         // eslint-disable-next-line no-control-regex
-        .replace(/[\u0000-\u001f\u007f"<>\\]/g, ' ')
+        .replace(/[\u0000-\u001f\u007f"<>\\@:]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, 80);
@@ -145,6 +150,7 @@ export async function consumeEmailQuota(tenantId, n, { limit, now = new Date() }
  * @returns {Promise<{ id: string|null }>}
  */
 export async function sendEmail(p, { fetchImpl = globalThis.fetch, env = process.env, now = new Date(), skipQuota = false } = {}) {
+    // p.trial: şirket deneme sürümünde mi (tavan düşük).
     const cfg = mailerConfig(env);
     if (!cfg.enabled) throw new MailerDisabledError();
 
@@ -159,11 +165,12 @@ export async function sendEmail(p, { fetchImpl = globalThis.fetch, env = process
     }
     const replyTo = typeof p.replyTo === 'string' && isEmail(p.replyTo.trim()) ? p.replyTo.trim() : null;
 
+    const limit = p.trial ? Math.min(cfg.dailyLimit, cfg.trialDailyLimit) : cfg.dailyLimit;
     if (!skipQuota) {
-        const ok = await consumeEmailQuota(p.tenantId, to.length, { limit: cfg.dailyLimit, now });
+        const ok = await consumeEmailQuota(p.tenantId, to.length, { limit, now });
         if (!ok) {
             throw new MailerError(
-                `Şirketinizin bugünkü e-posta gönderim sınırı (${cfg.dailyLimit}) doldu. Yarın tekrar deneyin.`,
+                `Şirketinizin bugünkü e-posta gönderim sınırı (${limit}) doldu. Yarın tekrar deneyin.`,
                 { status: 429, code: 'EMAIL_DAILY_LIMIT' }
             );
         }
@@ -191,6 +198,14 @@ export async function sendEmail(p, { fetchImpl = globalThis.fetch, env = process
             : {}),
     };
 
+    // Gönderilemeyen e-posta günlük haktan düşmesin.
+    const refund = () =>
+        skipQuota
+            ? Promise.resolve()
+            : db
+                .doc(tenantPaths(p.tenantId).usageDay(dayKey(now)))
+                .set({ email: { sent: admin.firestore.FieldValue.increment(-to.length) } }, { merge: true })
+                .catch(() => {});
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), SEND_TIMEOUT_MS);
     let res;
@@ -203,6 +218,7 @@ export async function sendEmail(p, { fetchImpl = globalThis.fetch, env = process
         });
     } catch (err) {
         log.warn({ err: err?.name, tenantId: p.tenantId }, 'e-posta hizmetine ulaşılamadı');
+        await refund();
         throw new MailerError('E-posta hizmetine ulaşılamadı. Biraz sonra tekrar deneyin.');
     } finally {
         clearTimeout(timer);
@@ -212,6 +228,7 @@ export async function sendEmail(p, { fetchImpl = globalThis.fetch, env = process
         // Hizmetin hata metni anahtar içermez ama ham hali kullanıcıya
         // gösterilmez; loga yalnız durum ve ad.
         log.warn({ status: res.status, name: data?.name, tenantId: p.tenantId }, 'e-posta gönderilemedi');
+        await refund();
         throw new MailerError(
             res.status === 422 || res.status === 400
                 ? 'E-posta reddedildi (adres ya da içerik geçersiz).'

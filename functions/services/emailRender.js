@@ -141,6 +141,36 @@ function htmlValue(k, v) {
     return escapeHtml(v);
 }
 
+/**
+ * Şirketin kayıtlı şablon HTML'ini temizler (yönetici yazar, ama e-posta
+ * ortak Clyro alan adından gider): betik/çerçeve/form/gömülü nesne ve olay
+ * öznitelikleri atılır; `href` yalnız safeLink'ten geçen adres (ya da
+ * mailto:) olabilir, değilse bağlantı ölür; `src` yalnız https.
+ * Girdi 200 KB ile sınırlı; ifadeler doğrusal.
+ */
+export function sanitizeTemplateHtml(html, appUrl = '') {
+    let s = String(html || '').slice(0, 200_000);
+    s = s.replace(/<(script|iframe|object|embed|form|input|button|textarea|select|meta|link|base)\b[^>]*>/gi, '');
+    s = s.replace(/<\/(script|iframe|object|embed|form|button|textarea|select)\s*>/gi, '');
+    s = s.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+    s = s.replace(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (_, _q, a, b, c) => {
+        const raw = String(a ?? b ?? c ?? '').trim();
+        // Yalnız BAĞLANTI değişkeni (değeri cleanVars'ta safeLink'ten geçer);
+        // href="{{position}}" gibi metin değişkeniyle bağlantı kurulamaz.
+        const v = /^\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}$/.exec(raw);
+        if (v) return LINK_VARS.has(v[1]) ? `href="{{${v[1]}}}"` : 'href="#"';
+        if (/^mailto:[^\s"'<>]+$/i.test(raw)) return `href="${escapeHtml(raw)}"`;
+        const ok = safeLink(raw.replace(/&amp;/g, '&'), appUrl);
+        return ok ? `href="${escapeHtml(ok)}"` : 'href="#"';
+    });
+    s = s.replace(/\bsrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (_, _q, a, b, c) => {
+        const raw = String(a ?? b ?? c ?? '').trim();
+        if (/^\{\{\s*logoUrl\s*\}\}$/.test(raw)) return 'src="{{logoUrl}}"';
+        return /^https:\/\/[^\s"'<>]+$/i.test(raw) ? `src="${escapeHtml(raw)}"` : '';
+    });
+    return s;
+}
+
 /** {{değişken}} yerleştirme — kayıtlı şablonlar için. */
 export function applyVars(template, vars, brand) {
     const merged = {
@@ -232,14 +262,14 @@ ${v.requestedItems?.length ? `<p><strong>Talep edilenler:</strong></p><ul>${html
  * @param {{ templates?: object, branding?: object, tenantName?: string }} settings
  * @returns {{ subject: string, html: string, source: 'tenant'|'built-in' }}
  */
-export function renderEmail(key, vars, { templates = {}, branding = {}, tenantName = '' } = {}) {
+export function renderEmail(key, vars, { templates = {}, branding = {}, tenantName = '', appUrl = '' } = {}) {
     const def = BUILT_IN[key];
     if (!def) throw new Error(`Bilinmeyen şablon: ${key}`);
     const brand = brandingOf(branding, tenantName);
     const saved = templates?.[key];
     if (saved && typeof saved.html === 'string' && saved.html.trim()) {
         const subject = saved.subject ? applySubjectVars(saved.subject, vars, brand) : def.subject(vars, brand);
-        return { subject, html: applyVars(saved.html, vars, brand), source: 'tenant' };
+        return { subject, html: applyVars(sanitizeTemplateHtml(saved.html, appUrl), vars, brand), source: 'tenant' };
     }
     return { subject: def.subject(vars, brand), html: layout(brand, def.body(vars, brand)), source: 'built-in' };
 }

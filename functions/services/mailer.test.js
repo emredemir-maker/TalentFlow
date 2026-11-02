@@ -6,7 +6,13 @@ vi.mock('../config/firebaseAdmin.js', () => {
     const snap = (p) => ({ exists: store.docs.has(p), data: () => store.docs.get(p) });
     return {
         db: {
-            doc: (p) => ({ path: p }),
+            doc: (p) => ({
+                path: p,
+                set: async (d) => {
+                    const cur = store.docs.get(p) || {};
+                    store.docs.set(p, { ...cur, email: { sent: (cur.email?.sent || 0) + (d.email?.sent?.__inc || 0) } });
+                },
+            }),
             runTransaction: async (fn) =>
                 fn({
                     get: async (r) => snap(r.path),
@@ -49,7 +55,7 @@ describe('mailerConfig', () => {
     });
 
     it('varsayılan gönderen noreply@clyrolabs.com; günlük şirket tavanı 300', () => {
-        expect(mailerConfig(ENV)).toMatchObject({ enabled: true, fromAddress: 'noreply@clyrolabs.com', dailyLimit: 300 });
+        expect(mailerConfig(ENV)).toMatchObject({ enabled: true, fromAddress: 'noreply@clyrolabs.com', dailyLimit: 300, trialDailyLimit: 50 });
     });
 });
 
@@ -67,7 +73,10 @@ describe('başlıklar', () => {
     });
 
     it('BAŞLIK ENJEKSİYONU YOK: görünen addaki satır sonu/tırnak/köşeli parantez atılır', () => {
-        expect(sanitizeDisplayName('Acme"\r\nBcc: kurban@x.test <evil@x.test>')).toBe('Acme Bcc: kurban@x.test evil@x.test');
+        expect(sanitizeDisplayName('Acme"\r\nBcc: kurban@x.test <evil@x.test>')).toBe('Acme Bcc kurban x.test evil x.test');
+        // Ad bir adres/bağlantı gibi görünemez.
+        expect(sanitizeDisplayName('guvenlik@banka.com')).toBe('guvenlik banka.com');
+        expect(sanitizeDisplayName('https://banka.com')).toBe('https //banka.com');
         expect(formatFrom('', 'noreply@clyrolabs.com')).toBe('"Clyro Talent" <noreply@clyrolabs.com>');
         expect(sanitizeSubject('Konu\r\nBcc: x@y.z')).toBe('Konu Bcc: x@y.z');
     });
@@ -97,6 +106,14 @@ describe('başlıklar', () => {
 });
 
 describe('hata ve tavan', () => {
+    it('deneme şirketi düşük tavanla; başarısız gönderim haktan düşmez', async () => {
+        const env = { ...ENV, EMAIL_DAILY_LIMIT_TRIAL: '1' };
+        const now = new Date('2026-11-02T10:00:00Z');
+        await expect(sendEmail({ ...base, trial: true }, { env, fetchImpl: fakeFetch(500, {}), now })).rejects.toBeInstanceOf(MailerError);
+        await sendEmail({ ...base, trial: true }, { env, fetchImpl: fakeFetch(), now });
+        expect((await sendEmail({ ...base, trial: true }, { env, fetchImpl: fakeFetch(), now }).catch((e) => e)).code).toBe('EMAIL_DAILY_LIMIT');
+    });
+
     it('hizmet hatası anahtar/ham metin sızdırmadan MailerError', async () => {
         const err = await sendEmail(base, { env: ENV, fetchImpl: fakeFetch(422, { name: 'validation_error', message: 'secret detail' }) }).catch((e) => e);
         expect(err).toBeInstanceOf(MailerError);
