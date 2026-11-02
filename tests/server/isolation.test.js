@@ -999,30 +999,19 @@ describe('aday yanıtı — K5', () => {
 
 describe('bilgi talebi kimliği sunucuda', () => {
     it("istemcinin verdiği kimlik yok sayılır: B'nin talep kimliği A'da açılamaz", async () => {
-        process.env.EMAIL_USER = 'noreply@clyro.test';
-        process.env.EMAIL_PASS = 'x';
-        try {
-            await call('POST', '/api/send-info-request', {
-                uid: 'aAdmin',
-                tenant: 'A',
-                body: { to: 'aday@x.test', candidateName: 'Aday', requestId: 'ir-b1' },
-            });
-        } finally {
-            delete process.env.EMAIL_USER;
-            delete process.env.EMAIL_PASS;
-        }
-        // Posta gönderilemese de kayıt önce yazılır; kimlik sunucunun.
+        // E-posta gönderimi bu ortamda kapalı (RESEND_API_KEY yok) → 503 ve
+        // hiçbir kayıt açılmaz. Sunucunun kendi kimliğini ürettiği, gönderim
+        // açıkken tests/server/email.test.js'te sınanıyor.
+        const r = await call('POST', '/api/send-info-request', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { to: 'aday@x.test', candidateName: 'Aday', requestId: 'ir-b1' },
+        });
+        expect(r.status).toBe(503);
         expect((await get('tenants/A/infoRequests/ir-b1')).exists).toBe(false);
-        const a = await db.collection('tenants/A/infoRequests').get();
-        expect(a.size).toBe(1);
-        expect(a.docs[0].id).toMatch(/^ir-[0-9a-f-]{36}$/);
-        // Aday bağlantısı sunucuda üretildi ve bu talebe gidiyor.
-        const links = await db
-            .collection('publicLinks')
-            .where('targetId', '==', a.docs[0].id)
-            .get();
-        expect(links.size).toBe(1);
-        expect(links.docs[0].data()).toMatchObject({ tenantId: 'A', kind: 'infoRequest' });
+        expect((await db.collection('tenants/A/infoRequests').get()).size).toBe(0);
+        // Bağlantının sunucuda üretilip talebe gittiği, gönderim açıkken
+        // tests/server/email.test.js'te sınanıyor.
         expect((await get('tenants/B/infoRequests/ir-b1')).data().status).toBe('pending');
     }, 30_000);
 });

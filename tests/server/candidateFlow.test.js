@@ -253,18 +253,25 @@ describe('mülakat akışı', () => {
 
 describe('bilgi talebi akışı', () => {
     it('recruiter talep gönderir; aday bağlantıyla talebi okur ve yanıtlar', async () => {
-        process.env.EMAIL_USER = 'noreply@clyro.test';
-        process.env.EMAIL_PASS = 'x';
+        // Gönderim açık (PR 7b: Resend); yalnız Resend çağrısı yakalanır,
+        // diğer istekler gerçek fetch. Gönderilemeyen talep kaydı kalmaz,
+        // bu yüzden akış başarılı bir gönderimle sınanır.
+        process.env.RESEND_API_KEY = 're_test';
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = async (url, init) =>
+            String(url).startsWith('https://api.resend.com/')
+                ? { ok: true, status: 200, json: async () => ({ id: 'em_test' }) }
+                : realFetch(url, init);
         try {
-            // Posta sunucusuna ulaşılamasa da talep ve bağlantı önce yazılır.
-            await call('POST', '/api/send-info-request', {
+            const sent = await call('POST', '/api/send-info-request', {
                 uid: 'r1',
                 tenant: 'T1',
                 body: { to: 'ayse@x.test', candidateName: 'Ayşe', candidateId: 'c1' },
             });
+            expect(sent.status).toBe(200);
         } finally {
-            delete process.env.EMAIL_USER;
-            delete process.env.EMAIL_PASS;
+            globalThis.fetch = realFetch;
+            delete process.env.RESEND_API_KEY;
         }
         const links = await db.collection('publicLinks').where('kind', '==', 'infoRequest').get();
         expect(links.size).toBe(1);

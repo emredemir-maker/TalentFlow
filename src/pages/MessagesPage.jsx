@@ -108,7 +108,25 @@ export default function MessagesPage() {
         return unsub;
     }, [currentUser?.email]);
 
-    // Check Gmail inbox for replies to info request emails (IMAP)
+    // Yanıt kutusu durumu: aday yanıtları Reply-To ile işe alımcının KENDİ
+    // kutusuna gider; otomatik kontrol yalnız Gmail/Microsoft bağlıysa (sunucu:
+    // GET /api/email/status).
+    const [mailStatus, setMailStatus] = useState(null);
+    useEffect(() => {
+        if (!currentUser || pageTab !== 'info_requests') return;
+        let alive = true;
+        (async () => {
+            try {
+                const token = await currentUser.getIdToken();
+                const res = await fetch('/api/email/status', { headers: { Authorization: `Bearer ${token}` } });
+                if (res.ok && alive) setMailStatus(await res.json());
+            } catch { /* uyarı gösterilmez */ }
+        })();
+        return () => { alive = false; };
+    }, [currentUser, pageTab]);
+    const inboxConnected = !!(mailStatus?.replyInbox?.google || mailStatus?.replyInbox?.microsoft);
+
+    // Bilgi talebi yanıtlarını işe alımcının bağlı kutusunda (Gmail / Microsoft 365) arar.
     const handleCheckInfoReplies = useCallback(async () => {
         if (!currentUser) return;
         setCheckingInfoReplies(true);
@@ -120,6 +138,11 @@ export default function MessagesPage() {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             });
             const data = await res.json();
+            if (res.status === 409) {
+                // Kutu bağlı değil / yeniden bağlanmalı: hata değil, yönlendirme.
+                addNotification('info', data.error || 'Gmail ya da Microsoft 365 hesabınızı bağlayın.');
+                return;
+            }
             if (!res.ok) throw new Error(data.error || 'Hata oluştu');
             setCheckInfoResult({ scanned: data.scanned, updated: data.updated });
             if (data.updated > 0) addNotification('success', `${data.updated} talep otomatik olarak yanıtlandı olarak işaretlendi.`);
@@ -574,6 +597,17 @@ export default function MessagesPage() {
                                 : <><RefreshCw className="w-3.5 h-3.5" /> Yanıtları Kontrol Et</>
                             }
                         </button>
+                    </div>
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-n50 border border-n200 text-[11px] text-n600 leading-relaxed">
+                        <Mail className="w-3.5 h-3.5 shrink-0 mt-0.5 text-n400" />
+                        <span>
+                            Talepler <strong>{mailStatus?.fromAddress || 'noreply@clyrolabs.com'}</strong> adresinden şirket adınızla gider;
+                            aday e-postayla yanıtlarsa yanıt <strong>sizin kutunuza</strong> ({mailStatus?.replyTo || 'hesabınızın e-postası'}) düşer.
+                            {' '}&quot;Yanıtları Kontrol Et&quot; yalnız <strong>Gmail ya da Microsoft 365 hesabını bağlayan</strong> kullanıcıda çalışır
+                            {mailStatus && !inboxConnected ? ' — sizin hesabınız bağlı değil (Ayarlar → Entegrasyonlar).' : '.'}
+                            {' '}Adayın form bağlantısından gönderdiği yanıtlar her durumda otomatik kaydedilir.
+                            {mailStatus && mailStatus.enabled === false ? ' Uyarı: bu ortamda e-posta gönderimi kapalı.' : ''}
+                        </span>
                     </div>
                     {checkInfoResult && (
                         <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-ok-bg/60 border border-ok/15 text-[12px] text-ok-text">

@@ -80,8 +80,6 @@ jobs:
           eksik=""
           [ -z "$FIREBASE_SERVICE_ACCOUNT" ] && eksik="$eksik FIREBASE_SERVICE_ACCOUNT"
           [ -z "$VITE_FIREBASE_API_KEY" ] && eksik="$eksik VITE_FIREBASE_API_KEY"
-          [ -z "$EMAIL_USER" ] && eksik="$eksik EMAIL_USER"
-          [ -z "$EMAIL_PASS" ] && eksik="$eksik EMAIL_PASS"
           [ -z "$VITE_GEMINI_API_KEY" ] && eksik="$eksik VITE_GEMINI_API_KEY"
           [ -z "$INTEGRATION_ENCRYPTION_KEY" ] && eksik="$eksik INTEGRATION_ENCRYPTION_KEY"
           if [ -n "$eksik" ]; then
@@ -95,6 +93,11 @@ jobs:
           if [ -z "$AI_DAILY_TOKEN_LIMIT" ] || [ -z "$AI_DAILY_GROUNDED_LIMIT" ]; then
             echo "::warning::Günlük AI bütçe freni KAPALI — AI_DAILY_TOKEN_LIMIT / AI_DAILY_GROUNDED_LIMIT secret'ları boş." 
           fi
+          # Aday e-postaları (PR 7b): Resend anahtarı yoksa gönderim güvenli
+          # biçimde KAPALI kalır (uçlar 503 EMAIL_DISABLED); dağıtım durmaz.
+          if [ -z "$RESEND_API_KEY" ]; then
+            echo "::warning::RESEND_API_KEY boş — aday e-postaları gönderilmeyecek."
+          fi
           # Hub köprüsü yoksa Talent'a giriş yapılamaz (K3: giriş yalnız Hub'dan).
           if [ -z "$HUB_EXCHANGE_SECRET" ]; then
             echo "::warning::HUB_EXCHANGE_SECRET boş — Hub'dan Talent'a giriş 503 döner."
@@ -102,8 +105,7 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           INTEGRATION_ENCRYPTION_KEY: ${{ secrets.INTEGRATION_ENCRYPTION_KEY }}
           AI_DAILY_TOKEN_LIMIT: ${{ secrets.AI_DAILY_TOKEN_LIMIT }}
@@ -140,7 +142,7 @@ jobs:
       # `default` var, "production" diye bir takma ad YOK — yani
       # `functions/.env.production` hiçbir zaman OKUNMADI.
       #
-      # NASIL ANLAŞILDI: dağıtılmış Cloud Run servisinde EMAIL_USER ve
+      # NASIL ANLAŞILDI: dağıtılmış Cloud Run servisinde (eski) EMAIL_USER ve
       # VITE_GEMINI_API_KEY var ama AI_DAILY_TOKEN_LIMIT YOK. Var olanlar
       # daha önce elle set edilmiş ve Cloud Run'ın koruduğu kalıntılar;
       # dosyadan gelen hiçbir şey ulaşmamış. Demo akışı `.env` yazıyor ve
@@ -161,9 +163,9 @@ jobs:
       # CORS izin listesi (middleware/cors.js).
       - name: Create functions/.env
         run: |
-          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\nHUB_API_URL=%s\nHUB_EXCHANGE_SECRET=%s\nHUB_EVENTS_SECRET=%s\n' \
-            "$EMAIL_USER" \
-            "$EMAIL_PASS" \
+          printf 'RESEND_API_KEY=%s\nMAIL_FROM_ADDRESS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\nHUB_API_URL=%s\nHUB_EXCHANGE_SECRET=%s\nHUB_EVENTS_SECRET=%s\n' \
+            "$RESEND_API_KEY" \
+            "${MAIL_FROM_ADDRESS:-noreply@clyrolabs.com}" \
             "$VITE_GEMINI_API_KEY" \
             "$VITE_FIREBASE_API_KEY" \
             "$INTEGRATION_ENCRYPTION_KEY" \
@@ -179,8 +181,10 @@ jobs:
           echo "✅ functions/.env oluşturuldu:"
           sed 's/=.*/=***/' functions/.env
         env:
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          # Aday e-postaları: Resend (noreply@clyrolabs.com, gönderen adı şirket).
+          # Eski tek Gmail hesabı (EMAIL_USER/EMAIL_PASS) kaldırıldı (PR 7b).
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM_ADDRESS: ${{ vars.MAIL_FROM_ADDRESS }}
           # GitHub secret'ının adı tarihsel olarak VITE_ önekli; fonksiyona
           # GEMINI_API_KEY adıyla gidiyor (sunucu yalnızca bu adı okur).
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}

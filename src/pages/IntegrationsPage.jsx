@@ -569,7 +569,7 @@ export default function IntegrationsPage() {
                                                 '"Yeni kayıt" ile yeni bir uygulama oluşturun',
                                                 'Desteklenen hesap türleri: Herhangi bir kuruluş + kişisel hesaplar',
                                                 'Redirect URI olarak aşağıdaki URL\'yi Web türünde ekleyin',
-                                                'Gerekli API izinlerini ekleyin: User.Read, Calendars.ReadWrite, Mail.Send',
+                                                'Gerekli API izinlerini ekleyin: User.Read, Calendars.ReadWrite, Mail.Send, Mail.Read',
                                                 '"Sertifikalar ve Gizlilikler" bölümünden yeni bir Client Secret oluşturun',
                                             ]}
                                         />
@@ -617,6 +617,7 @@ export default function IntegrationsPage() {
                                         <ScopeTable scopes={[
                                             { scope: 'User.Read',                desc: 'Kullanıcı profili' },
                                             { scope: 'Mail.Send',                desc: 'Outlook e-posta gönderme' },
+                                            { scope: 'Mail.Read',                desc: 'Aday yanıtlarını kontrol (bilgi talepleri)' },
                                             { scope: 'Calendars.ReadWrite',      desc: 'Takvim oluşturma/okuma' },
                                             { scope: 'OnlineMeetings.ReadWrite', desc: 'Teams toplantısı oluşturma' },
                                             { scope: 'offline_access',           desc: 'Refresh token alımı' },
