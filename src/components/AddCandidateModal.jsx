@@ -15,6 +15,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNotifications } from '../context/NotificationContext';
 import { IS_DEMO } from '../utils/demoMode';
 import { DEMO_CV_LIMITI, kalanKota, kotaDus, kotayaGoreAyir } from '../utils/demoUpload';
+import { saveableResults, saveButtonState } from '../utils/addCandidateResults';
 
 const SOURCES = [
     { id: 'İnsan Kaynakları', label: 'Doğrudan Başvuru', sub: 'İç havuz / doğrudan başvuru', icon: Users, color: '#3B82F6' },
@@ -294,7 +295,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
         setLoading(true);
         try {
             // Only save NEW, non-duplicate, successfully parsed candidates
-            const toSave = results.filter(r => r.success && r.candidate && !r.isDuplicate);
+            const toSave = saveableResults(results);
             await Promise.all(toSave.map(async (r, idx) => {
                 try {
                     const candidateData = {
@@ -336,6 +337,9 @@ export default function AddCandidateModal({ isOpen, onClose }) {
     const selectedSource = SOURCES.find(s => s.id === sourceType);
     const needsDetail = ['İşe Alım Firması', 'Kariyer Portalı', 'Sosyal Medya', 'Referans'].includes(sourceType);
 
+    // Düğme sayısı, kaydetmenin yazacağı adaylarla aynı süzgeçten gelir.
+    const saveBtn = saveButtonState(results, { isDemo: IS_DEMO, loading });
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleClose} />
@@ -352,7 +356,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                                 {results
                                     ? (() => {
-                                        const newOnes = results.filter(r => r.success && !r.isDuplicate).length;
+                                        const newOnes = saveableResults(results).length;
                                         const dups = results.filter(r => r.isDuplicate).length;
                                         const fails = results.filter(r => !r.success).length;
                                         return [
@@ -398,7 +402,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
 
                     {/* RESULTS SUMMARY BAR */}
                     {results && (() => {
-                        const newOnes = results.filter(r => r.success && !r.isDuplicate);
+                        const newOnes = saveableResults(results);
                         const dups = results.filter(r => r.isDuplicate);
                         const avgScore = newOnes.length > 0
                             ? Math.round(newOnes.reduce((a, r) => a + (r.match?.score || 0), 0) / newOnes.length)
@@ -771,7 +775,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         </button>
                         <button
                             onClick={handleSaveAll}
-                            disabled={loading || !results.some(r => r.success)}
+                            disabled={saveBtn.disabled}
                             className="flex-[2] py-3 rounded-2xl bg-[#111312] hover:bg-blue-800 text-white text-[11px] font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
@@ -779,9 +783,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                 söylemesi gerekiyor: "Havuza Ekle" yazan bir
                                 düğmenin eklememesi, ziyaretçinin ürünü yanlış
                                 anlamasına yol açar. */}
-                            {IS_DEMO
-                                ? 'Sonucu Kapat'
-                                : `${results.filter(r => r.success).length} Adayı Havuza Ekle`}
+                            {saveBtn.label}
                         </button>
                     </div>
                 )}
