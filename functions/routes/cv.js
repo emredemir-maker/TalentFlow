@@ -3,9 +3,13 @@
 // object.
 //
 //   POST /api/process-cv     — multipart upload of up to 20 PDF/DOCX files,
-//                               parsed, persisted to Firebase Storage (cvs/),
-//                               returned with a permanent download URL per
-//                               file (local /uploads fallback in dev).
+//                               parsed, persisted to Firebase Storage
+//                               (tenants/{t}/cvs/), returned with the storage
+//                               PATH (`cvPath`) — jetonlu kalıcı indirme adresi
+//                               YOK (local /uploads fallback in dev).
+//   GET  /api/candidates/:id/cv — adayın CV dosyası; yetki her istekte
+//                               (üyelik + department_user görünürlüğü), dosya
+//                               sunucudan akıtılır, önbelleğe alınmaz.
 //   POST /api/direct-add     — JSON { text, url } from the browser-extension
 //                               quick-add helper. No file saved.
 //   POST /api/check-duplicate — JSON { email, phone } — looks up the
@@ -15,15 +19,14 @@
 // All three are gated by aiLimiter where they hit Gemini.
 import { Router } from 'express';
 import fs from 'fs';
-import { randomUUID } from 'crypto';
 import { readFile, unlink } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
-import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
-import { storagePaths } from '../services/tenantPaths.js';
+import { requireTenant, ALL_ROLES, WRITER_ROLES } from '../middleware/auth.js';
+import { isValidDocId, storagePaths } from '../services/tenantPaths.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
@@ -80,13 +83,6 @@ const upload = multer({
 
 const router = Router();
 
-// Same token-style download URL the client SDK's getDownloadURL() returns.
-// Built by hand because admin getSignedUrl() needs the signBlob IAM role,
-// which the default Functions service account doesn't have.
-export function buildCvDownloadUrl(bucketName, storagePath, token) {
-    return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
-}
-
 // Fallback: the express static /uploads mount (server.js). Only durable in
 // local dev — on Cloud Functions the file lives in /tmp and dies with the
 // instance, hence Storage is always tried first.
@@ -95,42 +91,110 @@ export function buildLocalCvUrl(filename) {
     return `${baseUrl}/uploads/cvs/${filename}`;
 }
 
-// Persist an uploaded CV to Firebase Storage under cvs/ — the same prefix
-// AddCandidateModal.jsx uses for client-side uploads, covered by the
-// existing /cvs/{filename} block in storage.rules.
+// Yüklenen CV'yi şirketin klasörüne (tenants/{t}/cvs/) yazar ve Storage YOLUNU
+// döner. İndirme jetonu (firebaseStorageDownloadTokens) KONMAZ: jetonlu adres
+// kuralları ve üyeliği atlar, kim eline geçirirse süresiz açar. Dosyayı
+// GET /api/candidates/:id/cv her istekte yetkiyi denetleyerek verir.
 // Exported for tests (see cv.test.js — Storage is mocked there).
+// @returns {Promise<{ cvPath?: string, cvUrl?: string }>}
 export async function storeCvFile(file, tenantId) {
     try {
         const bucket = getStorageBucket();
-        // Şirketin klasörü (storage.rules: tenants/{t}/cvs/**). Eski ortak
-        // `cvs/` kökü kurallarda kapalı (K10).
         const destination = storagePaths.cv(tenantId, file.filename);
-        const token = randomUUID();
         await bucket.upload(file.path, {
             destination,
-            metadata: {
-                contentType: file.mimetype,
-                metadata: { firebaseStorageDownloadTokens: token },
-            },
+            metadata: { contentType: file.mimetype },
         });
         // Storage is the source of truth now — drop the multer temp copy
         // so repeated requests don't fill the instance's /tmp.
         await unlink(file.path).catch(() => {});
-        return buildCvDownloadUrl(bucket.name, destination, token);
+        return { cvPath: destination };
     } catch (err) {
         if (isServerlessRuntime()) {
             // An instance-local URL would be dead on arrival: /uploads
             // serves /tmp (recycled with the instance) and hosting never
-            // rewrites /uploads/** to the function. Better no link than a
-            // broken one — the UI hides the CV button when cvUrl is empty.
+            // rewrites /uploads/** to the function. Better no file than a
+            // broken link — the UI hides the CV button when there is none.
             log.error(`Storage upload failed for ${file.filename}: ${err.message}`);
             await unlink(file.path).catch(() => {});
-            return '';
+            return {};
         }
         log.warn(`Storage upload failed for ${file.filename}, serving from local /uploads: ${err.message}`);
-        return buildLocalCvUrl(file.filename);
+        return { cvUrl: buildLocalCvUrl(file.filename) };
     }
 }
+
+/**
+ * department_user bir adayı görebilir mi — firestore.rules deptCanSee ile aynı:
+ * adayın departmanı ya da açıldığı departmanlar üyenin departmanlarıyla kesişmeli.
+ */
+export function departmentCanSee(candidate, departments) {
+    const mine = Array.isArray(departments) ? departments : [];
+    if (mine.length === 0) return false;
+    if (mine.includes(candidate?.department)) return true;
+    const shared = Array.isArray(candidate?.visibleToDepartments) ? candidate.visibleToDepartments : [];
+    return shared.some((d) => mine.includes(d));
+}
+
+const CV_CONTENT_TYPES = {
+    pdf: 'application/pdf',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+router.get('/api/candidates/:candidateId/cv', requireTenant(ALL_ROLES, { write: false }), async (req, res) => {
+    const { candidateId } = req.params;
+    try {
+        if (!isValidDocId(candidateId)) return res.status(404).json({ error: 'CV bulunamadı.' });
+        const snap = await db.doc(req.paths.candidate(candidateId)).get();
+        if (!snap.exists) return res.status(404).json({ error: 'CV bulunamadı.' });
+        const candidate = snap.data() || {};
+        // department_user yalnız görebildiği adayın CV'sini açar (kuralların aynası).
+        if (req.user.role === 'department_user' && !departmentCanSee(candidate, req.user.departments)) {
+            return res.status(404).json({ error: 'CV bulunamadı.' });
+        }
+        const cvPath = typeof candidate.cvPath === 'string' ? candidate.cvPath : '';
+        // YALNIZ BU ŞİRKETİN CV KLASÖRÜ: aday kaydını şirketin kendi kullanıcıları
+        // yazabiliyor; başka şirketin dosyasını gösteren bir yol sunucuya o dosyayı
+        // okutmamalı. '..' ile klasör dışına çıkış da reddedilir.
+        const prefix = `${storagePaths.tenantPrefix(req.tenant.id)}cvs/`;
+        if (!cvPath.startsWith(prefix) || cvPath.includes('..') || cvPath.includes('//')) {
+            if (cvPath) log.warn({ candidateId }, 'şirket dışı CV yolu reddedildi');
+            return res.status(404).json({ error: 'CV bulunamadı.' });
+        }
+        const file = getStorageBucket().file(cvPath);
+        const [exists] = await file.exists();
+        if (!exists) return res.status(404).json({ error: 'CV bulunamadı.' });
+        const [buffer] = await file.download();
+
+        const ext = (cvPath.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase();
+        const type = CV_CONTENT_TYPES[ext] || 'application/octet-stream';
+        res.set({
+            'Content-Type': type,
+            // PDF tarayıcıda gömülü açılır; diğer türler indirilir.
+            'Content-Disposition': `${ext === 'pdf' ? 'inline' : 'attachment'}; filename="cv-${candidateId}.${ext || 'bin'}"`,
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+        });
+
+        // Kişisel veriye erişim deftere (KVKK). Yanıttan ÖNCE beklenir: Cloud
+        // Functions yanıt bitince arka plan işini askıya alabilir. Defter
+        // yazılamazsa dosya yine verilir.
+        await db.collection(req.paths.accessLogs())
+            .add({
+                action: 'cv-download',
+                uid: req.user.uid,
+                email: req.user.email || '',
+                candidateId,
+                at: new Date().toISOString(),
+            })
+            .catch((err) => log.warn({ err: err.message }, 'CV erişim kaydı yazılamadı'));
+
+        res.send(buffer);
+    } catch (err) {
+        log.error({ err: err.message }, 'GET /api/candidates/:id/cv');
+        res.status(500).json({ error: 'CV okunamadı.' });
+    }
+});
 
 router.post('/api/direct-add', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     try {
@@ -190,7 +254,7 @@ router.post('/api/process-cv', aiLimiter, requireTenant(WRITER_ROLES), wrapMulte
                 const candidate = await parseProfile(text);
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
-                candidate.cvUrl = await storeCvFile(file, req.tenant.id);
+                Object.assign(candidate, await storeCvFile(file, req.tenant.id));
 
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {

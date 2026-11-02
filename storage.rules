@@ -11,8 +11,11 @@ rules_version = '2';
 // verilmesini ister (çapraz kural için; paylaşılan projede Emre onayıyla, tek
 // seferlik).
 //
-// Not: kayıttaki `getDownloadURL` jetonlu adresleri kuralları ATLAR; ayrım yalnız
-// adresi bilmeyenler için geçerli. Kural denetimli indirme PR 6'da.
+// İndirme (PR 6): CV için jetonlu kalıcı adres (getDownloadURL) ÜRETİLMEZ —
+// jetonlu adres bu kuralları atlar. Aday kaydı yalnız Storage yolunu (cvPath)
+// tutar; dosyayı GET /api/candidates/:id/cv üyelik ve department_user
+// görünürlüğüyle verir. Şirket logosu bilinçli istisna: e-postalarda ve
+// başvuru sayfasında gösterilen herkese açık bir görsel.
 // ─────────────────────────────────────────────────────────────────────────────
 service firebase.storage {
   match /b/{bucket}/o {
@@ -84,10 +87,14 @@ service firebase.storage {
     }
 
     // ── CV dosyaları ──────────────────────────────────────────────────────────
-    // get: şirketin etkin üyesi. list: kapalı (uygulama klasör listelemiyor).
+    // get: şirketin bütün adaylarını gören roller (admin, recruiter, destek).
+    // department_user doğrudan okuyamaz: hangi adayı görebileceği aday
+    // belgesine bağlı ve Storage kuralı onu bilmiyor — dosyayı sunucu ucu
+    // (/api/candidates/:id/cv) görünürlüğü denetleyerek verir.
+    // list: kapalı (uygulama klasör listelemiyor).
     // write: admin/recruiter, 20MB. Silme sunucuda (Admin SDK).
     match /tenants/{tenantId}/cvs/{allPaths=**} {
-      allow get:   if canRead(tenantId, allRoles());
+      allow get:   if canRead(tenantId, ['admin', 'recruiter', 'support']);
       allow list:  if false;
       allow write: if canWrite(tenantId, ['admin', 'recruiter'])
                       && request.resource.size < 20 * 1024 * 1024;

@@ -437,6 +437,41 @@ describe('veri yalıtımı', () => {
     });
 });
 
+describe('saklama imhası — CV yolu (PR 6)', () => {
+    it("cvPath'teki dosyayı yalnız şirketin cvs/ klasöründeyse siler (logo ve toplu yükleme dosyası korunur)", async () => {
+        const bucket = admin.storage().bucket(BUCKET);
+        await bucket.file('tenants/A/cvs/eski.pdf').save(Buffer.from('pdf'));
+        await bucket.file('tenants/A/branding/logo.png').save(Buffer.from('png'));
+        await bucket.file('tenants/A/bulk-imports/aRecruiter/t/0.zip').save(Buffer.from('zip'));
+        const eski = { appliedDate: '2020-01-01T00:00:00Z', status: 'rejected' };
+        const batch = db.batch();
+        batch.set(db.doc('tenants/A/candidates/pCv'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/cvs/eski.pdf',
+        });
+        batch.set(db.doc('tenants/A/candidates/pLogo'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/branding/logo.png',
+        });
+        batch.set(db.doc('tenants/A/candidates/pBulk'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/bulk-imports/aRecruiter/t/0.zip',
+        });
+        await batch.commit();
+        const r = await call('POST', '/api/admin/retention/purge', { uid: 'aAdmin', tenant: 'A' });
+        expect(r.status).toBe(200);
+        expect(r.body.files).toBe(1);
+        expect((await bucket.file('tenants/A/cvs/eski.pdf').exists())[0]).toBe(false);
+        expect((await bucket.file('tenants/A/branding/logo.png').exists())[0]).toBe(true);
+        expect((await bucket.file('tenants/A/bulk-imports/aRecruiter/t/0.zip').exists())[0]).toBe(
+            true
+        );
+    });
+});
+
 describe('üyelik kaldırma (auth-user silme yerine)', () => {
     it("A yöneticisi B'nin kullanıcısını kaldıramaz (A'da üyeliği yok → 404); B'deki üyelik değişmez", async () => {
         const r = await call('DELETE', '/api/admin/members/bRecruiter', {
@@ -1107,5 +1142,97 @@ describe('toplu içe aktarma işçisi (collection group)', () => {
             .collection('artifacts/talent-flow/public/data/bulkImportJobs')
             .get();
         expect(legacy.docs.every((d) => d.data().status === 'queued')).toBe(true);
+    });
+});
+
+describe('CV dosyası (PR 6): jetonlu adres yok, sunucu yetkiyi her istekte denetler', () => {
+    beforeAll(async () => {
+        const bucket = admin.storage().bucket(BUCKET);
+        await bucket.file('tenants/A/cvs/eng.pdf').save(Buffer.from('%PDF-eng'), {
+            contentType: 'application/pdf',
+        });
+        await bucket.file('tenants/A/cvs/sales.pdf').save(Buffer.from('%PDF-sales'));
+        const docs = {
+            'tenants/A/candidates/cvEng': {
+                name: 'Eng',
+                department: 'Eng',
+                cvPath: 'tenants/A/cvs/eng.pdf',
+            },
+            'tenants/A/candidates/cvSales': {
+                name: 'Sales',
+                department: 'Sales',
+                cvPath: 'tenants/A/cvs/sales.pdf',
+            },
+            'tenants/A/candidates/cvShared': {
+                name: 'Paylaşılan',
+                department: 'Sales',
+                visibleToDepartments: ['Eng'],
+                cvPath: 'tenants/A/cvs/sales.pdf',
+            },
+            // Şirketin kendi kullanıcısının yazdığı, B'nin dosyasını gösteren yollar.
+            'tenants/A/candidates/cvEvil': { name: 'Kötü', cvPath: 'tenants/B/cvs/b.pdf' },
+            'tenants/A/candidates/cvTraversal': {
+                name: 'Kötü',
+                cvPath: 'tenants/A/cvs/../../B/cvs/b.pdf',
+            },
+            'tenants/A/candidates/cvOther': {
+                name: 'Kötü',
+                cvPath: 'tenants/A/bulk-imports/aRecruiter/x.pdf',
+            },
+            'tenants/A/candidates/cvNone': { name: 'Dosyasız' },
+            // Rol testleri aDept'in departmanlarını değiştiriyor; burada sabitlenir.
+            'tenants/A/members/aDept': {
+                role: 'department_user',
+                status: 'active',
+                departments: ['Eng'],
+            },
+        };
+        const batch = db.batch();
+        for (const [p, d] of Object.entries(docs)) batch.set(db.doc(p), d);
+        await batch.commit();
+    });
+
+    const cv = async (id, { uid, tenant = 'A', anon } = {}) => {
+        const headers = {};
+        if (uid) {
+            headers.Authorization = `Bearer ${token(uid, anon ? { provider: 'anonymous' } : {})}`;
+        }
+        if (tenant) headers['X-Tenant-Id'] = tenant;
+        const res = await fetch(`${base}/api/candidates/${id}/cv`, { headers });
+        return { status: res.status, headers: res.headers, text: res.ok ? await res.text() : null };
+    };
+
+    it('recruiter ve destek üyesi dosyayı alır; yanıt önbelleğe alınmaz, erişim deftere yazılır', async () => {
+        const r = await cv('cvEng', { uid: 'aAdmin' });
+        expect(r.status).toBe(200);
+        expect(r.text).toBe('%PDF-eng');
+        expect(r.headers.get('content-type')).toContain('application/pdf');
+        expect(r.headers.get('cache-control')).toBe('private, no-store');
+        expect((await cv('cvEng', { uid: 'aSupport' })).status).toBe(200);
+        // Defter yanıttan önce yazılır (bekleme yok).
+        const logs = await db
+            .collection('tenants/A/accessLogs')
+            .where('action', '==', 'cv-download')
+            .where('candidateId', '==', 'cvEng')
+            .get();
+        expect(logs.size).toBeGreaterThanOrEqual(2);
+    });
+    it('department_user yalnız görebildiği adayın dosyasını alır', async () => {
+        expect((await cv('cvEng', { uid: 'aDept' })).status).toBe(200);
+        expect((await cv('cvShared', { uid: 'aDept' })).status).toBe(200);
+        expect((await cv('cvSales', { uid: 'aDept' })).status).toBe(404);
+    });
+    it('başka şirketin üyesi, anonim, kimliksiz ve süresi dolmuş üye alamaz', async () => {
+        expect((await cv('cvEng', { uid: 'bAdmin' })).status).toBe(403);
+        expect((await cv('cvEng', { uid: 'bAdmin', tenant: 'B' })).status).toBe(404);
+        expect((await cv('cvEng', { uid: 'anonX', anon: true })).status).toBe(403);
+        expect((await cv('cvEng', {})).status).toBe(401);
+        expect((await cv('cvEng', { uid: 'aSupportOld' })).status).toBe(403);
+        expect((await cv('cvEng', { uid: 'aRemoved' })).status).toBe(403);
+    });
+    it("aday kaydındaki yol şirketin CV klasörü dışını gösteriyorsa (B'nin dosyası, '..', başka klasör) 404", async () => {
+        for (const id of ['cvEvil', 'cvTraversal', 'cvOther', 'cvNone', 'yok', '..']) {
+            expect((await cv(id, { uid: 'aAdmin' })).status, id).toBe(404);
+        }
     });
 });
