@@ -126,6 +126,8 @@ export const PLATFORM_PATHS = {
     /** Herkese açık bağlantılar (aday sayfaları, §2.5) — yalnız sunucu okur/yazar. */
     publicLinks: 'publicLinks',
     publicLink: (id) => `publicLinks/${did(id)}`,
+    /** (şirket, tür, hedef) → bağlantı kimliği dizini; eşzamanlı istekte tek bağlantı. */
+    publicLinkIndex: (key) => `publicLinkIndex/${did(key)}`,
 };
 
 // ── Storage ────────────────────────────────────────────────────────────────

@@ -18,7 +18,7 @@
 //   interview    → tenants/{t}/interviews/{targetId}     (mülakata katılım,
 //                  davet onayı; candidateId bağlantıda — /api/session tarama yapmaz)
 //   infoRequest  → tenants/{t}/infoRequests/{targetId}   (bilgi talebi yanıtı)
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { db, admin } from '../config/firebaseAdmin.js';
 import { loadPublicTenant } from '../middleware/auth.js';
@@ -52,10 +52,27 @@ export function linkPathFor(kind, linkId) {
     throw new Error(`Bilinmeyen bağlantı türü: ${kind}`);
 }
 
+export class LinkConflictError extends Error {
+    constructor() {
+        super('Bu kayıt için bağlantı başka bir adaya ait.');
+        this.name = 'LinkConflictError';
+        this.status = 409;
+    }
+}
+
+/** Dizin anahtarı: (şirket, tür, hedef) → sha256 (64 hex; bağlantı kimliği biçiminde değil). */
+export function linkIndexKey(tenantId, kind, targetId) {
+    return createHash('sha256').update(`${tenantId}\u0000${kind}\u0000${targetId}`).digest('hex');
+}
+
 /**
  * Şirketin bir kaydı için bağlantı oluşturur; aynı (şirket, tür, hedef) için
  * zaten varsa onu döner (paylaşılan ilan bağlantısı her açılışta değişmesin).
  * Hedefin şirkette var olduğunu ÇAĞIRAN doğrular.
+ *
+ * Tek işlemde (transaction) dizin belgesi + bağlantı: eşzamanlı iki istek iki
+ * ayrı bağlantı açamaz. Mülakat bağlantısı adaya bağlıdır; aynı oturum için
+ * başka adayla istenirse LinkConflictError (409).
  *
  * @returns {Promise<{ linkId: string, path: string, created: boolean }>}
  */
@@ -63,33 +80,33 @@ export async function ensurePublicLink({ tenantId, kind, targetId, candidateId =
     if (!isValidTenantId(tenantId)) throw new Error('Geçersiz şirket kimliği.');
     if (!LINK_KINDS.includes(kind)) throw new Error('Geçersiz bağlantı türü.');
     if (!isValidDocId(targetId)) throw new Error('Geçersiz hedef kimliği.');
+    const wantCandidate = kind === 'interview' ? candidateId || null : null;
 
-    // Yalnız eşitlik filtreleri: tek alan indeksleriyle çalışır, bileşik
-    // indeks gerekmez.
-    const existing = await db
-        .collection(PLATFORM_PATHS.publicLinks)
-        .where('tenantId', '==', tenantId)
-        .where('kind', '==', kind)
-        .where('targetId', '==', targetId)
-        .limit(1)
-        .get();
-    if (!existing.empty) {
-        const d = existing.docs[0];
-        return { linkId: d.id, path: linkPathFor(kind, d.id), created: false };
-    }
-
-    const linkId = newLinkId();
-    const doc = {
-        tenantId,
-        kind,
-        targetId,
-        createdBy: createdBy || null,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-    if (kind === 'interview' && candidateId) doc.candidateId = candidateId;
-    // create(): aynı kimlik (2^-128 olasılıkla) varsa ezmek yerine hata.
-    await db.doc(PLATFORM_PATHS.publicLink(linkId)).create(doc);
-    return { linkId, path: linkPathFor(kind, linkId), created: true };
+    const indexRef = db.doc(PLATFORM_PATHS.publicLinkIndex(linkIndexKey(tenantId, kind, targetId)));
+    return db.runTransaction(async (t) => {
+        const idx = await t.get(indexRef);
+        if (idx.exists) {
+            const linkId = idx.data()?.linkId;
+            const linkSnap = isValidLinkId(linkId) ? await t.get(db.doc(PLATFORM_PATHS.publicLink(linkId))) : null;
+            if (linkSnap?.exists) {
+                if ((linkSnap.data()?.candidateId || null) !== wantCandidate) throw new LinkConflictError();
+                return { linkId, path: linkPathFor(kind, linkId), created: false };
+            }
+        }
+        const linkId = newLinkId();
+        const doc = {
+            tenantId,
+            kind,
+            targetId,
+            createdBy: createdBy || null,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        if (wantCandidate) doc.candidateId = wantCandidate;
+        // create(): aynı kimlik (2^-128 olasılıkla) varsa ezmek yerine hata.
+        t.create(db.doc(PLATFORM_PATHS.publicLink(linkId)), doc);
+        t.set(indexRef, { linkId, tenantId, kind, targetId });
+        return { linkId, path: linkPathFor(kind, linkId), created: true };
+    });
 }
 
 /**

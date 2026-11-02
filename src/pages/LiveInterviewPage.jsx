@@ -20,6 +20,7 @@ import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firesto
 import { getAuthHeaders } from '../services/ai/config';
 import { tc, withTenantParam } from '../config/tenantPaths';
 import { usePublicLink, usePublicLinkUrl } from '../context/PublicLinkContext';
+import { requestPublicLink } from '../services/publicLinks';
 import { publicApiHeaders } from '../services/publicApi';
 
 export default function LiveInterviewPage() {
@@ -1684,8 +1685,10 @@ export default function LiveInterviewPage() {
                                                         await persistSessionData(startData);
                                                         // Notify additional participants
                                                         if (lobbyParticipants.length > 0) {
-                                                            const joinLink = candidateJoinUrl;
                                                             try {
+                                                                // Bağlantı henüz yüklenmediyse sunucudan iste (boş bağlantı gönderilmesin).
+                                                                const joinLink = candidateJoinUrl
+                                                                    || (await requestPublicLink('interview', sessionId, { candidateId: candidateData?.id })).url;
                                                                 await fetch('/api/send-participant-invite', {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },

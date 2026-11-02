@@ -17,7 +17,7 @@ import { db } from '../config/firebaseAdmin.js';
 import { sessionLimiter } from '../middleware/rateLimit.js';
 import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
 import { isValidDocId } from '../services/tenantPaths.js';
-import { ensurePublicLink, isValidSessionId, resolvePublicLink } from '../services/publicLinks.js';
+import { ensurePublicLink, isValidSessionId, LinkConflictError, resolvePublicLink } from '../services/publicLinks.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('public-links');
 
@@ -58,6 +58,7 @@ router.post(
             });
             res.json({ linkId: link.linkId, path: link.path });
         } catch (err) {
+            if (err instanceof LinkConflictError) return res.status(409).json({ error: err.message });
             log.error({ err: err.message }, 'POST /api/public-links');
             res.status(500).json({ error: 'Bağlantı oluşturulamadı.' });
         }

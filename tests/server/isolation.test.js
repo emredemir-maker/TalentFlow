@@ -540,6 +540,8 @@ describe('herkese açık bağlantılar (publicLinks, §2.5)', () => {
         await db
             .doc('tenants/A/candidates/aLink')
             .set({ name: 'Bağlantı', email: 'link@a.test', createdAt: new Date() });
+        await db.doc('tenants/A/candidates/aLink2').set({ name: 'İkinci', createdAt: new Date() });
+        await db.doc('tenants/A/positions/pc2').set({ title: 'Paralel', status: 'open' });
     });
     it('çözücü: bilinmeyen, biçimsiz, iptal edilmiş bağlantı ve kapalı şirket 404; geçerli bağlantı şirketi ve hedefi döner', async () => {
         const ok = await call('GET', `/api/public/resolve/${L('posB')}`);
@@ -604,6 +606,26 @@ describe('herkese açık bağlantılar (publicLinks, §2.5)', () => {
         expect(r1.status).toBe(200);
         expect(r1.body.linkId).toMatch(/^[A-Za-z0-9_-]{22}$/);
         expect(r1.body.path).toBe(`/apply/${r1.body.linkId}`);
+        // Eşzamanlı istekler tek bağlantı üretir (dizin + işlem).
+        const paralel = await Promise.all(
+            Array.from({ length: 5 }, () =>
+                call('POST', '/api/public-links', {
+                    body: { kind: 'position', targetId: 'pc2' },
+                    tenant: 'A',
+                    uid: 'aAdmin',
+                })
+            )
+        );
+        expect(new Set(paralel.map((r) => r.body.linkId)).size).toBe(1);
+        expect(
+            (
+                await db
+                    .collection('publicLinks')
+                    .where('tenantId', '==', 'A')
+                    .where('targetId', '==', 'pc2')
+                    .get()
+            ).size
+        ).toBe(1);
         // Aynı ilan için aynı bağlantı.
         const r2 = await call('POST', '/api/public-links', { body, tenant: 'A', uid: 'aAdmin' });
         expect(r2.body.linkId).toBe(r1.body.linkId);
@@ -638,6 +660,22 @@ describe('herkese açık bağlantılar (publicLinks, §2.5)', () => {
         });
         expect(ok.status).toBe(200);
         expect(ok.body.path).toBe(`/join/${ok.body.linkId}`);
+        // Aynı oturum başka bir adayla istenirse 409 (bağlantı adaya bağlı).
+        expect(
+            (
+                await call2({
+                    kind: 'interview',
+                    targetId: 'iv-yeni-oturum-1',
+                    candidateId: 'aLink2',
+                })
+            ).status
+        ).toBe(409);
+        const again = await call2({
+            kind: 'interview',
+            targetId: 'iv-yeni-oturum-1',
+            candidateId: 'aLink',
+        });
+        expect(again.body.linkId).toBe(ok.body.linkId);
         expect((await get(`publicLinks/${ok.body.linkId}`)).data()).toMatchObject({
             tenantId: 'A',
             kind: 'interview',
@@ -714,13 +752,19 @@ describe('herkese açık (aday) uçlar — şirket ve kayıt bağlantıdan', () 
                 link: L('ivB'),
                 sessionId: 'iv-x',
                 candidateId: 'aLink',
-                updates: { candidateStatus: 'hazir', questions: [] },
+                updates: {
+                    candidateStatus: 'hazir',
+                    questions: [],
+                    candidatePresence: { büyük: 'x'.repeat(1000) },
+                },
             },
         });
         expect(upd.status).toBe(200);
         const b1 = (await get('tenants/B/candidates/b1')).data();
         expect(b1.interviewSessions[0].candidateStatus).toBe('hazir');
         expect(b1.interviewSessions[0].questions).toEqual([]);
+        // İzin listesindeki alana bile nesne yazılamaz (düz değer şartı).
+        expect(b1.interviewSessions[0].candidatePresence).toBeUndefined();
         expect((await get('tenants/A/candidates/aLink')).data().interviewSessions).toBeUndefined();
         const eski = await call('POST', '/api/update-candidate-status', {
             body: {
@@ -782,7 +826,12 @@ describe('herkese açık (aday) uçlar — şirket ve kayıt bağlantıdan', () 
         const aday = await call('POST', '/api/init-interview-session', {
             body: {
                 link: L('ivB'),
-                initialData: { candidateStatus: 'lobi', aiSummary: 'sahte', candidateId: 'aLink' },
+                initialData: {
+                    candidateStatus: 'lobi',
+                    aiSummary: 'sahte',
+                    candidateId: 'aLink',
+                    status: 'completed',
+                },
             },
         });
         expect(aday.status).toBe(200);
@@ -790,6 +839,8 @@ describe('herkese açık (aday) uçlar — şirket ve kayıt bağlantıdan', () 
         expect(iv.candidateStatus).toBe('lobi');
         expect(iv.aiSummary).toBeUndefined();
         expect(iv.candidateId).toBe('b1');
+        // İzin listesi dışı (status) da yazılmaz: aday oturumu "tamamlandı" yapamaz.
+        expect(iv.status).toBeUndefined();
         // Bağlantının oturumundan başka bir oturum adı verilirse 404.
         expect(
             (
@@ -852,6 +903,14 @@ describe('herkese açık (aday) uçlar — şirket ve kayıt bağlantıdan', () 
         });
         expect(ok.status).toBe(200);
         expect((await get('tenants/B/infoRequests/ir-b2')).data().status).toBe('responded');
+        // Tek yanıt: ikinci gönderim reddedilir, mülakat belgesi şişirilemez.
+        expect(
+            (
+                await call('POST', '/api/candidate-respond', {
+                    body: { link: L('irB2'), type: 'info', responseData: 'tekrar' },
+                })
+            ).status
+        ).toBe(409);
         expect((await get('tenants/B/infoRequests/ir-b1')).data().status).toBe('pending');
         expect((await get('tenants/C/infoRequests/ir-c1')).data().status).toBe('pending');
 

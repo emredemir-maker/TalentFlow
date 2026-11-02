@@ -58,7 +58,7 @@ const linkCache = new Map();
  */
 export async function requestPublicLink(kind, targetId, { candidateId, getHeaders = getAuthHeaders, origin } = {}) {
     const tenant = getActiveTenantId();
-    const key = `${tenant}|${kind}|${targetId}`;
+    const key = `${tenant}|${kind}|${targetId}|${candidateId || ''}`;
     if (linkCache.has(key)) return linkCache.get(key);
     const headers = { 'Content-Type': 'application/json', ...(await getHeaders()) };
     const res = await fetch(`${API_BASE}/api/public-links`, {

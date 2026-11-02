@@ -106,6 +106,25 @@ const CANDIDATE_ALLOWED_FIELDS = new Set([
     'hasConsent',
 ]);
 
+/**
+ * Aday tarafının yazabileceği alanlar: izin listesi + düz değer (metin ≤ 500,
+ * sayı, mantıksal, null). Nesne/dizi reddedilir — aday kayıtları (1 MiB
+ * sınırı) dışarıdan şişirilemesin.
+ * @returns {{ safe: Record<string, unknown>, dropped: string[] }}
+ */
+export function filterCandidateUpdates(data) {
+    const safe = {};
+    const dropped = [];
+    for (const [key, value] of Object.entries(data || {})) {
+        const plain = value === null || typeof value === 'boolean'
+            || (typeof value === 'number' && Number.isFinite(value))
+            || (typeof value === 'string' && value.length <= 500);
+        if (CANDIDATE_ALLOWED_FIELDS.has(key) && plain) safe[key] = value;
+        else dropped.push(key);
+    }
+    return { safe, dropped };
+}
+
 // Değerlendirme çıktıları ve mülakat akış kontrolü — MEVCUT bir oturum
 // dokümanına bu uçtan yazılamaz. firestore.rules'taki aynı isimli deny-list'in
 // aynasıdır: kurallar aday tarayıcısını kısıtlarken bu uç Admin SDK ile
@@ -185,6 +204,17 @@ router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
             await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...(initialData || {}) });
             log.info(`[init-interview-session] Created ${paths.interview(sessionId)}`);
         } else if (initialData && Object.keys(initialData).length > 0) {
+            // Aday yolu: İZİN LİSTESİ (yalnız durum/kalp atışı alanları, düz
+            // değerler) ve tamamlanmış oturuma yazım yok.
+            if (!canCreate) {
+                if (snap.data()?.status === 'completed') return res.status(409).json({ error: 'Oturum tamamlandı.' });
+                const { safe: candidateSafe, dropped: candidateDropped } = filterCandidateUpdates(initialData);
+                if (candidateDropped.length > 0) {
+                    log.warn(`[init-interview-session] Aday alanları reddedildi (${sessionId}): ${candidateDropped.join(', ')}`);
+                }
+                if (Object.keys(candidateSafe).length > 0) await sessionRef.set(candidateSafe, { merge: true });
+                return res.json({ success: true });
+            }
             const { safe, dropped } = filterSessionMerge(initialData);
             if (dropped.length > 0) {
                 log.warn(`[init-interview-session] Korumalı alanlar reddedildi (${sessionId}): ${dropped.join(', ')}`);
@@ -204,14 +234,8 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
         return res.status(400).json({ error: 'Missing required fields.' });
     }
 
-    const safeUpdates = {};
-    for (const key of Object.keys(updates)) {
-        if (CANDIDATE_ALLOWED_FIELDS.has(key)) {
-            safeUpdates[key] = updates[key];
-        } else {
-            log.warn(`[update-candidate-status] Blocked field "${key}"`);
-        }
-    }
+    const { safe: safeUpdates, dropped } = filterCandidateUpdates(updates);
+    if (dropped.length > 0) log.warn(`[update-candidate-status] Blocked fields: ${dropped.join(', ')}`);
     if (Object.keys(safeUpdates).length === 0) {
         return res.status(400).json({ error: 'No permitted fields to update.' });
     }
