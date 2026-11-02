@@ -834,8 +834,7 @@ describe('CV dosyası (PR 6): jetonlu adres yok, sunucu yetkiyi her istekte dene
         expect(r.headers.get('content-type')).toContain('application/pdf');
         expect(r.headers.get('cache-control')).toBe('private, no-store');
         expect((await cv('cvEng', { uid: 'aSupport' })).status).toBe(200);
-        // Defter yazımı yanıtı beklemiyor.
-        await new Promise((res) => setTimeout(res, 300));
+        // Defter yanıttan önce yazılır (bekleme yok).
         const logs = await db
             .collection('tenants/A/accessLogs')
             .where('action', '==', 'cv-download')

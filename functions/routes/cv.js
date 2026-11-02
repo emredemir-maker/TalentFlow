@@ -176,8 +176,10 @@ router.get('/api/candidates/:candidateId/cv', requireTenant(ALL_ROLES, { write: 
             'X-Content-Type-Options': 'nosniff',
         });
 
-        // Kişisel veriye erişim deftere (KVKK). Defter yazılamazsa dosya yine verilir.
-        db.collection(req.paths.accessLogs())
+        // Kişisel veriye erişim deftere (KVKK). Yanıttan ÖNCE beklenir: Cloud
+        // Functions yanıt bitince arka plan işini askıya alabilir. Defter
+        // yazılamazsa dosya yine verilir.
+        await db.collection(req.paths.accessLogs())
             .add({
                 action: 'cv-download',
                 uid: req.user.uid,
