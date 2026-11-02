@@ -1,0 +1,950 @@
+From 7e208f40da4f6f1435889462dd4c5cdacc37c9ad Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 2 Nov 2026 13:34:39 +0000
+Subject: [PATCH] feat: Talent server exchange and admin support access
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Talent kodu sunucudan değiştirir (talent= gizli değeri girilince eski tarayıcı yolu kapanır); değişim yanıtına plan ve
+deneme bitişi, ret yanıtına gerekçe eklendi. Konsolda Talent destek erişimi: gerekçe, en çok 24 saat, taze kimlik,
+imzalı istek (CLYRO-M2M-V1), source=admin işlem kaydı.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Um6htWoisDhc2rfeHcJGfK
+---
+ .github/workflows/deploy.yml                |   2 +-
+ apps/admin/src/pages/Tenant.tsx             |  48 +++++
+ apps/api/src/app.ts                         |   5 +-
+ apps/api/src/apps-server-exchange.test.ts   |  20 +-
+ apps/api/src/bootstrap.ts                   |   2 +
+ apps/api/src/config.ts                      |  27 ++-
+ apps/api/src/function.ts                    |   2 +
+ apps/api/src/routes/admin/index.ts          |   5 +-
+ apps/api/src/routes/admin/talent-support.ts | 108 ++++++++++
+ apps/api/src/routes/apps.ts                 |  36 +++-
+ apps/api/src/services/audit.ts              |   4 +-
+ apps/api/src/services/talent-m2m.ts         |  57 +++++
+ apps/api/src/talent-bridge.test.ts          | 223 ++++++++++++++++++++
+ apps/api/src/test-support.ts                |   5 +-
+ docs/DECISIONS.md                           |   1 +
+ docs/OPERATIONS.md                          |  34 +++
+ docs/STATUS.md                              |   7 +
+ 17 files changed, 557 insertions(+), 29 deletions(-)
+ create mode 100644 apps/api/src/routes/admin/talent-support.ts
+ create mode 100644 apps/api/src/services/talent-m2m.ts
+ create mode 100644 apps/api/src/talent-bridge.test.ts
+
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+index 1108a0b..67f09a3 100644
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -94,7 +94,7 @@ jobs:
+       - name: İsteğe bağlı gizli değerler
+         run: |
+           FOUND=""
+-          for NAME in CX_INN_M2M_SECRET HUB_EVENTS_SECRET_CX HUB_EVENTS_SECRET_SIGNALS HUB_EVENTS_SECRET_TALENT HUB_EVENTS_SECRET_MEET HUB_NOTIFY_ENCRYPTION_KEY HUB_TELEGRAM_BOT_TOKEN RESEND_API_KEY HUB_OPS_WEBHOOK_SECRET; do
++          for NAME in CX_INN_M2M_SECRET HUB_EVENTS_SECRET_CX HUB_EVENTS_SECRET_SIGNALS HUB_EVENTS_SECRET_TALENT HUB_EVENTS_SECRET_MEET TALENT_EVENTS_SECRET HUB_NOTIFY_ENCRYPTION_KEY HUB_TELEGRAM_BOT_TOKEN RESEND_API_KEY HUB_OPS_WEBHOOK_SECRET; do
+             if npx --yes firebase-tools functions:secrets:get "$NAME" --project "$PROJECT_ID" --non-interactive >/dev/null 2>&1; then
+               FOUND="${FOUND:+$FOUND,}$NAME"
+             else
+diff --git a/apps/admin/src/pages/Tenant.tsx b/apps/admin/src/pages/Tenant.tsx
+index 6956015..52f8f93 100644
+--- a/apps/admin/src/pages/Tenant.tsx
++++ b/apps/admin/src/pages/Tenant.tsx
+@@ -109,6 +109,8 @@ export function TenantPage({ id }: { id: string }) {
+         <AdminInvite tenantId={id} disabled={!tenant.isActive} onDone={refresh} />
+       </div>
+ 
++      <TalentSupport tenantId={id} onDone={refresh} />
++
+       <Panel title="Bu şirketteki konsol işlemleri" className="mt-4">
+         <AuditTable entries={audit.data?.entries ?? []} showTenant={false} />
+       </Panel>
+@@ -159,3 +161,49 @@ function AdminInvite({ tenantId, disabled, onDone }: { tenantId: string; disable
+     </Panel>
+   );
+ }
++
++/**
++ * Talent destek erişimi (K11): platform yöneticisi şirketin Talent verisini üye olmadan göremez. Gerekçe yazılarak süreli
++ * (en çok 24 saat), salt okunur destek üyeliği istenir; Talent'ta şirketin kendi denetim defterine ve buradaki işlem
++ * kaydına düşer, süre dolunca kendiliğinden kapanır. Kritik işlem: taze kimlik ister.
++ */
++function TalentSupport({ tenantId, onDone }: { tenantId: string; onDone: () => void }) {
++  const critical = useCritical();
++  const [reason, setReason] = useState("");
++  const [hours, setHours] = useState(24);
++  const grant = useMutation({
++    mutationFn: () => critical(() => api<{ expiresAt: string }>("POST", `/tenants/${tenantId}/talent-support`, { reason: reason.trim(), ttlHours: hours })),
++    onSuccess: () => {
++      setReason("");
++      onDone();
++    },
++  });
++  const revoke = useMutation({ mutationFn: () => api("DELETE", `/tenants/${tenantId}/talent-support`), onSuccess: onDone });
++  const submit = (e: FormEvent) => {
++    e.preventDefault();
++    grant.mutate();
++  };
++  return (
++    <Panel title="Talent destek erişimi" className="mt-4">
++      <p className="border-b border-ink-100 px-4 py-2 text-xs text-ink-500">
++        Şirketin Talent verisini yalnız süreli ve salt okunur görürsünüz. Gerekçe şirketin kendi denetim defterinde görünür.
++        Erişim Hub hesabınıza açılır: Talent'ı kendi Hub alanınızdan açıp şirket seçiciden bu şirketi seçin.
++      </p>
++      <form className="space-y-3 p-4" onSubmit={submit}>
++        <Field label="Gerekçe" hint="En az 10 karakter (ör. destek talebi numarası ve sorun)">
++          <Input required minLength={10} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
++        </Field>
++        <div className="flex flex-wrap items-end gap-2">
++          <Field label="Süre (saat)">
++            <Input type="number" min={1} max={24} value={hours} onChange={(e) => setHours(Math.min(24, Math.max(1, Number(e.target.value) || 1)))} />
++          </Field>
++          <Button type="submit" disabled={grant.isPending || reason.trim().length < 10}>Destek erişimi iste</Button>
++          <Button type="button" variant="ghost" disabled={revoke.isPending} onClick={() => { if (confirm("Destek erişimi şimdi kapatılsın mı?")) revoke.mutate(); }}>Erişimi kapat</Button>
++        </div>
++        {grant.data && <p className="text-xs text-ink-500">Açıldı; {dateTime(grant.data.expiresAt)} tarihinde kendiliğinden kapanır.</p>}
++        {revoke.isSuccess && <p className="text-xs text-ink-500">Destek erişimi kapatıldı.</p>}
++        <ErrorText>{grant.error?.message ?? revoke.error?.message}</ErrorText>
++      </form>
++    </Panel>
++  );
++}
+diff --git a/apps/api/src/app.ts b/apps/api/src/app.ts
+index fb84d7d..93f5249 100644
+--- a/apps/api/src/app.ts
++++ b/apps/api/src/app.ts
+@@ -12,6 +12,7 @@ import { trustCloudRunProxies } from "./net/trust-proxy";
+ import { appExchangeRoutes, appRoutes, appServerExchangeRoutes, type AppLinks } from "./routes/apps";
+ import type { ServerExchangeApp } from "./config";
+ import type { CxM2mClient } from "./services/cx-m2m";
++import type { TalentM2mClient } from "./services/talent-m2m";
+ import { authRoutes } from "./routes/auth";
+ import { adminRoutes } from "./routes/admin";
+ import { earlyAccessRoutes } from "./routes/early-access";
+@@ -50,6 +51,8 @@ export interface AppDeps {
+   adminIdpTenant?: string | null;
+   /** Konsolun "CX planları" sayfası için CX'e imzalı M2M istemcisi (CX_INN_M2M_SECRET); yoksa sayfa "bağlı değil" der. */
+   cxM2m?: CxM2mClient | null;
++  /** Konsolun Talent destek erişimi için Talent'a imzalı M2M istemcisi (TALENT_EVENTS_SECRET); yoksa 503. */
++  talentM2m?: TalentM2mClient | null;
+   /** Boş değilse konsol yalnız bu IP'lerden açılır. */
+   adminIpAllowlist?: readonly string[];
+   /** Erken erişim formunun bulunduğu tanıtım sitesi kökenleri (clyrolabs.com). */
+@@ -136,7 +139,7 @@ export function createApp(deps: AppDeps): Express {
+   api.use(defaultDenyBarrier(PUBLIC_API_PATHS));
+ 
+   api.get("/healthz", (_req, res) => res.json({ ok: true }));
+-  api.use("/admin", adminRoutes({ db: deps.db, verifyIdToken: deps.verifyIdToken, platformAdminEmails: platformAdmins, secureCookies: deps.isProd, appUrl: deps.appUrl, adminIdpTenant: deps.adminIdpTenant ?? null, cx: deps.cxM2m ?? null, notify }));
++  api.use("/admin", adminRoutes({ db: deps.db, verifyIdToken: deps.verifyIdToken, platformAdminEmails: platformAdmins, secureCookies: deps.isProd, appUrl: deps.appUrl, adminIdpTenant: deps.adminIdpTenant ?? null, cx: deps.cxM2m ?? null, talent: deps.talentM2m ?? null, notify }));
+   if (limited) api.use("/auth/session", limiter(20));
+   api.use(authRoutes({ db: deps.db, verifyIdToken: deps.verifyIdToken, platformAdminEmails: deps.platformAdminEmails, secureCookies: deps.isProd }));
+   api.use(meRoutes(deps.db, { selfSignup: deps.selfSignup ?? false }));
+diff --git a/apps/api/src/apps-server-exchange.test.ts b/apps/api/src/apps-server-exchange.test.ts
+index 5e8bd2c..1c2872d 100644
+--- a/apps/api/src/apps-server-exchange.test.ts
++++ b/apps/api/src/apps-server-exchange.test.ts
+@@ -54,7 +54,7 @@ describe("sunucudan sunucuya kod değişimi (CX)", () => {
+       uid: "uid-yonetici@kopru.test",
+       email: "yonetici@kopru.test",
+       displayName: null,
+-      tenant: { id: tenantId, name: "Tenant kopru", slug: "kopru", role: "tenant_admin" },
++      tenant: { id: tenantId, name: "Tenant kopru", slug: "kopru", role: "tenant_admin", plan: "active", trialEndsAt: null },
+     });
+     assert.equal(r.allowOrigin, null, "tarayıcıya CORS açılmaz");
+ 
+@@ -153,9 +153,9 @@ describe("sunucudan sunucuya kod değişimi (CX)", () => {
+ 
+   describe("değişim anında yeniden denetim: tutmazsa ne tenant bilgisi ne jeton", () => {
+     /** Ret: jeton ve tenant bilgisi yok; yalnız CX'in bayat üyeliği silebilmesi için kim ve hangi alan. */
+-    const denied = (r: { status: number; body: any }, uid: string, tenantId: string) => {
++    const denied = (r: { status: number; body: any }, uid: string, tenantId: string, reason: string) => {
+       assert.equal(r.status, 403);
+-      assert.deepEqual(r.body, { error: "Bu çalışma alanına erişiminiz yok", code: "workspace_access_denied", uid, tenantId });
++      assert.deepEqual(r.body, { error: "Bu çalışma alanına erişiminiz yok", code: "workspace_access_denied", uid, tenantId, reason });
+     };
+ 
+     test("kod alındıktan sonra üyelikten çıkarılan kişi", async () => {
+@@ -164,7 +164,7 @@ describe("sunucudan sunucuya kod değişimi (CX)", () => {
+       const code = await launch(member);
+       const [u] = await t.db.select({ id: users.id }).from(users).where(eq(users.email, "uye@cikan.test"));
+       await t.db.delete(tenantMemberships).where(and(eq(tenantMemberships.tenantId, tenantId), eq(tenantMemberships.userId, u!.id)));
+-      denied(await serverExchange("cx", code), "uid-uye@cikan.test", tenantId);
++      denied(await serverExchange("cx", code), "uid-uye@cikan.test", tenantId, "not_member");
+       assert.equal((await serverExchange("cx", code)).status, 401, "kod yine de yanar");
+     });
+ 
+@@ -172,14 +172,14 @@ describe("sunucudan sunucuya kod değişimi (CX)", () => {
+       const { tenantId, admin } = await tenantWithAdmin(t, "kopru-askida", "yonetici@askida.test");
+       const code = await launch(admin);
+       await t.db.update(tenants).set({ isActive: false }).where(eq(tenants.id, tenantId));
+-      denied(await serverExchange("cx", code), "uid-yonetici@askida.test", tenantId);
++      denied(await serverExchange("cx", code), "uid-yonetici@askida.test", tenantId, "inactive");
+     });
+ 
+     test("denemesi biten alan", async () => {
+       const { tenantId, admin } = await tenantWithAdmin(t, "kopru-deneme", "yonetici@deneme.test");
+       const code = await launch(admin);
+       await t.db.update(tenants).set({ plan: "trial", trialEndsAt: new Date(Date.now() - 1000) }).where(eq(tenants.id, tenantId));
+-      denied(await serverExchange("cx", code), "uid-yonetici@deneme.test", tenantId);
++      denied(await serverExchange("cx", code), "uid-yonetici@deneme.test", tenantId, "trial_expired");
+     });
+ 
+     test("denemesi süren alan geçer", async () => {
+@@ -193,7 +193,7 @@ describe("sunucudan sunucuya kod değişimi (CX)", () => {
+       const { tenantId, admin } = await tenantWithAdmin(t, "kopru-kapatilan", "yonetici@kapatilan.test");
+       const code = await launch(admin);
+       await t.db.insert(tenantAppAccess).values({ tenantId, app: "cx", enabled: false });
+-      denied(await serverExchange("cx", code), "uid-yonetici@kapatilan.test", tenantId);
++      denied(await serverExchange("cx", code), "uid-yonetici@kapatilan.test", tenantId, "app_disabled");
+     });
+   });
+ 
+@@ -274,7 +274,7 @@ describe("gizli değer yardımcıları", () => {
+     const two = loadConfig({ ...base, APP_EXCHANGE_SECRETS: `cx=${"s".repeat(32)},meet=${"m".repeat(32)}` }).APP_EXCHANGE_SECRETS;
+     assert.equal(two.get("meet"), "m".repeat(32));
+     assert.throws(() => loadConfig({ ...base, APP_EXCHANGE_SECRETS: `cx=${"s".repeat(40)},meet=${"s".repeat(40)}` }), (e: Error) => /APP_EXCHANGE_SECRETS/.test(e.message) && !e.message.includes("ssss"));
+-    for (const bad of ["cx=kisa-deger", `talent=${"s".repeat(40)}`, `cx=${"s".repeat(40)},cx=${"t".repeat(40)}`, "s".repeat(40)]) {
++    for (const bad of ["cx=kisa-deger", `crm=${"s".repeat(40)}`, `cx=${"s".repeat(40)},cx=${"t".repeat(40)}`, "s".repeat(40)]) {
+       assert.throws(() => loadConfig({ ...base, APP_EXCHANGE_SECRETS: bad }), (e: Error) => /APP_EXCHANGE_SECRETS/.test(e.message) && !e.message.includes("kisa-deger") && !e.message.includes("ssss"));
+     }
+   });
+@@ -300,7 +300,7 @@ describe("Signals sunucu yolu (Hub üyelik eşlemesi)", () => {
+         uid: "uid-yonetici@signals-kopru.test",
+         email: "yonetici@signals-kopru.test",
+         displayName: null,
+-        tenant: { id: tenantId, name: "Tenant signals-kopru", slug: "signals-kopru", role: "tenant_admin" },
++        tenant: { id: tenantId, name: "Tenant signals-kopru", slug: "signals-kopru", role: "tenant_admin", plan: "active", trialEndsAt: null },
+       });
+       assert.ok(!("token" in r.body), "Signals'a giriş jetonu verilmez");
+       const cx = await launch(admin, "cx");
+@@ -329,7 +329,7 @@ describe("Signals sunucu yolu (Hub üyelik eşlemesi)", () => {
+       await t.db.delete(tenantMemberships).where(and(eq(tenantMemberships.tenantId, tenantId), eq(tenantMemberships.userId, u!.id)));
+       const r = await serverExchange("signals", code, { base: s.base, secret: TEST_SIGNALS_EXCHANGE_SECRET });
+       assert.equal(r.status, 403);
+-      assert.deepEqual(r.body, { error: "Bu çalışma alanına erişiminiz yok", code: "workspace_access_denied", uid: "uid-uye@signals-cikar.test", tenantId });
++      assert.deepEqual(r.body, { error: "Bu çalışma alanına erişiminiz yok", code: "workspace_access_denied", uid: "uid-uye@signals-cikar.test", tenantId, reason: "not_member" });
+     } finally {
+       await s.close();
+     }
+diff --git a/apps/api/src/bootstrap.ts b/apps/api/src/bootstrap.ts
+index 8cd2e9e..64dabea 100644
+--- a/apps/api/src/bootstrap.ts
++++ b/apps/api/src/bootstrap.ts
+@@ -5,6 +5,7 @@ import { createFirebaseVerifier, createLaunchTokenMinter } from "./auth/firebase
+ import { loadConfig, type Config } from "./config";
+ import { createAiModels } from "./ai/factory";
+ import { createCxM2mClient } from "./services/cx-m2m";
++import { createTalentM2mClient } from "./services/talent-m2m";
+ import { buildNotifyDeps } from "./notify/factory";
+ 
+ /** Yerel geliştirme: DATABASE_URL=pglite://memory → bellek içi Postgres (Neon gerekmez, veri kapanınca silinir). */
+@@ -26,6 +27,7 @@ export async function buildApp(env: NodeJS.ProcessEnv = process.env): Promise<{
+     appLinks: { cx: config.CX_INN_URL.replace(/\/+$/, ""), talent: config.TALENTFLOW_URL.replace(/\/+$/, ""), signals: config.SIGNALS_URL.replace(/\/+$/, ""), meet: config.MEET_URL.replace(/\/+$/, "") },
+     appExchangeSecrets: config.APP_EXCHANGE_SECRETS,
+     cxM2m: config.CX_INN_M2M_SECRET ? createCxM2mClient({ baseUrl: config.CX_INN_API_URL ?? config.CX_INN_URL, secret: config.CX_INN_M2M_SECRET }) : null,
++    talentM2m: config.TALENT_EVENTS_SECRET ? createTalentM2mClient({ baseUrl: config.TALENT_API_URL ?? config.TALENTFLOW_URL, secret: config.TALENT_EVENTS_SECRET }) : null,
+     platformAdminEmails: config.PLATFORM_ADMIN_EMAILS,
+     allowedOrigins: config.ALLOWED_ORIGINS,
+     adminOrigins: config.ADMIN_ORIGINS,
+diff --git a/apps/api/src/config.ts b/apps/api/src/config.ts
+index 3d6b07d..d611bd5 100644
+--- a/apps/api/src/config.ts
++++ b/apps/api/src/config.ts
+@@ -45,7 +45,7 @@ const schema = z.object({
+   ADMIN_IP_ALLOWLIST: list,
+   /**
+    * Sunucudan sunucuya kod değişimi (routes/apps.ts → /api/apps/server-exchange) için uygulama başına paylaşılan gizli
+-   * değer (Secret Manager), biçim `cx=<değer>,meet=<değer>,signals=<değer>`. Tanımsızsa o uygulama için sunucu yolu kapalıdır (503). Değer günlüğe yazılmaz.
++   * değer (Secret Manager), biçim `cx=<değer>,meet=<değer>,signals=<değer>,talent=<değer>`. Tanımsızsa o uygulama için sunucu yolu kapalıdır (503). Değer günlüğe yazılmaz.
+    */
+   APP_EXCHANGE_SECRETS: z.string().optional().transform((v, ctx) => parseExchangeSecrets(v, ctx)),
+   /**
+@@ -61,6 +61,14 @@ const schema = z.object({
+   HUB_EVENTS_SECRET_SIGNALS: secret32,
+   HUB_EVENTS_SECRET_TALENT: secret32,
+   HUB_EVENTS_SECRET_MEET: secret32,
++  /**
++   * Hub → Talent imzalı istekler (CLYRO-M2M-V1, gönderen `hub`; services/talent-m2m.ts): yönetim konsolunun destek erişimi
++   * (K11). Talent'taki `HUB_EVENTS_SECRET` ile aynı değer; ters yönün (`HUB_EVENTS_SECRET_TALENT`) ve kod değişiminin
++   * (`APP_EXCHANGE_SECRETS` → `talent=`) değerinden FARKLI olmalı. Tanımsızsa konsol "Talent bağlı değil" der.
++   */
++  TALENT_EVENTS_SECRET: secret32,
++  /** Talent sunucusunun kökü (istekler `<kök>/api/hub/...`). Verilmezse TALENTFLOW_URL. Üretimde https. */
++  TALENT_API_URL: z.string().url().optional(),
+   /** Kanal hedeflerinin AES-256-GCM anahtarı: 32 bayt, base64 (`openssl rand -base64 32`). Yoksa kanal eklenemez. */
+   HUB_NOTIFY_ENCRYPTION_KEY: z.string().trim().optional().catch(undefined),
+   /** Telegram bot jetonu (BotFather). Yoksa Telegram bağlayıcısı kapalı. */
+@@ -88,14 +96,23 @@ const schema = z.object({
+   if (c.ADMIN_ORIGINS.some((o) => !o.startsWith("https://"))) ctx.addIssue({ code: "custom", path: ["ADMIN_ORIGINS"], message: "üretimde https olmalı" });
+   // İmza gizli değeri kabloda gitmez ama yanıt (fatura, plan) gider: CX'e yalnız şifreli bağlantıyla.
+   if (!(c.CX_INN_API_URL ?? c.CX_INN_URL).startsWith("https://")) ctx.addIssue({ code: "custom", path: ["CX_INN_API_URL"], message: "üretimde https olmalı" });
++  if (!(c.TALENT_API_URL ?? c.TALENTFLOW_URL).startsWith("https://")) ctx.addIssue({ code: "custom", path: ["TALENT_API_URL"], message: "üretimde https olmalı" });
++}).superRefine((c, ctx) => {
++  // İki yön ve kod değişimi aynı değeri paylaşırsa biri sızınca hepsi açılır.
++  const t = c.TALENT_EVENTS_SECRET;
++  if (t && (t === c.HUB_EVENTS_SECRET_TALENT || t === c.APP_EXCHANGE_SECRETS.get("talent"))) {
++    ctx.addIssue({ code: "custom", path: ["TALENT_EVENTS_SECRET"], message: "başka bir gizli değerle aynı" });
++  }
+ });
+ 
+ /** Sunucu yoluyla kod değiştirebilen uygulamalar: tenant bilgisi yalnız bunlara, yalnız gizli değerle gider. */
+-export const SERVER_EXCHANGE_APPS = ["cx", "meet", "signals"] as const;
++export const SERVER_EXCHANGE_APPS = ["cx", "meet", "signals", "talent"] as const;
+ /**
+- * Yalnız sunucu yolunu kullanabilen uygulamalar (gizli değer yoksa Hub'dan açılmazlar). Signals geçiş döneminde iki yolu da
+- * bilir: gizli değeri tanımlıysa yalnız sunucu yolu, değilse eski tarayıcı yolu (yalnız e-posta) çalışır.
++ * Yalnız sunucu yolunu kullanabilen uygulamalar (gizli değer yoksa Hub'dan açılmazlar). Signals ve Talent geçiş döneminde iki
++ * yolu da bilir: gizli değeri tanımlıysa yalnız sunucu yolu, değilse eski tarayıcı yolu çalışır (Talent: çok şirketli sürüm
++ * yayına çıkana kadar; talent= değeri o yayınla birlikte girilir).
+  */
++export const TRANSITIONAL_SERVER_APPS: readonly ServerExchangeApp[] = ["signals", "talent"];
+ export const SERVER_ONLY_APPS: readonly ServerExchangeApp[] = ["cx", "meet"];
+ export type ServerExchangeApp = (typeof SERVER_EXCHANGE_APPS)[number];
+ const isServerExchangeApp = (v: string): v is ServerExchangeApp => (SERVER_EXCHANGE_APPS as readonly string[]).includes(v);
+@@ -136,7 +153,7 @@ function originOf(o: string): string {
+ 
+ export type Config = Omit<
+   z.infer<typeof schema>,
+-  "DATABASE_URL" | "GEMINI_API_KEY" | "APP_EXCHANGE_SECRETS" | "CX_INN_M2M_SECRET" | "HUB_EVENTS_SECRET_CX" | "HUB_EVENTS_SECRET_SIGNALS" | "HUB_EVENTS_SECRET_TALENT" | "HUB_EVENTS_SECRET_MEET" | "HUB_NOTIFY_ENCRYPTION_KEY" | "HUB_TELEGRAM_BOT_TOKEN" | "RESEND_API_KEY" | "HUB_OPS_WEBHOOK_SECRET"
++  "DATABASE_URL" | "GEMINI_API_KEY" | "APP_EXCHANGE_SECRETS" | "CX_INN_M2M_SECRET" | "HUB_EVENTS_SECRET_CX" | "HUB_EVENTS_SECRET_SIGNALS" | "HUB_EVENTS_SECRET_TALENT" | "HUB_EVENTS_SECRET_MEET" | "TALENT_EVENTS_SECRET" | "HUB_NOTIFY_ENCRYPTION_KEY" | "HUB_TELEGRAM_BOT_TOKEN" | "RESEND_API_KEY" | "HUB_OPS_WEBHOOK_SECRET"
+ >;
+ 
+ /** Eksik ya da hatalı değişkende açılışta durur; ayrıntı yalnız değişken adlarını içerir. */
+diff --git a/apps/api/src/function.ts b/apps/api/src/function.ts
+index 6f41fe2..1124542 100644
+--- a/apps/api/src/function.ts
++++ b/apps/api/src/function.ts
+@@ -26,6 +26,7 @@ let ready: Promise<Express> | undefined;
+  * (.github/workflows/deploy.yml); bağlanmayan özellik "bağlı değil" der. Yalnız bu listedekiler kabul edilir.
+  *  - CX_INN_M2M_SECRET: konsolun "CX planları" sayfası (services/cx-m2m.ts).
+  *  - HUB_EVENTS_SECRET_*: uygulamaların imzalı olayları (routes/m2m-events.ts), uygulama başına ayrı.
++ *  - TALENT_EVENTS_SECRET: Hub → Talent imzalı istekler (konsolun destek erişimi; services/talent-m2m.ts).
+  *  - HUB_NOTIFY_ENCRYPTION_KEY, HUB_TELEGRAM_BOT_TOKEN, RESEND_API_KEY, HUB_OPS_WEBHOOK_SECRET: bildirimler (notify/).
+  * Liste .github/workflows/deploy.yml'deki "İsteğe bağlı gizli değerler" adımıyla aynı olmalı.
+  */
+@@ -35,6 +36,7 @@ const OPTIONAL_SECRETS = [
+   "HUB_EVENTS_SECRET_SIGNALS",
+   "HUB_EVENTS_SECRET_TALENT",
+   "HUB_EVENTS_SECRET_MEET",
++  "TALENT_EVENTS_SECRET",
+   "HUB_NOTIFY_ENCRYPTION_KEY",
+   "HUB_TELEGRAM_BOT_TOKEN",
+   "RESEND_API_KEY",
+diff --git a/apps/api/src/routes/admin/index.ts b/apps/api/src/routes/admin/index.ts
+index 7609ff1..585021b 100644
+--- a/apps/api/src/routes/admin/index.ts
++++ b/apps/api/src/routes/admin/index.ts
+@@ -13,14 +13,17 @@ import { adminCxBillingRoutes } from "./cx-billing";
+ import { adminNotificationRoutes } from "./notifications";
+ import type { NotifyDeps } from "../../notify/deps";
+ import { adminSessionRoutes } from "./session";
++import { adminTalentSupportRoutes } from "./talent-support";
++import type { TalentM2mClient } from "../../services/talent-m2m";
+ 
+-export function adminRoutes(deps: { db: Db; verifyIdToken: IdTokenVerifier; platformAdminEmails: ReadonlySet<string>; secureCookies: boolean; appUrl: string; adminIdpTenant: string | null; cx: CxM2mClient | null; notify: NotifyDeps }) {
++export function adminRoutes(deps: { db: Db; verifyIdToken: IdTokenVerifier; platformAdminEmails: ReadonlySet<string>; secureCookies: boolean; appUrl: string; adminIdpTenant: string | null; cx: CxM2mClient | null; talent?: TalentM2mClient | null; notify: NotifyDeps }) {
+   const r = Router();
+   r.use(adminSessionRoutes(deps));
+   r.use(requireAdmin(deps.platformAdminEmails));
+   // CX planları ve bildirimler konsol uçlarından önce: konsol router'ı bilinmeyen yolu 404'le kapatır.
+   r.use(adminCxBillingRoutes({ db: deps.db, cx: deps.cx }));
+   r.use(adminNotificationRoutes({ db: deps.db, notify: deps.notify, appUrl: deps.appUrl }));
++  r.use(adminTalentSupportRoutes({ db: deps.db, talent: deps.talent ?? null }));
+   r.use(adminConsoleRoutes({ db: deps.db, appUrl: deps.appUrl, email: deps.notify.email }));
+   return r;
+ }
+diff --git a/apps/api/src/routes/admin/talent-support.ts b/apps/api/src/routes/admin/talent-support.ts
+new file mode 100644
+index 0000000..a9b4e75
+--- /dev/null
++++ b/apps/api/src/routes/admin/talent-support.ts
+@@ -0,0 +1,108 @@
++/**
++ * Yönetim konsolu → Talent destek erişimi (TalentFlow docs/coklu-sirket-plani.md K11). index.ts'te requireAdmin'in
++ * arkasında (admin kapsamlı oturum, PLATFORM_ADMIN_EMAILS, ADMIN_ORIGINS + x-clyro-admin, admin IdP kiracısı + TOTP).
++ *
++ * Platform yöneticisi bir şirketin Talent verisini üye olmadan göremez. Destek gerektiğinde konsoldan gerekçe yazılarak
++ * istenir; Hub, Talent'a imzalı istek gönderir (services/talent-m2m.ts) ve Talent o şirkette süreli (en çok 24 saat),
++ * salt okunur bir `support` üyeliği açar; süre dolunca kurallar erişimi kendiliğinden kapatır. Açma kritik işlemdir
++ * (requireFreshAuth); açma ve kapatma Hub işlem kaydına (`source = 'admin'`) ve Talent'ta şirketin kendi denetim
++ * defterine gerekçeyle düşer — şirket yöneticisi kendi defterinde görür.
++ *
++ * Destek kimliği konsol hesabı DEĞİL: konsol hesabı ayrı Identity Platform kiracısında ve Talent'a giremez. Yöneticinin
++ * aynı e-postalı Hub hesabının Firebase kimliği kullanılır; Hub hesabı yoksa 409 (önce Hub'a bir kez girilmeli). Destek
++ * verilen şirket kişinin Talent şirket seçicisinde görünür; Talent'a kendi Hub alanından girer.
++ */
++import { Router, type Request, type Response } from "express";
++import { and, eq, isNotNull } from "drizzle-orm";
++import { z } from "zod";
++import { tenants, users, type Db } from "@hub-inn/db";
++import { HttpError, parseBody } from "../../http";
++import { requireFreshAuth } from "../../middleware/admin";
++import { audit } from "../../services/audit";
++import type { TalentM2mClient } from "../../services/talent-m2m";
++
++const grantBody = z.strictObject({
++  reason: z.string().trim().min(10, "Gerekçe en az 10 karakter").max(500, "Gerekçe en çok 500 karakter"),
++  ttlHours: z.number().int().min(1).max(24).default(24),
++});
++
++const SUPPORT_PATH = "/api/hub/support-access";
++
++export function adminTalentSupportRoutes(deps: { db: Db; talent: TalentM2mClient | null }) {
++  const { db } = deps;
++  const r = Router();
++
++  const tenantIdOf = (v: unknown) => {
++    const p = z.string().uuid().safeParse(v);
++    if (!p.success) throw new HttpError(404, "Çalışma alanı bulunamadı");
++    return p.data.toLowerCase();
++  };
++
++  /** Ortak hazırlık: Talent bağlı mı, alan var mı, yöneticinin Hub kimliği. */
++  async function prepare(req: Request) {
++    if (!deps.talent) throw new HttpError(503, "Talent bağlantısı yapılandırılmamış (TALENT_EVENTS_SECRET)");
++    const tenantId = tenantIdOf(req.params.id);
++    const [t] = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
++    if (!t) throw new HttpError(404, "Çalışma alanı bulunamadı");
++    const admin = req.adminAuth!.user;
++    const [u] = await db
++      .select({ firebaseUid: users.firebaseUid, email: users.email })
++      .from(users)
++      .where(and(eq(users.email, admin.email), isNotNull(users.firebaseUid)))
++      .limit(1);
++    if (!u?.firebaseUid) {
++      throw new HttpError(409, "Destek erişimi Hub hesabınıza açılır: önce aynı e-postayla Clyro Hub'a bir kez giriş yapın.");
++    }
++    return { tenantId, admin, firebaseUid: u.firebaseUid, email: u.email };
++  }
++
++  async function send(res: Response, body: Record<string, unknown>) {
++    try {
++      return await deps.talent!.post(SUPPORT_PATH, body);
++    } catch {
++      res.status(502).json({ error: "Talent'a ulaşılamadı" });
++      return null;
++    }
++  }
++
++  r.post("/tenants/:id/talent-support", requireFreshAuth, async (req, res) => {
++    const body = parseBody(grantBody, req);
++    const p = await prepare(req);
++    const out = await send(res, {
++      type: "support.grant",
++      tenantId: p.tenantId,
++      uid: p.firebaseUid,
++      email: p.email,
++      reason: body.reason,
++      requestedBy: p.admin.email,
++      ttlHours: body.ttlHours,
++    });
++    if (!out) return;
++    if (out.status === 404) throw new HttpError(409, "Bu çalışma alanı Talent'ı henüz hiç açmamış");
++    if (out.status === 409) throw new HttpError(409, "Bu kişi zaten şirketin Talent üyesi; destek erişimine gerek yok");
++    if (out.status !== 200) throw new HttpError(502, "Talent isteği reddetti");
++    const expiresAt = new Date(Date.now() + body.ttlHours * 3_600_000);
++    await audit(db, {
++      tenantId: p.tenantId,
++      actorUserId: p.admin.id,
++      action: "talent.support_granted",
++      targetType: "app",
++      targetId: "talent",
++      metadata: { reason: body.reason, ttlHours: body.ttlHours, expiresAt: expiresAt.toISOString() },
++      source: "admin",
++    });
++    res.json({ ok: true, expiresAt });
++  });
++
++  // Kapatma erişimi daraltır: taze kimlik istenmez (süresinden önce kapatmak hızlı olmalı).
++  r.delete("/tenants/:id/talent-support", async (req, res) => {
++    const p = await prepare(req);
++    const out = await send(res, { type: "support.revoke", tenantId: p.tenantId, uid: p.firebaseUid, requestedBy: p.admin.email });
++    if (!out) return;
++    if (out.status !== 200) throw new HttpError(502, "Talent isteği reddetti");
++    await audit(db, { tenantId: p.tenantId, actorUserId: p.admin.id, action: "talent.support_revoked", targetType: "app", targetId: "talent", source: "admin" });
++    res.json({ ok: true });
++  });
++
++  return r;
++}
+diff --git a/apps/api/src/routes/apps.ts b/apps/api/src/routes/apps.ts
+index 6e69536..9edaee4 100644
+--- a/apps/api/src/routes/apps.ts
++++ b/apps/api/src/routes/apps.ts
+@@ -4,7 +4,7 @@ import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
+ import { z } from "zod";
+ import { appLaunchCodes, users, type Db, type TenantRole } from "@hub-inn/db";
+ import type { LaunchTokenMinter } from "../auth/firebase";
+-import { SERVER_ONLY_APPS, type ServerExchangeApp } from "../config";
++import { SERVER_ONLY_APPS, TRANSITIONAL_SERVER_APPS, type ServerExchangeApp } from "../config";
+ import { hashToken, newToken } from "../auth/tokens";
+ import { HttpError, parseBody } from "../http";
+ import { requireTenant, tenantOf } from "../middleware/auth";
+@@ -65,10 +65,11 @@ const exchangeBody = z.object({ app: z.string().max(20), code: z.string().min(20
+  */
+ export function appExchangeRoutes(deps: { db: Db; mintLaunchToken: LaunchTokenMinter; appLinks: AppLinks; exchangeSecrets?: ReadonlyMap<ServerExchangeApp, string> }) {
+   const { db } = deps;
+-  // Sunucu yolunu kullanan uygulamalar (CX, Meet; gizli değeri tanımlıysa Signals) tarayıcı yolundan kod değiştiremez: bu yol
+-  // tenant/üyelik denetimi yapmadan jeton ya da e-posta verir; onların kodu yalnız gizli değerli sunucu yolunda yanar.
+-  // Signals'ın gizli değeri tanımlanınca eski yol kendiliğinden kapanır: aynı kod iki yoldan farklı denetimle açılmasın.
+-  const serverOnly = new Set<string>([...SERVER_ONLY_APPS, ...(deps.exchangeSecrets?.has("signals") ? ["signals"] : [])]);
++  // Sunucu yolunu kullanan uygulamalar (CX, Meet; gizli değeri tanımlıysa Signals ve Talent) tarayıcı yolundan kod
++  // değiştiremez: bu yol tenant/üyelik denetimi yapmadan jeton ya da e-posta verir; onların kodu yalnız gizli değerli sunucu
++  // yolunda yanar. Geçiş dönemindeki uygulamanın gizli değeri tanımlanınca eski yol kendiliğinden kapanır: aynı kod iki
++  // yoldan farklı denetimle açılmasın.
++  const serverOnly = new Set<string>([...SERVER_ONLY_APPS, ...TRANSITIONAL_SERVER_APPS.filter((a) => deps.exchangeSecrets?.has(a))]);
+   const origins = new Map(
+     Object.entries(deps.appLinks)
+       .filter(([app]) => !serverOnly.has(app))
+@@ -216,8 +217,19 @@ export function appServerExchangeRoutes(deps: { db: Db; mintLaunchToken: LaunchT
+     if (!row.firebase_uid) throw new HttpError(401, "Giriş bağlantısının süresi dolmuş ya da kullanılmış");
+     const trialExpired = row.plan === "trial" && (!row.trial_ends_at || new Date(row.trial_ends_at) <= new Date());
+     // Kod verildikten sonra üyelikten çıkarılan, askıya alınan, denemesi biten ya da uygulaması kapatılan alana geçiş yok.
+-    if (!row.role || row.tenant_active !== true || !row.tenant_name || !row.tenant_slug || trialExpired || row.app_disabled) {
+-      res.status(403).json({ error: "Bu çalışma alanına erişiminiz yok", code: "workspace_access_denied", uid: row.firebase_uid, tenantId: row.tenant_id });
++    // Gerekçe uygulamanın bayat üyeliği kapatıp kapatmayacağına karar vermesi için (Talent: yalnız `not_member` kapatır;
++    // askı, deneme bitişi ve uygulamanın kapatılması geri alınabilir). Yalnız gizli değeri doğrulanmış sunucuya gider.
++    const reason = !row.role
++      ? "not_member"
++      : row.tenant_active !== true || !row.tenant_name || !row.tenant_slug
++        ? "inactive"
++        : row.app_disabled
++          ? "app_disabled"
++          : trialExpired
++            ? "trial_expired"
++            : null;
++    if (reason) {
++      res.status(403).json({ error: "Bu çalışma alanına erişiminiz yok", code: "workspace_access_denied", uid: row.firebase_uid, tenantId: row.tenant_id, reason });
+       return;
+     }
+     res.json({
+@@ -226,7 +238,15 @@ export function appServerExchangeRoutes(deps: { db: Db; mintLaunchToken: LaunchT
+       uid: row.firebase_uid,
+       email: row.email,
+       displayName: row.display_name,
+-      tenant: { id: row.tenant_id, name: row.tenant_name, slug: row.tenant_slug, role: row.role },
++      // plan + trialEndsAt: Talent şirketin yazma/okuma sürelerini bundan kurar (deneme bitince 14 gün salt okunur, K5).
++      tenant: {
++        id: row.tenant_id,
++        name: row.tenant_name,
++        slug: row.tenant_slug,
++        role: row.role,
++        plan: row.plan,
++        trialEndsAt: row.trial_ends_at ? new Date(row.trial_ends_at).toISOString() : null,
++      },
+     });
+   });
+ 
+diff --git a/apps/api/src/services/audit.ts b/apps/api/src/services/audit.ts
+index dda08b4..a85191d 100644
+--- a/apps/api/src/services/audit.ts
++++ b/apps/api/src/services/audit.ts
+@@ -40,7 +40,9 @@ export type AuditAction =
+   | "notification_channel.unsubscribed"
+   | "notifications.telegram_webhook_set"
+   | "notifications.ops_tested"
+-  | "trial.reminder_sent";
++  | "trial.reminder_sent"
++  | "talent.support_granted"
++  | "talent.support_revoked";
+ 
+ /** admin: yönetim konsolundan yapılan işlem (konsolun işlem kaydında görünür). Boş: Hub içindeki işlem. */
+ export type AuditSource = "admin";
+diff --git a/apps/api/src/services/talent-m2m.ts b/apps/api/src/services/talent-m2m.ts
+new file mode 100644
+index 0000000..5c2b6ce
+--- /dev/null
++++ b/apps/api/src/services/talent-m2m.ts
+@@ -0,0 +1,57 @@
++/**
++ * Hub API → Clyro Talent sunucudan sunucuya (M2M) istemcisi. Kimlik yalnız CLYRO-M2M-V1 HMAC imzasıdır (services/cx-m2m.ts
++ * ile aynı imza metni); gönderen satırı `hub`. Talent tarafı: TalentFlow functions/services/hubBridge.js → verifyHubSignature
++ * (±120 sn, tek kullanımlık nonce). Gizli değer (`TALENT_EVENTS_SECRET`, Talent'ta `HUB_EVENTS_SECRET`) kabloda gitmez,
++ * günlüğe yazılmaz. Origin başlığı gönderilmez (Talent tarayıcı isteğini reddeder); yönlendirme izlenmez.
++ */
++import { randomBytes } from "node:crypto";
++import { M2M_HEADERS, m2mSign, sha256Hex } from "./cx-m2m";
++
++export const TALENT_M2M_ACTOR = "hub";
++
++export interface TalentResponse {
++  status: number;
++  json: unknown;
++}
++
++export interface TalentM2mClient {
++  /** Yol /api/hub/ ile başlar. Ağ hatası/zaman aşımında Error atar. */
++  post(path: string, body: unknown): Promise<TalentResponse>;
++}
++
++export function createTalentM2mClient(opts: { baseUrl: string; secret: string; fetch?: typeof fetch; now?: () => number; timeoutMs?: number }): TalentM2mClient {
++  const base = opts.baseUrl.replace(/\/+$/, "");
++  const doFetch = opts.fetch ?? fetch;
++  const now = opts.now ?? Date.now;
++  return {
++    async post(path, body) {
++      if (!path.startsWith("/api/hub/")) throw new Error("Talent M2M yolu /api/hub/ ile başlamalı");
++      // Ham gövdenin tamamı imzalanır; gönderilen baytlar imzalananlarla aynı.
++      const payload = JSON.stringify(body);
++      const timestamp = String(Math.floor(now() / 1000));
++      const nonce = randomBytes(18).toString("base64url");
++      const res = await doFetch(base + path, {
++        method: "POST",
++        headers: {
++          [M2M_HEADERS.timestamp]: timestamp,
++          [M2M_HEADERS.nonce]: nonce,
++          [M2M_HEADERS.actor]: TALENT_M2M_ACTOR,
++          [M2M_HEADERS.signature]: m2mSign(opts.secret, { method: "POST", path, timestamp, nonce, actor: TALENT_M2M_ACTOR, bodySha256: sha256Hex(payload) }),
++          "content-type": "application/json",
++          accept: "application/json",
++        },
++        body: payload,
++        redirect: "manual",
++        signal: AbortSignal.timeout(opts.timeoutMs ?? 10_000),
++      });
++      const text = await res.text();
++      let json: unknown = null;
++      try {
++        json = text ? JSON.parse(text) : null;
++      } catch {
++        // ağ geçidi sayfası
++      }
++      return { status: res.status, json };
++    },
++  };
++}
+diff --git a/apps/api/src/talent-bridge.test.ts b/apps/api/src/talent-bridge.test.ts
+new file mode 100644
+index 0000000..9ba5303
+--- /dev/null
++++ b/apps/api/src/talent-bridge.test.ts
+@@ -0,0 +1,223 @@
++/**
++ * Talent köprüsü (TalentFlow çok şirketli PR 4): Talent'ın sunucudan sunucuya kod değişimi (plan + deneme bitişi + ret
++ * gerekçesi) ve yönetim konsolundan Talent destek erişimi (K11: gerekçe, en çok 24 saat, taze kimlik, imzalı istek,
++ * `source = 'admin'` işlem kaydı).
++ */
++import { test, before, after, describe } from "node:test";
++import assert from "node:assert/strict";
++import { createHash, createHmac } from "node:crypto";
++import { and, eq } from "drizzle-orm";
++import { auditLogs, sessions, tenants, users } from "@hub-inn/db";
++import { createTalentM2mClient } from "./services/talent-m2m";
++import {
++  adminConsole,
++  ADMIN_EMAIL,
++  startTestApp,
++  tenantWithAdmin,
++  TEST_APP_LINKS,
++  TEST_CX_EXCHANGE_SECRET,
++  TEST_MEET_EXCHANGE_SECRET,
++  type Client,
++  type TestApp,
++} from "./test-support";
++
++const TALENT_EXCHANGE = "test-talent-exchange-secret-0123456789abcdef";
++const TALENT_EVENTS = "test-talent-events-secret-0123456789abcdefgh";
++
++interface Sent {
++  url: string;
++  headers: Record<string, string>;
++  body: string;
++}
++const sent: Sent[] = [];
++let talentReply: { status: number; body: unknown } = { status: 200, body: { ok: true } };
++const fakeFetch = (async (url: string, init: RequestInit) => {
++  sent.push({ url, headers: init.headers as Record<string, string>, body: String(init.body) });
++  return new Response(JSON.stringify(talentReply.body), { status: talentReply.status, headers: { "content-type": "application/json" } });
++}) as unknown as typeof fetch;
++
++let t: TestApp;
++before(async () => {
++  t = await startTestApp({
++    appExchangeSecrets: new Map([
++      ["cx", TEST_CX_EXCHANGE_SECRET],
++      ["meet", TEST_MEET_EXCHANGE_SECRET],
++      ["talent", TALENT_EXCHANGE],
++    ]),
++    talentM2m: createTalentM2mClient({ baseUrl: "https://talent.example.test", secret: TALENT_EVENTS, fetch: fakeFetch }),
++  });
++});
++after(() => t.close());
++
++const codeOf = (url: string) => url.split("#code=")[1]!;
++async function launch(c: Client, app = "talent") {
++  const r = await c.call("POST", `/api/apps/${app}/launch`);
++  assert.equal(r.status, 200, JSON.stringify(r.body));
++  return codeOf(r.body.url as string);
++}
++async function serverExchange(code: string, secret = TALENT_EXCHANGE) {
++  const res = await fetch(`${t.base}/api/apps/server-exchange`, {
++    method: "POST",
++    headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
++    body: JSON.stringify({ app: "talent", code }),
++  });
++  return { status: res.status, body: (await res.json().catch(() => null)) as any };
++}
++
++describe("Talent sunucu yolu", () => {
++  test("jeton + alan + rol + plan döner; denemedeki alanda deneme bitişi", async () => {
++    const { tenantId, admin } = await tenantWithAdmin(t, "talent-kopru", "yonetici@talent-kopru.test");
++    const r = await serverExchange(await launch(admin));
++    assert.equal(r.status, 200);
++    assert.equal(r.body.token, "launch-token|uid-yonetici@talent-kopru.test");
++    assert.deepEqual(r.body.tenant, { id: tenantId, name: "Tenant talent-kopru", slug: "talent-kopru", role: "tenant_admin", plan: "active", trialEndsAt: null });
++
++    const ends = new Date(Date.now() + 5 * 86_400_000);
++    await t.db.update(tenants).set({ plan: "trial", trialEndsAt: ends }).where(eq(tenants.id, tenantId));
++    const trial = await serverExchange(await launch(admin));
++    assert.equal(trial.body.tenant.plan, "trial");
++    assert.equal(trial.body.tenant.trialEndsAt, ends.toISOString());
++  });
++
++  test("gizli değeri tanımlıyken eski tarayıcı yolu Talent için kapanır ve kodu yakmaz", async () => {
++    const { admin } = await tenantWithAdmin(t, "talent-eski", "yonetici@talent-eski.test");
++    const code = await launch(admin);
++    const res = await fetch(`${t.base}/api/apps/exchange`, {
++      method: "POST",
++      headers: { origin: TEST_APP_LINKS.talent, "content-type": "application/json" },
++      body: JSON.stringify({ app: "talent", code }),
++    });
++    assert.equal(res.status, 403);
++    assert.equal((await serverExchange(code)).status, 200);
++  });
++
++  test("gizli değeri tanımlı değilse Talent eski yolla açılır (geçiş dönemi: çok şirketli sürüm yayına çıkana kadar)", async () => {
++    const old = await startTestApp({ db: t.db });
++    try {
++      const { admin } = await tenantWithAdmin(old, "talent-gecis", "yonetici@talent-gecis.test");
++      const code = await launch(admin);
++      const res = await fetch(`${old.base}/api/apps/exchange`, {
++        method: "POST",
++        headers: { origin: TEST_APP_LINKS.talent, "content-type": "application/json" },
++        body: JSON.stringify({ app: "talent", code }),
++      });
++      assert.equal(res.status, 200);
++    } finally {
++      await old.close();
++    }
++  });
++
++  test("başka uygulamanın gizli değeri Talent kodunu açmaz", async () => {
++    const { admin } = await tenantWithAdmin(t, "talent-sir", "yonetici@talent-sir.test");
++    const code = await launch(admin);
++    assert.equal((await serverExchange(code, TEST_CX_EXCHANGE_SECRET)).status, 401);
++    assert.equal((await serverExchange(code)).status, 200);
++  });
++
++  test("denemesi biten alanda ret gerekçesi trial_expired (Talent üyeliği kapatmaz)", async () => {
++    const { tenantId, admin } = await tenantWithAdmin(t, "talent-bitti", "yonetici@talent-bitti.test");
++    const code = await launch(admin);
++    await t.db.update(tenants).set({ plan: "trial", trialEndsAt: new Date(Date.now() - 1000) }).where(eq(tenants.id, tenantId));
++    const r = await serverExchange(code);
++    assert.equal(r.status, 403);
++    assert.equal(r.body.reason, "trial_expired");
++    assert.ok(!("token" in r.body));
++  });
++});
++
++describe("konsoldan Talent destek erişimi (K11)", () => {
++  const verifySigned = (s: Sent) => {
++    const path = new URL(s.url).pathname;
++    const h = s.headers;
++    const text = ["CLYRO-M2M-V1", "POST", path, h["x-clyro-m2m-timestamp"], h["x-clyro-m2m-nonce"], "hub", createHash("sha256").update(s.body).digest("hex")].join("\n");
++    return h["x-clyro-m2m-signature"] === `v1=${createHmac("sha256", TALENT_EVENTS).update(text).digest("hex")}` && h["x-clyro-m2m-actor"] === "hub";
++  };
++
++  async function setup(slug: string) {
++    const { tenantId } = await tenantWithAdmin(t, slug, `yonetici@${slug}.test`);
++    const platform = await adminConsole(t);
++    return { tenantId, platform };
++  }
++
++  test("yöneticinin Hub hesabı yoksa 409 (konsol hesabı Talent'a giremez); Talent'a istek gitmez", async () => {
++    const { tenantId, platform } = await setup("destek-hesapsiz");
++    const before = sent.length;
++    const r = await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "Müşteri talebi: aday listesi boş" });
++    assert.equal(r.status, 409);
++    assert.equal(sent.length, before);
++  });
++
++  test("gerekçeyle 24 saatlik destek açılır: imzalı istek, Hub kimliği, işlem kaydı (source=admin)", async () => {
++    // Platform yöneticisi aynı e-postayla Hub'a bir kez girer (Firebase kimliği oluşur).
++    const hubSide = t.client();
++    assert.equal(await hubSide.login("hub-uid-admin", ADMIN_EMAIL), 204);
++    const { tenantId, platform } = await setup("destek-acik");
++    const r = await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "Müşteri talebi #42: aday listesi boş görünüyor" });
++    assert.equal(r.status, 200, JSON.stringify(r.body));
++    const last = sent.at(-1)!;
++    assert.equal(last.url, "https://talent.example.test/api/hub/support-access");
++    assert.ok(verifySigned(last), "CLYRO-M2M-V1 imzası");
++    assert.equal(last.headers.origin, undefined);
++    assert.deepEqual(JSON.parse(last.body), {
++      type: "support.grant",
++      tenantId,
++      uid: "hub-uid-admin",
++      email: ADMIN_EMAIL,
++      reason: "Müşteri talebi #42: aday listesi boş görünüyor",
++      requestedBy: ADMIN_EMAIL,
++      ttlHours: 24,
++    });
++    const [log] = await t.db.select().from(auditLogs).where(and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.action, "talent.support_granted")));
++    assert.equal(log?.source, "admin");
++    assert.equal((log?.metadata as any)?.reason, "Müşteri talebi #42: aday listesi boş görünüyor");
++
++    const off = await platform.call("DELETE", `/api/admin/tenants/${tenantId}/talent-support`);
++    assert.equal(off.status, 200);
++    assert.equal(JSON.parse(sent.at(-1)!.body).type, "support.revoke");
++    const revoked = await t.db.select().from(auditLogs).where(and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.action, "talent.support_revoked")));
++    assert.equal(revoked.length, 1);
++  });
++
++  test("gerekçesiz / kısa gerekçe 400, 24 saatten uzun süre 400", async () => {
++    const { tenantId, platform } = await setup("destek-gerekce");
++    assert.equal((await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, {})).status, 400);
++    assert.equal((await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "kısa" })).status, 400);
++    assert.equal((await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "Yeterince uzun gerekçe", ttlHours: 48 })).status, 400);
++  });
++
++  test("kimlik tazeliği yoksa 401 reauth_required (kritik işlem)", async () => {
++    const { tenantId, platform } = await setup("destek-taze");
++    const [u] = await t.db.select({ id: users.id }).from(users).where(eq(users.email, ADMIN_EMAIL));
++    await t.db.update(sessions).set({ authTime: new Date(Date.now() - 60 * 60_000) }).where(and(eq(sessions.userId, u!.id), eq(sessions.scope, "admin")));
++    const r = await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "Müşteri talebi: inceleme" });
++    assert.equal(r.status, 401);
++    assert.equal(r.body.code, "reauth_required");
++  });
++
++  test("Talent'ta alan yoksa / kişi zaten üyeyse 409; Talent hatası 502; kayıt yazılmaz", async () => {
++    const { tenantId, platform } = await setup("destek-talent");
++    for (const [status, want] of [[404, 409], [409, 409], [500, 502]] as const) {
++      talentReply = { status, body: { error: "x" } };
++      const r = await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "Müşteri talebi: inceleme" });
++      assert.equal(r.status, want);
++    }
++    talentReply = { status: 200, body: { ok: true } };
++    const logs = await t.db.select().from(auditLogs).where(and(eq(auditLogs.tenantId, tenantId), eq(auditLogs.action, "talent.support_granted")));
++    assert.equal(logs.length, 0);
++  });
++
++  test("Hub oturumu (konsol değil) destek ucunu açamaz; Talent bağlantısı yoksa 503", async () => {
++    const { tenantId, admin } = await tenantWithAdmin(t, "destek-hub-oturum", "yonetici@destek-hub-oturum.test");
++    const r = await admin.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "Müşteri talebi: inceleme" });
++    assert.ok(r.status === 401 || r.status === 403, String(r.status));
++
++    const noTalent = await startTestApp({ db: t.db });
++    try {
++      const platform = await adminConsole(noTalent);
++      const x = await platform.call("POST", `/api/admin/tenants/${tenantId}/talent-support`, { reason: "Müşteri talebi: inceleme" });
++      assert.equal(x.status, 503);
++    } finally {
++      await noTalent.close();
++    }
++  });
++});
+diff --git a/apps/api/src/test-support.ts b/apps/api/src/test-support.ts
+index b52315f..52c5be6 100644
+--- a/apps/api/src/test-support.ts
++++ b/apps/api/src/test-support.ts
+@@ -13,6 +13,7 @@ import type { IdTokenVerifier } from "./auth/firebase";
+ import type { Fetcher } from "./leads/scan/fetcher";
+ import type { AiModels } from "./ai/model";
+ import type { CxM2mClient } from "./services/cx-m2m";
++import type { TalentM2mClient } from "./services/talent-m2m";
+ import type { EventApp, NotifyDeps } from "./notify/deps";
+ import { createChannelCipher } from "./notify/crypto";
+ import { SendError } from "./notify/senders";
+@@ -74,11 +75,11 @@ export interface ClientOpts {
+   admin?: boolean;
+ }
+ 
+-export async function startTestApp(opts: { db?: Db; platformAdminEmails?: string[]; isProd?: boolean; fetcher?: () => Fetcher; ai?: () => AiModels | null; selfSignup?: boolean; adminIpAllowlist?: string[]; rateLimit?: boolean; adminIdpTenant?: string | null; appExchangeSecrets?: ReadonlyMap<ServerExchangeApp, string>; cxM2m?: CxM2mClient | null; notify?: NotifyDeps } = {}): Promise<TestApp> {
++export async function startTestApp(opts: { db?: Db; platformAdminEmails?: string[]; isProd?: boolean; fetcher?: () => Fetcher; ai?: () => AiModels | null; selfSignup?: boolean; adminIpAllowlist?: string[]; rateLimit?: boolean; adminIdpTenant?: string | null; appExchangeSecrets?: ReadonlyMap<ServerExchangeApp, string>; cxM2m?: CxM2mClient | null; talentM2m?: TalentM2mClient | null; notify?: NotifyDeps } = {}): Promise<TestApp> {
+   const own = opts.db ? null : await createTestDb();
+   const db = opts.db ?? own!.db;
+   const closeDb = async () => { await own?.close(); };
+-  const app = createApp({ db, verifyIdToken: fakeVerifier, mintLaunchToken: async (uid) => `launch-token|${uid}`, appLinks: TEST_APP_LINKS, appExchangeSecrets: opts.appExchangeSecrets ?? new Map([["cx", TEST_CX_EXCHANGE_SECRET], ["meet", TEST_MEET_EXCHANGE_SECRET]]), siteOrigins: [TEST_SITE_ORIGIN], selfSignup: opts.selfSignup ?? true, platformAdminEmails: opts.platformAdminEmails ?? [ADMIN_EMAIL], allowedOrigins: [ORIGIN], adminOrigins: [ADMIN_ORIGIN], adminIdpTenant: opts.adminIdpTenant === undefined ? ADMIN_IDP_TENANT : opts.adminIdpTenant, adminIpAllowlist: opts.adminIpAllowlist, appUrl: ORIGIN, cxM2m: opts.cxM2m ?? null, notify: opts.notify, isProd: opts.isProd ?? false, rateLimit: opts.rateLimit ?? false, fetcher: opts.fetcher, ai: opts.ai });
++  const app = createApp({ db, verifyIdToken: fakeVerifier, mintLaunchToken: async (uid) => `launch-token|${uid}`, appLinks: TEST_APP_LINKS, appExchangeSecrets: opts.appExchangeSecrets ?? new Map([["cx", TEST_CX_EXCHANGE_SECRET], ["meet", TEST_MEET_EXCHANGE_SECRET]]), siteOrigins: [TEST_SITE_ORIGIN], selfSignup: opts.selfSignup ?? true, platformAdminEmails: opts.platformAdminEmails ?? [ADMIN_EMAIL], allowedOrigins: [ORIGIN], adminOrigins: [ADMIN_ORIGIN], adminIdpTenant: opts.adminIdpTenant === undefined ? ADMIN_IDP_TENANT : opts.adminIdpTenant, adminIpAllowlist: opts.adminIpAllowlist, appUrl: ORIGIN, cxM2m: opts.cxM2m ?? null, talentM2m: opts.talentM2m ?? null, notify: opts.notify, isProd: opts.isProd ?? false, rateLimit: opts.rateLimit ?? false, fetcher: opts.fetcher, ai: opts.ai });
+   const server: Server = await new Promise((resolve) => {
+     const s = app.listen(0, "127.0.0.1", () => resolve(s));
+   });
+diff --git a/docs/DECISIONS.md b/docs/DECISIONS.md
+index b40c01e..81b0bc3 100644
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -10,6 +10,7 @@ kapanınca kesinleşmiş tabloya taşınır). Platform katmanlarının ayrıntı
+ 
+ | Tarih | Karar | Gerekçe / not |
+ |---|---|---|
++| 2026-11-02 | **Talent köprüsü Hub'ın mevcut sunucu yolunu kullanır (OIDC değil); destek erişimi konsoldan, Hub hesabına, en çok 24 saat.** Talent `talent=` gizli değeriyle `/api/apps/server-exchange`'i kullanır; Hub → Talent istekleri CLYRO-M2M-V1 (`TALENT_EVENTS_SECRET`). Ret yanıtına `reason` eklendi; `trial_expired` dahil Hub'ın deneme kuralı değişmedi. | TalentFlow planı OIDC diyordu; CX/Meet/Signals'la aynı desen tek bir doğrulama yolu demek. Talent'ın K5 "14 gün salt okunur" bandının Hub'dan da açılabilmesi Hub'ın "süresi dolan alanda 402" kuralını değiştirir — Emre kararı bekliyor. |
+ | 2026-11-02 | **Sitede CRM'den söz edilmez; Signals CRM bağlayıcısı genel olur.** Signals paket tanımlarından "CRM bağlantısı" kalktı (fiyatlar, ürün sayfası, ana sayfa, llms.txt). Bağlayıcı tek sağlayıcıya bağlı değil: Zoho CRM, Zendesk Sell, Salesforce, HubSpot ve özel (custom) CRM aynı arayüzle; siteye bağlayıcı canlıya çıkınca, sağlayıcı adı vermeden döner. | Emre. 29 Ekim kararının (CRM canlıya çıkana kadar sitede yok) uygulanması; lead-radar `src/crm/connector.ts` ortak arayüz, `docs/plan-crm-baglayicilar.md`. |
+ | 2026-11-01 | **Talent mülakat yapay zekâ sınırının bilinen iki boşluğu şimdilik kalır (Emre).** TalentFlow #327: canlı analiz 20/saat ve takip sorusu 10/saat sunucuda sayılır; (1) sayaç (Firestore) hata verirse süren mülakat kesilmesin diye sınır o an uygulanmaz, (2) etiketini değiştiren değiştirilmiş bir istemci bu sınırı atlayıp genel frenlere (IP başı dakika sınırı, bütçe freni) düşer. | Çok şirketli geçişte sıkılaştırılacak: şirket başı kota, mülakat kimliğine bağlı sayım, sayaç hatasında güvenli tarafta kalma. |
+ | 2026-11-01 | **Talent fiyat ve analiz kuralları (Emre).** Aşım: 100 ön analiz 500 TL, 10 detaylı analiz 400 TL, 10 aday istihbarat 500 TL, 10 mülakat değerlendirmesi 500 TL. Uygulama içi mülakat ek paketi: 10 saat 1.990 TL, 40 saat 6.900 TL. Paket fiyatları ve kotalar aynı. Detaylı analiz kotası aday–pozisyon karşılaştırması başına; varsayılan yalnız atandığı pozisyon, diğer pozisyonlar ayrı seçim (kota önceden gösterilir). Elle ekleme / başvuru formu kendiliğinden detaylı analiz çalıştırmaz; ön analiz her yolda tek çağrı. "Otonom" ifadesi kalkar. Pahalı ses yedeği kapalı; yalnız uygulama içi mülakat ek paketi olan müşteride açık, diğerlerine "Bu özellik için Chrome kullanın". | Maliyet raporu (tahmin): Büyüme en kötü detaylı analiz 13.200 → ~2.300 TL. |
+diff --git a/docs/OPERATIONS.md b/docs/OPERATIONS.md
+index 14336ed..353bf90 100644
+--- a/docs/OPERATIONS.md
++++ b/docs/OPERATIONS.md
+@@ -167,6 +167,40 @@ eski Platform sayfası ve `/api/platform/*` uçları kaldırıldı. Kim yönetic
+ 8. **Kontrol:** konsolda Şirketler açılıyor; hub.clyrolabs.com'da normal Google girişi kod sormuyor; hub.clyrolabs.com'dan
+    `/api/admin/me` → 401/403. Sonucu STATUS.md'ye yaz; ROADMAP "Admin ekranı" kutusu canlıda doğrulanınca işaretlenir.
+ 
++### Talent köprüsü ve destek erişimi (TalentFlow çok şirketli PR 4)
++
++Talent (TalentFlow) Hub kodunu artık **kendi sunucusundan** değiştirir (`/api/apps/server-exchange`, CX/Meet/Signals ile
++aynı yol). Yanıt jetona ek olarak alanı, rolü, planı ve deneme bitişini taşır; Talent bunlardan şirket ve üyelik
++belgelerini yazar. Ret yanıtında `reason` (`not_member` | `inactive` | `app_disabled` | `trial_expired`) döner: Talent
++yalnız `not_member`'da üyeliği kapatır.
++
++Konsolda şirket sayfasındaki **Talent destek erişimi**: gerekçe (≥10 karakter) + süre (1–24 saat) → Hub, Talent'a imzalı
++(CLYRO-M2M-V1, gönderen `hub`) istek gönderir; Talent o şirkette salt okunur, süreli `support` üyeliği açar. Kritik işlem
++(taze kimlik); açma/kapatma işlem kaydına `talent.support_granted` / `talent.support_revoked` (`source = 'admin'`) düşer.
++Erişim yöneticinin **aynı e-postalı Hub hesabına** açılır (konsol hesabı Talent'a giremez): hesap yoksa 409.
++
++Gizli değerler (değerler sohbete/günlüğe yazılmaz; Emre girer):
++
++- `APP_EXCHANGE_SECRETS` → mevcut değere `,talent=<değer>` eklenir (Talent'ta `HUB_EXCHANGE_SECRET` aynı değer).
++  **Bu girildiği an Talent'ın eski tarayıcı yolu kapanır**: TalentFlow'un çok şirketli sürümü (`claude/talent-mt` →
++  `main`) aynı gün yayınlanmadan girilmemeli.
++- `TALENT_EVENTS_SECRET` (isteğe bağlı secret; Talent'ta `HUB_EVENTS_SECRET` aynı değer). Ters yönün
++  (`HUB_EVENTS_SECRET_TALENT`) ve `talent=` değerinden farklı olmalı; aynıysa açılış durur.
++- `TALENT_API_URL` (sır değil, isteğe bağlı): Talent sunucusunun kökü; verilmezse `TALENTFLOW_URL`.
++
++```powershell
++# 1) Talent destek erişimi için olay değeri (32+ karakter; çıktıyı ekrana yazdırmadan panoya alır)
++$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Fill($b); [Convert]::ToBase64String($b) | Set-Clipboard
++firebase functions:secrets:set TALENT_EVENTS_SECRET --project agentinn-nyqpx   # panodan yapıştır
++# 2) APP_EXCHANGE_SECRETS'e talent= eklemek: mevcut değeri Secret Manager'dan alıp sonuna ,talent=<yeni değer> ekleyerek
++#    yeni sürüm olarak yazın (değer ekrana basılmaz):
++firebase functions:secrets:set APP_EXCHANGE_SECRETS --project agentinn-nyqpx
++```
++
++Üyelikten çıkarma bildirimi (Hub → Talent `POST /api/hub/membership-revoked`, gövde Signals'ınkiyle aynı) Talent'ta
++hazır; Hub tarafı #67'deki olay kuyruğu birleşince ona `talent` hedefi olarak eklenecek. O zamana kadar Talent'ta Hub
++üyeliği en çok 24 saat geçerli (sonra Hub'dan yeniden açılır) ve her Hub girişinde reddedilen kişinin üyeliği kapanır.
++
+ ### CX planları (konsol → CX, sunucudan sunucuya)
+ 
+ Konsoldaki **CX planları** sayfası CX müşterilerinin planını (deneme / pilot / yıllık pilot / Başlangıç / Büyüme /
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index 9528e4e..d1556df 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -307,6 +307,13 @@ Kod `emredemir-maker/CX-Inn` `main`'de (5d100a1c = Infoset'teki son hal 4495126;
+ 
+ ## Oturum günlüğü
+ 
++### 2026-11-02 — Talent köprüsü (TalentFlow çok şirketli PR 4'ün Hub tarafı)
++
++- `talent` sunucu yoluna eklendi (gizli değeri girilince eski tarayıcı yolu kapanır); değişim yanıtına `plan` ve
++  `trialEndsAt`, ret yanıtına `reason`. Konsolda "Talent destek erişimi" (gerekçe, ≤24 saat, taze kimlik, işlem kaydı).
++- Yarım: Talent'a üyelikten çıkarma bildirimi #67'nin olay kuyruğuna bağlı (birleşince eklenecek). Yayın sırası ve gizli
++  değerler OPERATIONS.md › "Talent köprüsü".
++
+ ### 2026-11-02 (öğlen)
+ - Fiyat: #66 (son fiyatlar) çakışması çözülüp birleşti, #68 CRM ifadesi; DECISIONS iade satırı "iade yok" ile değişti (2046ee2).
+ - Meet: #58 mağaza hazırlığı; görseller emülatörde demo veriyle üretildi (repoya dosya girmedi).
+-- 
+2.43.0
+

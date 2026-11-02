@@ -45,6 +45,7 @@ import emailRoutes, { cleanupOldFiles } from './routes/email.js';
 import positionsRoutes from './routes/positions.js';
 import usersRoutes from './routes/users.js';
 import companyIntelRoutes from './routes/companyIntel.js';
+import hubRoutes from './routes/hub.js';
 import { createBulkRouter } from './routes/bulk.js';
 
 // Bulk-import worker — long-running poller that drains the
@@ -81,6 +82,10 @@ app.use(hppMiddleware);
 app.set('trust proxy', 1);
 
 app.use(corsMiddleware);
+// Hub köprüsü genel JSON ayrıştırıcısından ÖNCE: imzalı olay uçları ham gövdeyi
+// (en çok 4 KB) kendisi okur ve imzanın SHA-256 satırıyla karşılaştırır; kendi hız
+// sınırları var (routes/hub.js).
+app.use(hubRoutes);
 app.use(express.json({ limit: '5mb' }));
 app.use(generalLimiter);
 
