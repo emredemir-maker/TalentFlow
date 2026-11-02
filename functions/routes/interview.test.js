@@ -307,3 +307,25 @@ describe('replaceSessionInList', () => {
         expect(replaceSessionInList([null, {}], 'iv-1', sonuc).length).toBe(3);
     });
 });
+
+describe('filterCandidateUpdates (aday yazımı izin listesi)', async () => {
+    const { filterCandidateUpdates } = await import('./interview.js');
+    it('yalnız izinli alanlar ve düz değerler geçer', () => {
+        const { safe, dropped } = filterCandidateUpdates({
+            candidateStatus: 'lobi',
+            hasConsent: true,
+            lastActive: 123,
+            candidatePresence: null,
+            status: 'completed',
+            aiSummary: 'x',
+            candidateConnected: { nesne: true },
+            transcript: ['a'],
+        });
+        expect(safe).toEqual({ candidateStatus: 'lobi', hasConsent: true, lastActive: 123, candidatePresence: null });
+        expect(dropped.sort()).toEqual(['aiSummary', 'candidateConnected', 'status', 'transcript']);
+    });
+    it('uzun metin ve sonsuz sayı reddedilir', () => {
+        const { safe } = filterCandidateUpdates({ candidateStatus: 'x'.repeat(501), lastActive: Infinity });
+        expect(safe).toEqual({});
+    });
+});

@@ -18,11 +18,17 @@ import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getAuthHeaders } from '../services/ai/config';
-import { tc, withTenantParam, getActiveTenantId } from '../config/tenantPaths';
+import { tc, withTenantParam } from '../config/tenantPaths';
+import { usePublicLink, usePublicLinkUrl } from '../context/PublicLinkContext';
+import { requestPublicLink } from '../services/publicLinks';
 import { publicApiHeaders } from '../services/publicApi';
 
 export default function LiveInterviewPage() {
-    const { sessionId } = useParams();
+    // /join/:linkId (aday): oturum bağlantıdan çözüldü (PublicLinkGate).
+    // /live-interview/:sessionId (iç kullanıcı): oturum adreste.
+    const params = useParams();
+    const publicLink = usePublicLink();
+    const sessionId = publicLink?.targetId || params.sessionId;
     const navigate = useNavigate();
     const { user, isAuthenticated, userProfile, role, logout } = useAuth();
     const { candidates, updateCandidate, loading: candidatesLoading, error: candidatesError } = useCandidates();
@@ -59,6 +65,14 @@ export default function LiveInterviewPage() {
     const session = useMemo(() =>
         candidateData?.interviewSessions?.find(s => s.id === sessionId),
         [candidateData, sessionId]);
+
+    // Adaya verilecek katılım bağlantısı (/join/{linkId}) — yalnız iç kullanıcı
+    // ister; bağlantı sunucuda üretilir, şirket ya da oturum kimliği taşımaz.
+    const candidateJoinUrl = usePublicLinkUrl(
+        'interview',
+        isRecruiter && !publicLink ? sessionId : null,
+        { candidateId: candidateData?.id }
+    );
 
     // effectiveSession: merges candidates-collection data (authoritative for recruiter)
     // with the public /interviews/{sessionId} doc (authoritative for real-time candidate signals).
@@ -456,7 +470,12 @@ export default function LiveInterviewPage() {
                     await fetch('/api/init-interview-session', {
                         method: 'POST',
                         headers: await publicApiHeaders(),
-                        body: JSON.stringify({ tenantId: getActiveTenantId(), sessionId, initialData: payload }),
+                        // Aday: şirket ve oturum bağlantıdan; iç kullanıcı: X-Tenant-Id + üyelik.
+                        body: JSON.stringify(
+                            publicLink
+                                ? { link: publicLink.linkId, initialData: payload }
+                                : { sessionId, initialData: payload }
+                        ),
                     });
                     // After backend creates the doc, the next client write is an UPDATE (allowed).
                 } catch (apiErr) {
@@ -804,7 +823,7 @@ export default function LiveInterviewPage() {
                     await fetch('/api/init-interview-session', {
                         method: 'POST',
                         headers: await publicApiHeaders(),
-                        body: JSON.stringify({ tenantId: getActiveTenantId(), sessionId, initialData: { status: 'completed', completedAt: new Date().toISOString() } })
+                        body: JSON.stringify({ sessionId, initialData: { status: 'completed', completedAt: new Date().toISOString() } })
                     });
                 } else {
                     throw writeErr;
@@ -819,7 +838,7 @@ export default function LiveInterviewPage() {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
                     headers: await publicApiHeaders(),
-                    body: JSON.stringify({ tenantId: getActiveTenantId(), sessionId, initialData: { status: 'completed', completedAt: new Date().toISOString() } })
+                    body: JSON.stringify({ sessionId, initialData: { status: 'completed', completedAt: new Date().toISOString() } })
                 });
             } catch (_) {}
             navigate(withTenantParam(`/interview-report/${sessionId}`));
@@ -1399,12 +1418,13 @@ export default function LiveInterviewPage() {
                                         <div className="flex items-center gap-2">
                                             <div className="flex-1 min-w-0 bg-white border border-blue-200 rounded-xl px-3 py-2">
                                                 <p className="text-[10px] font-black text-blue-800 tabular-nums italic truncate select-all">
-                                                    {window.location.origin}/join/{sessionId}
+                                                    {candidateJoinUrl || 'Bağlantı hazırlanıyor…'}
                                                 </p>
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    navigator.clipboard.writeText(withTenantParam(`${window.location.origin}/join/${sessionId}`));
+                                                    if (!candidateJoinUrl) { alert('Aday bağlantısı henüz hazır değil.'); return; }
+                                                    navigator.clipboard.writeText(candidateJoinUrl);
                                                     alert("Aday linki kopyalandı!");
                                                 }}
                                                 className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-900/40 hover:bg-black transition-all cursor-pointer"
@@ -1665,8 +1685,10 @@ export default function LiveInterviewPage() {
                                                         await persistSessionData(startData);
                                                         // Notify additional participants
                                                         if (lobbyParticipants.length > 0) {
-                                                            const joinLink = withTenantParam(`${window.location.origin}/join/${sessionId}`);
                                                             try {
+                                                                // Bağlantı henüz yüklenmediyse sunucudan iste (boş bağlantı gönderilmesin).
+                                                                const joinLink = candidateJoinUrl
+                                                                    || (await requestPublicLink('interview', sessionId, { candidateId: candidateData?.id })).url;
                                                                 await fetch('/api/send-participant-invite', {
                                                                     method: 'POST',
                                                                     headers: { 'Content-Type': 'application/json' },
@@ -2050,7 +2072,8 @@ export default function LiveInterviewPage() {
 
                         <button
                             onClick={() => {
-                                navigator.clipboard.writeText(withTenantParam(`${window.location.origin}/join/${sessionId}`));
+                                if (!candidateJoinUrl) { alert('Aday bağlantısı henüz hazır değil.'); return; }
+                                navigator.clipboard.writeText(candidateJoinUrl);
                                 alert('Aday linki kopyalandı!');
                             }}
                             className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-[11px] py-[5px]"

@@ -123,6 +123,11 @@ export const PLATFORM_PATHS = {
     usage: 'platformUsage',
     /** Kişinin şirket listesi (şirket seçici). */
     userTenants: (uid) => `userTenants/${did(uid)}`,
+    /** Herkese açık bağlantılar (aday sayfaları, §2.5) — yalnız sunucu okur/yazar. */
+    publicLinks: 'publicLinks',
+    publicLink: (id) => `publicLinks/${did(id)}`,
+    /** (şirket, tür, hedef) → bağlantı kimliği dizini; eşzamanlı istekte tek bağlantı. */
+    publicLinkIndex: (key) => `publicLinkIndex/${did(key)}`,
     /** Hub → Talent imzalı olayların tek kullanımlık nonce'u (routes/hub.js). */
     hubNonce: (nonce) => `platform/hub/hubNonces/${did(nonce)}`,
 };

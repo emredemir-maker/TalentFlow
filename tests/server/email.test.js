@@ -260,7 +260,20 @@ describe('gönderici kuralları (K7)', () => {
             recruiterEmail: 'aRec@a.test',
             candidateEmail: 'aday@x.test',
         });
-        expect(r.body.respondUrl).toMatch(/^https:\/\/talent\.clyro\.test\/respond\/ir-/);
+        // Bağlantı yalnız rastgele bir kimlik taşır (publicLinks, PR 5); talep
+        // kimliği ve şirket bağlantıda görünmez, sunucuda çözülür.
+        const linkId = r.body.respondUrl.match(
+            /^https:\/\/talent\.clyro\.test\/respond\/([^/?#]+)$/
+        )?.[1];
+        expect(linkId).toBeTruthy();
+        expect(r.body.respondUrl).not.toContain(r.body.requestId);
+        expect(sent[0].body.html).toContain(`href="${r.body.respondUrl}"`);
+        const links = await db
+            .collection('publicLinks')
+            .where('targetId', '==', r.body.requestId)
+            .get();
+        expect(links.size).toBe(1);
+        expect(links.docs[0].data()).toMatchObject({ tenantId: 'A', kind: 'infoRequest' });
     });
 });
 

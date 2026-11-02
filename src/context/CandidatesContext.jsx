@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { normalizeCandidate } from '../utils/normalizeCandidate';
 import { resolveCandidateStage } from '../utils/candidateTable';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { tc, getActiveTenantId } from '../config/tenantPaths';
@@ -164,59 +164,11 @@ export function CandidatesProvider({ children }) {
             return;
         }
 
-        // IF Anonymous user, only start a targeted listener on /join/ routes.
-        // On /apply/ and other public pages there is no candidate doc to watch.
+        // Anonim oturum (aday sayfaları): aday kayıtları kurallarda yalnız
+        // şirket üyesine açık; aday tarafı oturum verisini mülakat belgesinden
+        // (tenants/{t}/interviews/{sessionId}) okur. Burada dinleyici açılmaz.
         if (user?.isAnonymous) {
-            const pathParts = window.location.pathname.split('/');
-            const sessionIdFromUrl = pathParts.find(p => p.startsWith('iv-'));
-
-            if (sessionIdFromUrl) {
-                console.log(`[TalentFlow] Anonymous user detected. Resolving candidateId from session doc: ${sessionIdFromUrl}`);
-                let innerUnsub = null;
-
-                // Read the session document (allow read: if true) to get the real candidateId
-                getDoc(doc(db, tc('interviews'), sessionIdFromUrl)).then((sessionSnap) => {
-                    if (!sessionSnap.exists()) {
-                        console.warn(`[TalentFlow] Session doc not found: ${sessionIdFromUrl}`);
-                        setCandidates([]);
-                        setLoading(false);
-                        return;
-                    }
-                    const candidateId = sessionSnap.data()?.candidateId;
-                    if (!candidateId) {
-                        console.warn(`[TalentFlow] Session doc has no candidateId`);
-                        setCandidates([]);
-                        setLoading(false);
-                        return;
-                    }
-                    console.log(`[TalentFlow] Starting TARGETED listener for candidate: ${candidateId}`);
-                    const candidateDocRef = doc(db, CANDIDATES_COLLECTION(), candidateId);
-                    innerUnsub = onSnapshot(candidateDocRef, (docSnap) => {
-                        if (docSnap.exists()) {
-                            setCandidates([{ id: docSnap.id, ...docSnap.data() }]);
-                            console.log(`[TalentFlow] Targeted candidate data loaded.`);
-                        } else {
-                            console.warn(`[TalentFlow] Candidate document not found: ${candidateId}`);
-                            setCandidates([]);
-                        }
-                        setLoading(false);
-                    }, (err) => {
-                        console.error('[TalentFlow] Targeted candidate listener error:', err);
-                        setCandidates([]);
-                        setLoading(false);
-                    });
-                }).catch((err) => {
-                    console.error('[TalentFlow] Session doc read error:', err);
-                    setCandidates([]);
-                    setLoading(false);
-                });
-
-                unsubCandidates = () => { if (innerUnsub) innerUnsub(); };
-                return () => unsubCandidates();
-            }
-
-            // Anonymous user on /apply/ (or other public route without a session ID):
-            // no candidates needed — bail out to avoid hitting the global listener.
+            clearTimeout(firstSnapshotTimer);
             setCandidates([]);
             setLoading(false);
             setError(null);
