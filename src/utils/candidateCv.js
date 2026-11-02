@@ -1,9 +1,10 @@
 // Aday CV görüntüleme yardımcıları.
 //
 // CV verisi üç ayrı akıştan geldiği için tek bir alana güvenilemiyor:
-//   - manuel yükleme  → cvUrl (orijinal dosya) + cvData (AI dökümü)
-//   - başvuru formu   → cvText (çıkarılmış metin), cvUrl çoğu zaman boş
-//   - toplu içe aktarma → cvText, bazen cvUrl
+//   - manuel yükleme  → cvPath (orijinal dosyanın Storage yolu; eski kayıtta
+//                        cvUrl) + cvData (AI dökümü)
+//   - başvuru formu   → cvText (çıkarılmış metin), dosya yok
+//   - toplu içe aktarma → cvText, bazen cvUrl (dış adres)
 // Ekran bu yüzden "orijinal dosya varsa göster, yoksa metinden form kur"
 // diye çalışıyor. Buradaki fonksiyonlar o kararı saf tutar.
 
@@ -31,7 +32,8 @@ export function cvFileExtension(urlOrName) {
  * kullanıcıya bozuk bir çerçeve göstermektense "indir" demek dürüst.
  */
 export function isEmbeddableCv(candidate) {
-    const url = candidate?.cvUrl || '';
+    // Yeni kayıt: Storage yolu (cvPath); eski kayıt: adres (cvUrl).
+    const url = candidate?.cvPath || candidate?.cvUrl || '';
     if (!url) return false;
     const ext = cvFileExtension(url) || cvFileExtension(candidate?.cvFileName || '');
     return ext === 'pdf';
@@ -39,7 +41,7 @@ export function isEmbeddableCv(candidate) {
 
 /** Orijinal CV dosyası var mı (gösterilebilir olması şart değil). */
 export function hasOriginalCvFile(candidate) {
-    return Boolean(candidate?.cvUrl);
+    return Boolean(candidate?.cvPath || candidate?.cvUrl);
 }
 
 /**

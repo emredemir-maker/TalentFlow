@@ -24,8 +24,10 @@ const router = Router();
 // Başvuru formu (anon oturum) çağırır. Amaca özel uç: istem sunucuda kurulur,
 // sorular ve ilan başlığı istemciden değil İLANDAN okunur (açık ilan şart);
 // istemciden yalnız cevaplar gelir. Bütçe şirketin 'anon' kovasından.
-router.post('/api/score-screening-answers', requireAiCaller({ allowAnonymous: true }), aiLimiter, async (req, res) => {
-    const { positionId, answers: rawAnswers } = req.body || {};
+router.post('/api/score-screening-answers', requireAiCaller({ allowAnonymous: true, linkKinds: ['position'] }), aiLimiter, async (req, res) => {
+    const { answers: rawAnswers } = req.body || {};
+    // Aday: ilan bağlantıdan (gövdedeki positionId yok sayılır); iç kullanıcı: gövdeden.
+    const positionId = req.publicLink ? req.publicLink.targetId : req.body?.positionId;
     if (!Array.isArray(rawAnswers) || rawAnswers.length === 0) {
         return res.status(400).json({ error: 'answers[] is required.' });
     }

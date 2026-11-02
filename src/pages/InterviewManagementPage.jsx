@@ -65,7 +65,8 @@ import {
     List,
     CalendarClock,
 } from 'lucide-react';
-import { tc, withTenantParam, getActiveTenantId } from '../config/tenantPaths';
+import { tc, withTenantParam } from '../config/tenantPaths';
+import { requestPublicLink } from '../services/publicLinks';
 import { publicApiHeaders } from '../services/publicApi';
 
 const PARTICIPANT_INVITES_PATH = () => tc('participantInvites');
@@ -853,7 +854,7 @@ export default function InterviewManagementPage() {
         });
     };
 
-    const openEmailPreview = () => {
+    const openEmailPreview = async () => {
         if (!selectedCandidate) {
             alert("Lütfen önce bir aday seçin.");
             return;
@@ -864,7 +865,14 @@ export default function InterviewManagementPage() {
         }
 
         const typeLabel = interviewType === 'technical' ? 'Teknik' : (interviewType === 'hr' ? 'İK' : 'Product');
-        const joinLink = withTenantParam(`${window.location.origin}/join/iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`);
+        let joinLink;
+        try {
+            // Aday bağlantısı sunucudan (şirket/oturum kimliği adreste yok, §2.5).
+            ({ url: joinLink } = await requestPublicLink('interview', `iv-${crypto.randomUUID()}`, { candidateId: selectedCandidate.id }));
+        } catch (err) {
+            alert('Aday bağlantısı oluşturulamadı: ' + err.message);
+            return;
+        }
         
         setEmailJoinLink(joinLink);
         setEmailSubject(`Mülakat Daveti: ${typeLabel} Değerlendirmesi - ${selectedCandidate.name}`);
@@ -1028,7 +1036,8 @@ export default function InterviewManagementPage() {
             
             // Cryptographically random session ID — prevents enumeration attacks
             const sessionId = `iv-${crypto.randomUUID()}`;
-            const platformJoinLink = withTenantParam(`${window.location.origin}/join/${sessionId}`);
+            // Aday bağlantısı sunucudan: yalnız rastgele bağlantı kimliği taşır (§2.5).
+            const { url: platformJoinLink } = await requestPublicLink('interview', sessionId, { candidateId: selectedCandidate.id });
             let meetLink = platformJoinLink;
             let calendarEventLink = null;
 
@@ -1266,7 +1275,7 @@ export default function InterviewManagementPage() {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
                     headers: await publicApiHeaders(),
-                    body: JSON.stringify({ tenantId: getActiveTenantId(),
+                    body: JSON.stringify({
                         sessionId,
                         initialData: {
                             status: newSession.status,
@@ -1337,7 +1346,8 @@ export default function InterviewManagementPage() {
         try {
             const interviewerName = currentUser?.displayName || 'Değerlendirici';
             const sessionId = `iv-${crypto.randomUUID()}`;
-            const platformJoinLink = withTenantParam(`${window.location.origin}/join/${sessionId}`);
+            // Aday bağlantısı sunucudan: yalnız rastgele bağlantı kimliği taşır (§2.5).
+            const { url: platformJoinLink } = await requestPublicLink('interview', sessionId, { candidateId: quickCandidate.id });
             const typeLabel = quickType === 'technical' ? 'Teknik Mülakat' : quickType === 'hr' ? 'İK Filtre' : 'Product Mülakatı';
             const now = new Date();
             const newSession = {
@@ -1366,7 +1376,7 @@ export default function InterviewManagementPage() {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
                     headers: await publicApiHeaders(),
-                    body: JSON.stringify({ tenantId: getActiveTenantId(),
+                    body: JSON.stringify({
                         sessionId,
                         initialData: {
                             status: 'live',
@@ -1428,7 +1438,7 @@ export default function InterviewManagementPage() {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
                     headers: await publicApiHeaders(),
-                    body: JSON.stringify({ tenantId: getActiveTenantId(),
+                    body: JSON.stringify({
                         sessionId,
                         initialData: {
                             status: 'live',
@@ -2489,14 +2499,9 @@ export default function InterviewManagementPage() {
                                 <div className="bg-ok-bg rounded-[14px] px-4 py-3 flex items-center justify-between">
                                     <div>
                                         <p className="text-[10px] font-semibold text-ok uppercase tracking-[0.2em] mb-0.5">Aday Katılım Linki</p>
-                                        <span className="text-[11px] font-mono text-ok font-semibold">{window.location.origin}/join/iv-{selectedCandidate?.id?.substring(0,6)}…</span>
+                                        {/* Gerçek bağlantı mülakat kaydedilince sunucuda üretilir (§2.5). */}
+                                        <span className="text-[11px] font-mono text-ok font-semibold">{window.location.origin}/join/… (kayıtta oluşturulur)</span>
                                     </div>
-                                    <button
-                                        onClick={() => selectedCandidate && navigator.clipboard.writeText(withTenantParam(`${window.location.origin}/join/iv-${selectedCandidate.id}-preview`))}
-                                        className="p-2 text-ok hover:bg-n0 rounded-md border border-transparent"
-                                    >
-                                        <Copy className="w-3.5 h-3.5" />
-                                    </button>
                                 </div>
                             </div>
                         )}

@@ -1,6 +1,6 @@
 // Tests for the cv routes' CV storage helpers.
 //
-// buildCvDownloadUrl / buildLocalCvUrl are pure; storeCvFile is covered with
+// buildLocalCvUrl / departmentCanSee are pure; storeCvFile is covered with
 // a mocked Storage bucket (vi.mock on config/firebaseAdmin.js) so the
 // success, local-fallback, and serverless-failure branches all run without
 // real Firebase credentials. The /api/process-cv handler itself (multer +
@@ -18,26 +18,15 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     getStorageBucket: mocks.getStorageBucket,
 }));
 
-import { buildCvDownloadUrl, buildLocalCvUrl, storeCvFile } from './cv.js';
+import { buildLocalCvUrl, departmentCanSee, storeCvFile } from './cv.js';
 
-describe('buildCvDownloadUrl', () => {
-    it('builds a firebasestorage.googleapis.com URL for the given bucket', () => {
-        const url = buildCvDownloadUrl('my-app.appspot.com', 'cvs/cv-1-2.pdf', 'tok-123');
-        expect(url).toBe(
-            'https://firebasestorage.googleapis.com/v0/b/my-app.appspot.com/o/cvs%2Fcv-1-2.pdf?alt=media&token=tok-123'
-        );
-    });
-
-    it('percent-encodes the path separator so the object name stays one URL segment', () => {
-        const url = buildCvDownloadUrl('b', 'cvs/a b+c.pdf', 't');
-        expect(url).toContain('/o/cvs%2Fa%20b%2Bc.pdf');
-        expect(url).not.toContain('/o/cvs/');
-    });
-
-    it('appends alt=media and the download token as query params', () => {
-        const url = new URL(buildCvDownloadUrl('b', 'cvs/x.pdf', 'the-token'));
-        expect(url.searchParams.get('alt')).toBe('media');
-        expect(url.searchParams.get('token')).toBe('the-token');
+describe('departmentCanSee (firestore.rules deptCanSee aynası)', () => {
+    it('kendi departmanı ya da açıldığı departman; departmansız üye hiçbirini görmez', () => {
+        expect(departmentCanSee({ department: 'Eng' }, ['Eng'])).toBe(true);
+        expect(departmentCanSee({ department: 'Sales', visibleToDepartments: ['Eng'] }, ['Eng'])).toBe(true);
+        expect(departmentCanSee({ department: 'Sales' }, ['Eng'])).toBe(false);
+        expect(departmentCanSee({ department: 'Eng' }, [])).toBe(false);
+        expect(departmentCanSee({}, undefined)).toBe(false);
     });
 });
 
@@ -79,12 +68,12 @@ describe('storeCvFile', () => {
         return p;
     };
 
-    it('uploads to tenants/<t>/cvs/<filename> with a download token and returns the token URL', async () => {
+    it('uploads to tenants/<t>/cvs/<filename> WITHOUT a download token and returns the storage path', async () => {
         const upload = vi.fn().mockResolvedValue([]);
         mocks.getStorageBucket.mockReturnValue({ name: 'test-bucket', upload });
         const tempPath = makeTempFile('cv-42.pdf');
 
-        const url = await storeCvFile({
+        const out = await storeCvFile({
             path: tempPath,
             filename: 'cv-42.pdf',
             mimetype: 'application/pdf',
@@ -96,11 +85,9 @@ describe('storeCvFile', () => {
         expect(options.destination).toBe('tenants/tenant-a/cvs/cv-42.pdf');
         expect(options.metadata.contentType).toBe('application/pdf');
 
-        const token = options.metadata.metadata.firebaseStorageDownloadTokens;
-        expect(token).toBeTruthy();
-        expect(url).toBe(
-            `https://firebasestorage.googleapis.com/v0/b/test-bucket/o/tenants%2Ftenant-a%2Fcvs%2Fcv-42.pdf?alt=media&token=${token}`
-        );
+        // Jetonlu (kuralları atlayan) indirme adresi üretilmez.
+        expect(options.metadata.metadata?.firebaseStorageDownloadTokens).toBeUndefined();
+        expect(out).toEqual({ cvPath: 'tenants/tenant-a/cvs/cv-42.pdf' });
         // Temp copy is deleted once Storage holds the file
         expect(fs.existsSync(tempPath)).toBe(false);
     });
@@ -111,18 +98,18 @@ describe('storeCvFile', () => {
         });
         const tempPath = makeTempFile('cv-7.pdf');
 
-        const url = await storeCvFile({
+        const out = await storeCvFile({
             path: tempPath,
             filename: 'cv-7.pdf',
             mimetype: 'application/pdf',
         }, 'tenant-a');
 
-        expect(url).toBe('http://localhost:3001/uploads/cvs/cv-7.pdf');
+        expect(out).toEqual({ cvUrl: 'http://localhost:3001/uploads/cvs/cv-7.pdf' });
         // File must survive — it's what the /uploads static mount serves
         expect(fs.existsSync(tempPath)).toBe(true);
     });
 
-    it('returns an empty cvUrl (never a dead link) when Storage fails on serverless', async () => {
+    it('returns no file reference (never a dead link) when Storage fails on serverless', async () => {
         process.env.K_SERVICE = 'talentflowapi';
         mocks.getStorageBucket.mockReturnValue({
             name: 'test-bucket',
@@ -130,13 +117,13 @@ describe('storeCvFile', () => {
         });
         const tempPath = makeTempFile('cv-9.pdf');
 
-        const url = await storeCvFile({
+        const out = await storeCvFile({
             path: tempPath,
             filename: 'cv-9.pdf',
             mimetype: 'application/pdf',
         }, 'tenant-a');
 
-        expect(url).toBe('');
+        expect(out).toEqual({});
         // /tmp copy is useless without a link — cleaned up
         expect(fs.existsSync(tempPath)).toBe(false);
     });

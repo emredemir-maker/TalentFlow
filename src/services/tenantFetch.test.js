@@ -28,4 +28,13 @@ describe('tenantFetch', () => {
         const [, none] = withTenantHeader('/api/users', undefined, null, opts);
         expect(none).toBeUndefined();
     });
+    it('aday sayfasında bağlantı kimliğini X-Public-Link olarak ekler; dışarıya göndermez', () => {
+        const [, init] = withTenantHeader('/api/ai/stt', {}, 'T1', {}, 'abcdefghijklmnopqrstuv');
+        expect(init.headers.get('X-Public-Link')).toBe('abcdefghijklmnopqrstuv');
+        const [, onlyLink] = withTenantHeader('/api/x', {}, null, {}, 'abcdefghijklmnopqrstuv');
+        expect(onlyLink.headers.get('X-Public-Link')).toBe('abcdefghijklmnopqrstuv');
+        expect(onlyLink.headers.has('X-Tenant-Id')).toBe(false);
+        const [, ext] = withTenantHeader('https://dis.test/api/x', {}, 'T1', {}, 'abcdefghijklmnopqrstuv');
+        expect(ext).toEqual({});
+    });
 });

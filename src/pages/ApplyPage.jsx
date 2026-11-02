@@ -1,6 +1,6 @@
 // src/pages/ApplyPage.jsx — Public job application page (no auth required)
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc, collection, query, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
@@ -14,7 +14,8 @@ import {
     ChevronRight, Shield, Globe, Layers, Link2, Share2, Users, Zap, Search as SearchIcon,
     ChevronDown
 } from 'lucide-react';
-import { tc, getActiveTenantId } from '../config/tenantPaths';
+import { tc } from '../config/tenantPaths';
+import { usePublicLink } from '../context/PublicLinkContext';
 
 const SOURCES_PATH = () => tc('sources');
 
@@ -32,11 +33,12 @@ const POSITIONS_COLLECTION = () => tc('positions');
  * kovasından düşer. Kota dolduysa ya da hata olursa null: başvuru AI'sız da
  * kaydedilir, değerlendirmeyi işe alımcı sonra yapar.
  */
-async function parseCvOnServer(positionId, cvText) {
+async function parseCvOnServer(linkId, cvText) {
+    // Şirket ve ilan sunucuda bağlantıdan çözülür (X-Public-Link / link).
     const res = await fetch('/api/public/apply/parse-cv', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
-        body: JSON.stringify({ positionId, cvText: String(cvText || '').slice(0, 60000), tenantId: getActiveTenantId() }),
+        headers: { 'Content-Type': 'application/json', 'X-Public-Link': linkId, ...(await getAuthHeaders()) },
+        body: JSON.stringify({ cvText: String(cvText || '').slice(0, 60000) }),
     });
     if (!res.ok) return null;
     const body = await res.json().catch(() => ({}));
@@ -78,7 +80,10 @@ function InputField({ label, icon: Icon, required, autoFilled, ...props }) {
 // Main component
 // ──────────────────────────────────────────────
 export default function ApplyPage() {
-    const { positionId } = useParams();
+    // Bağlantı (/apply/:linkId) PublicLinkGate'te çözüldü: şirket etkin, ilan
+    // kimliği bağlantının hedefi.
+    const publicLink = usePublicLink();
+    const positionId = publicLink?.targetId;
     const [searchParams] = useSearchParams();
     const refParam = searchParams.get('ref') || searchParams.get('utm_source') || '';
     const detectedSource = detectSource(refParam);
@@ -215,7 +220,7 @@ export default function ApplyPage() {
             const text = await extractTextFromFile(file);
             console.log('[CV auto-fill] extracted text length:', text?.length);
             if (text && text.length >= 40) {
-                const parsed = await parseCvOnServer(positionId, text);
+                const parsed = await parseCvOnServer(publicLink.linkId, text);
                 // Gönderimde aynı CV ikinci kez ayrıştırılmasın (iki ön analiz yazılmasın).
                 parsedRef.current = { file, parsed };
                 console.log('[CV auto-fill] parsed result:', parsed);
@@ -286,7 +291,7 @@ export default function ApplyPage() {
                 );
                 parsedCandidate = parsedRef.current?.file === cvFile && parsedRef.current?.parsed
                     ? parsedRef.current.parsed
-                    : await Promise.race([parseCvOnServer(position?.id || positionId, cvText), parseTimeout]);
+                    : await Promise.race([parseCvOnServer(publicLink.linkId, cvText), parseTimeout]);
             } catch {
                 parsedCandidate = null;
             }
@@ -324,11 +329,13 @@ export default function ApplyPage() {
                     const resp = await Promise.race([
                         fetch('/api/score-screening-answers', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
-                            // Sorular ve başlık sunucuda ilandan okunur; yalnız cevaplar gider.
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Public-Link': publicLink.linkId,
+                                ...(await getAuthHeaders()),
+                            },
+                            // İlan, sorular ve başlık sunucuda bağlantıdan okunur; yalnız cevaplar gider.
                             body: JSON.stringify({
-                                positionId: position.id || positionId,
-                                tenantId: getActiveTenantId(),
                                 answers: rawScreeningAnswers.map((a) => a.answer),
                             }),
                         }),
@@ -386,7 +393,9 @@ export default function ApplyPage() {
             const saveRes = await fetch('/api/applications', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...payload, tenantId: getActiveTenantId() }),
+                // Şirket ve ilan sunucuda bağlantıdan çözülür; gövdedeki
+                // positionId yok sayılır.
+                body: JSON.stringify({ ...payload, link: publicLink.linkId }),
             });
             if (saveRes.status === 409) {
                 setStep('duplicate');

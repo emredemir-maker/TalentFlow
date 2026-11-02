@@ -162,7 +162,7 @@ export function parseStt(raw) {
 // STT: sabit istem + ses. Yüz yüze/canlı mülakat sayfaları aday bağlantısında
 // (anonim oturum) da açıldığı için aday tarafına açık; bütçe şirketin 'anon'
 // kovasından.
-router.post('/api/ai/stt', requireAiCaller({ allowAnonymous: true }), aiLimiter, async (req, res) => {
+router.post('/api/ai/stt', requireAiCaller({ allowAnonymous: true, linkKinds: ['interview'] }), aiLimiter, async (req, res) => {
     const { audio } = req.body || {};
     const mimeType = String(req.body?.mimeType || 'audio/webm').split(';')[0];
     const bad = audioInputError(audio, mimeType, !!req.aiContext?.anonymous);
@@ -189,7 +189,7 @@ router.post('/api/ai/stt', requireAiCaller({ allowAnonymous: true }), aiLimiter,
 // Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
-router.post('/api/gemini-stt', requireAiCaller({ allowAnonymous: true }), aiLimiter, (req, res, next) => {
+router.post('/api/gemini-stt', requireAiCaller({ allowAnonymous: true, linkKinds: ['interview'] }), aiLimiter, (req, res, next) => {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
         wrapMulter(audioUpload.single('audio'))(req, res, next);

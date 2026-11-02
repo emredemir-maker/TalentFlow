@@ -1,14 +1,15 @@
 // Herkese açık ilan uçları — /apply/:positionId sayfasındaki aday (kimliksiz)
 // çağırır.
 //
-//   GET  /api/positions/:positionId?tenantId=…  — açık ilanı okur. Yoksa, kapalıysa
-//                                       ya da şirket kapalıysa 404/403.
-//   POST /api/applications           — başvuru formunu kaydeder.
+//   GET  /api/public/positions/:linkId — açık ilanı okur. Bağlantı/ilan yoksa,
+//                                        ilan kapalıysa ya da şirket kapalıysa
+//                                        404/403.
+//   POST /api/applications             — başvuru formunu kaydeder ({ link, … }).
 //
-// ŞİRKET: bağlantıdaki `tenantId` (geçici — PR 5'te publicLinks çözücüsü gelir
-// ve bağlantı yalnız rastgele bir kimlik taşır). İlan kimliği hâlâ arama
-// anahtarı; şirket kimliği aramayı yalnız o şirketin ağacına daraltır, başka
-// şirketin ilanına ya da başvuru koleksiyonuna ulaştırmaz.
+// ŞİRKET VE İLAN BAĞLANTIDAN (publicLinks, §2.5): istemci yalnız bağlantı
+// kimliğini gönderir; hangi şirketin hangi ilanına başvurulduğunu sunucu
+// `publicLinks/{linkId}` belgesinden çözer. Gövdedeki `tenantId`/`positionId`
+// yok sayılır.
 //
 // Başvuru oluşturma istemciye kurallarda KAPALI (firestore.rules applications
 // `create: false`): hedef şirketi ve ilanı istemci değil sunucu doğrular. Bu
@@ -16,8 +17,9 @@
 import { Router } from 'express';
 
 import { db, admin } from '../config/firebaseAdmin.js';
-import { loadPublicTenant } from '../middleware/auth.js';
+import { sessionLimiter } from '../middleware/rateLimit.js';
 import { isValidDocId } from '../services/tenantPaths.js';
+import { resolvePublicLink } from '../services/publicLinks.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('positions');
 
@@ -33,15 +35,15 @@ async function readOpenPosition(tenant, positionId) {
     return data;
 }
 
-router.get('/api/positions/:positionId', async (req, res) => {
+router.get('/api/public/positions/:linkId', sessionLimiter, async (req, res) => {
     try {
-        const tenant = await loadPublicTenant(String(req.query.tenantId || ''));
-        if (!tenant) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
-        const data = await readOpenPosition(tenant, req.params.positionId);
+        const link = await resolvePublicLink(req.params.linkId, { kinds: ['position'] });
+        if (!link) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+        const data = await readOpenPosition(link.tenant, link.targetId);
         if (!data) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
         if (data === 'closed') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });
         // Açık ilanın tamamı — kurallar da anonim adaya aynı belgeyi açıyor.
-        res.json({ id: req.params.positionId, ...data });
+        res.json({ id: link.targetId, ...data });
     } catch (err) {
         log.error({ err: err.message }, 'GET /api/positions/:id error');
         res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
@@ -50,22 +52,24 @@ router.get('/api/positions/:positionId', async (req, res) => {
 
 const str = (v, max) => String(v ?? '').trim().slice(0, max);
 
-router.post('/api/applications', async (req, res) => {
+router.post('/api/applications', sessionLimiter, async (req, res) => {
     try {
         const {
-            tenantId,
-            positionId,
+            link: linkId,
             name, email, phone, linkedin,
             cvText, cvFileName,
             source,
             parsedCandidate, aiScore, aiScoreBreakdown, aiSummary,
         } = req.body || {};
-        if (!positionId || !name || !email || !phone) {
+        if (!linkId || !name || !email || !phone) {
             return res.status(400).json({ error: 'Zorunlu alanlar eksik.' });
         }
-        // Yazma: şirket deneme/aktif ve yazma süresi içinde olmalı (K5).
-        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
-        if (!tenant) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+        // Şirket ve ilan bağlantıdan; yazma için şirket deneme/aktif ve yazma
+        // süresi içinde olmalı (K5).
+        const link = await resolvePublicLink(String(linkId), { kinds: ['position'], write: true });
+        if (!link) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+        const tenant = link.tenant;
+        const positionId = link.targetId;
         const position = await readOpenPosition(tenant, positionId);
         if (!position) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
         if (position === 'closed') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });

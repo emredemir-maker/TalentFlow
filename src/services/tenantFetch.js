@@ -8,9 +8,11 @@
 //
 // YALNIZ KENDİ API'MİZ: göreli `/api/…` ya da VITE_SERVER_URL köküyle başlayan
 // adres. Dış adreslere (Google, Microsoft, Hub) şirket kimliği gönderilmez.
-import { getActiveTenantId } from '../config/tenantPaths';
+import { getActiveLinkId, getActiveTenantId } from '../config/tenantPaths';
 
 export const TENANT_HEADER = 'X-Tenant-Id';
+/** Aday sayfasında çözülen herkese açık bağlantı (anonim AI uçları şirketi bundan alır). */
+export const PUBLIC_LINK_HEADER = 'X-Public-Link';
 
 /** Bu adres bizim API'miz mi? */
 export function isOwnApi(url, { serverUrl = '', origin = '' } = {}) {
@@ -21,12 +23,13 @@ export function isOwnApi(url, { serverUrl = '', origin = '' } = {}) {
 }
 
 /** fetch argümanlarına başlığı ekler (zaten varsa dokunmaz). Saf — testlenir. */
-export function withTenantHeader(input, init, tenantId, opts) {
-    if (!tenantId) return [input, init];
+export function withTenantHeader(input, init, tenantId, opts, linkId = null) {
+    if (!tenantId && !linkId) return [input, init];
     const url = typeof input === 'string' ? input : input?.url;
     if (!isOwnApi(url, opts)) return [input, init];
     const headers = new Headers(init?.headers || (typeof input === 'object' ? input.headers : undefined));
-    if (!headers.has(TENANT_HEADER)) headers.set(TENANT_HEADER, tenantId);
+    if (tenantId && !headers.has(TENANT_HEADER)) headers.set(TENANT_HEADER, tenantId);
+    if (linkId && !headers.has(PUBLIC_LINK_HEADER)) headers.set(PUBLIC_LINK_HEADER, linkId);
     return [input, { ...(init || {}), headers }];
 }
 
@@ -41,5 +44,6 @@ export function installTenantFetch() {
         serverUrl: import.meta.env.VITE_SERVER_URL || '',
         origin: window.location.origin,
     };
-    window.fetch = (input, init) => original(...withTenantHeader(input, init, getActiveTenantId(), opts));
+    window.fetch = (input, init) =>
+        original(...withTenantHeader(input, init, getActiveTenantId(), opts, getActiveLinkId()));
 }

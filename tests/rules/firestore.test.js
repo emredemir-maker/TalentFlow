@@ -666,6 +666,8 @@ describe('platform ve köprü belgeleri', () => {
             await deny(db.doc('publicLinks/l-1').get());
             await deny(db.collection('publicLinks').get());
             await deny(db.doc('publicLinks/l-2').set({ tenantId: 'A' }));
+            await deny(db.doc('publicLinkIndex/k-1').get());
+            await deny(db.doc('publicLinkIndex/k-2').set({ linkId: 'x' }));
             await deny(db.doc('platform/config').get());
             await deny(db.doc('platform/secrets').get());
             await deny(db.doc('platform/companyIntel/items/ci-1').get());

@@ -55,10 +55,14 @@ function token(uid, { provider = 'custom' } = {}) {
     ].join('.');
 }
 
-async function call(method, path, { uid, tenant, body, anon = false } = {}) {
+// Test bağlantı kimliği: 22 karakter base64url (sunucudaki biçim).
+const L = (name) => name.padEnd(22, '0');
+
+async function call(method, path, { uid, tenant, body, anon = false, link } = {}) {
     const headers = { 'Content-Type': 'application/json' };
     if (uid) headers.Authorization = `Bearer ${token(uid, anon ? { provider: 'anonymous' } : {})}`;
     if (tenant) headers['X-Tenant-Id'] = tenant;
+    if (link) headers['X-Public-Link'] = link;
     const res = await fetch(`${base}${path}`, {
         method,
         headers,
@@ -128,6 +132,20 @@ beforeAll(async () => {
             screeningQuestions: ['?'],
         },
         [`${T('C')}/positions/pc`]: { title: 'C ilanı', status: 'open', screeningQuestions: ['?'] },
+        // Herkese açık bağlantılar (aday AI uçları şirketi ve ilanı bunlardan alır).
+        [`publicLinks/${L('posA')}`]: { tenantId: 'A', kind: 'position', targetId: 'pa' },
+        [`publicLinks/${L('posBClosed')}`]: {
+            tenantId: 'B',
+            kind: 'position',
+            targetId: 'pbClosed',
+        },
+        [`publicLinks/${L('posC')}`]: { tenantId: 'C', kind: 'position', targetId: 'pc' },
+        [`publicLinks/${L('ivA')}`]: {
+            tenantId: 'A',
+            kind: 'interview',
+            targetId: 'iv-a-0001',
+            candidateId: 'x',
+        },
     };
     const batch = db.batch();
     for (const [p, d] of Object.entries(docs)) batch.set(db.doc(p), d);
@@ -226,44 +244,76 @@ describe('bütçe aşımı → 429, model çağrılmaz', () => {
     });
 });
 
-describe('aday tarafı amaca özel uçlar', () => {
-    it('ön eleme puanı: kapalı ilan 404, salt okunur şirket 404, şirketsiz 404', async () => {
+describe('aday tarafı amaca özel uçlar — şirket ve ilan bağlantıdan', () => {
+    const anon = { uid: 'anonX', anon: true };
+    it('ön eleme puanı: kapalı ilan 404, salt okunur şirket 404, bağlantısız 404', async () => {
         const closed = await call('POST', '/api/score-screening-answers', {
-            uid: 'anonX',
-            anon: true,
-            tenant: 'B',
-            body: { positionId: 'pbClosed', answers: ['a'] },
+            ...anon,
+            link: L('posBClosed'),
+            body: { answers: ['a'] },
         });
         expect(closed.status).toBe(404);
         const ro = await call('POST', '/api/score-screening-answers', {
-            uid: 'anonX',
-            anon: true,
-            tenant: 'C',
-            body: { positionId: 'pc', answers: ['a'] },
+            ...anon,
+            link: L('posC'),
+            body: { answers: ['a'] },
         });
         expect(ro.status).toBe(404);
         const none = await call('POST', '/api/score-screening-answers', {
-            uid: 'anonX',
-            anon: true,
+            ...anon,
             body: { positionId: 'pa', answers: ['a'] },
         });
         expect(none.status).toBe(404);
+        expect(none.body.code).toBe('LINK_REQUIRED');
     });
 
-    it("kotası dolu şirketin başvuru formu 429 alır (aday kovası); B'nin ilanı A kimliğiyle bulunmaz", async () => {
+    it('aday şirketi X-Tenant-Id ya da gövdedeki tenantId ile SEÇEMEZ (eski yol kapalı)', async () => {
+        for (const opts of [{ tenant: 'A' }, { body: { tenantId: 'A' } }]) {
+            const r = await call('POST', '/api/public/apply/parse-cv', {
+                ...anon,
+                ...opts,
+                body: { ...(opts.body || {}), positionId: 'pa', cvText: 'x'.repeat(100) },
+            });
+            expect(r.status).toBe(404);
+        }
+    });
+
+    it('bağlantı türü uca uymalı: mülakat bağlantısıyla başvuru AI, ilan bağlantısıyla STT yok', async () => {
+        const cv = await call('POST', '/api/public/apply/parse-cv', {
+            ...anon,
+            link: L('ivA'),
+            body: { cvText: 'x'.repeat(100) },
+        });
+        expect(cv.status).toBe(404);
+        const stt = await call('POST', '/api/ai/stt', {
+            ...anon,
+            link: L('posA'),
+            body: { audio: 'AAAA', mimeType: 'audio/webm' },
+        });
+        expect(stt.status).toBe(404);
+    });
+
+    it('kotası dolu şirketin başvuru formu 429 alır (aday kovası); gövdedeki positionId ilanı değiştiremez', async () => {
         // A'nın aday kovası boş ama şirket toplamı dolu → şirket sınırı.
         const r = await call('POST', '/api/public/apply/parse-cv', {
-            uid: 'anonX',
-            anon: true,
-            tenant: 'A',
-            body: { positionId: 'pa', cvText: 'Deneyimli yazılım geliştirici. '.repeat(5) },
+            ...anon,
+            link: L('posA'),
+            body: { cvText: 'Deneyimli yazılım geliştirici. '.repeat(5) },
         });
         expect(r.status).toBe(429);
-        const cross = await call('POST', '/api/public/apply/parse-cv', {
-            uid: 'anonX',
-            anon: true,
-            tenant: 'A',
+        // B'nin kapalı ilanını gövdeyle göstermek işe yaramaz: ilan bağlantının (pa).
+        const body = await call('POST', '/api/public/apply/parse-cv', {
+            ...anon,
+            link: L('posA'),
             body: { positionId: 'pbClosed', cvText: 'x'.repeat(100) },
+        });
+        expect(body.status).toBe(429);
+        // A başlığıyla B'nin kapalı ilan bağlantısı: şirket bağlantının (B), ilan kapalı → 404.
+        const cross = await call('POST', '/api/public/apply/parse-cv', {
+            ...anon,
+            tenant: 'A',
+            link: L('posBClosed'),
+            body: { cvText: 'x'.repeat(100) },
         });
         expect(cross.status).toBe(404);
     });

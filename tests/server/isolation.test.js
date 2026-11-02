@@ -37,6 +37,8 @@ let executeJob;
 let idFromName;
 
 const day = 24 * 60 * 60 * 1000;
+// Test bağlantı kimliği: 22 karakter base64url (sunucudaki biçim).
+const L = (name) => name.padEnd(22, '0');
 const inDays = (n) => new Date(Date.now() + n * day);
 
 // İmzasız emülatör jetonu.
@@ -105,6 +107,7 @@ beforeAll(async () => {
         'positions',
         'companyIntel',
         'auth',
+        'publicLinks',
     ]) {
         app.use((await import(`../../functions/routes/${mod}.js`)).default);
     }
@@ -206,6 +209,32 @@ beforeAll(async () => {
             resolvedAt: new Date().toISOString(),
         },
         'userTenants/bRecruiter': { tenants: { B: { name: 'B', role: 'recruiter' } } },
+        // Herkese açık bağlantılar (§2.5) — yalnız sunucu yazar.
+        [`publicLinks/${L('posB')}`]: { tenantId: 'B', kind: 'position', targetId: 'pb' },
+        [`publicLinks/${L('posBClosed')}`]: {
+            tenantId: 'B',
+            kind: 'position',
+            targetId: 'pbClosed',
+        },
+        [`publicLinks/${L('posBRevoked')}`]: {
+            tenantId: 'B',
+            kind: 'position',
+            targetId: 'pb',
+            revokedAt: new Date(),
+        },
+        [`publicLinks/${L('posC')}`]: { tenantId: 'C', kind: 'position', targetId: 'pc' },
+        [`publicLinks/${L('ivB')}`]: {
+            tenantId: 'B',
+            kind: 'interview',
+            targetId: 'iv-b1',
+            candidateId: 'b1',
+        },
+        [`publicLinks/${L('irB')}`]: { tenantId: 'B', kind: 'infoRequest', targetId: 'ir-b1' },
+        [`publicLinks/${L('irB2')}`]: { tenantId: 'B', kind: 'infoRequest', targetId: 'ir-b2' },
+        [`${T('B')}/infoRequests/ir-b2`]: { requestId: 'ir-b2', status: 'pending' },
+        [`publicLinks/${L('irC')}`]: { tenantId: 'C', kind: 'infoRequest', targetId: 'ir-c1' },
+        [`publicLinks/${L('irD')}`]: { tenantId: 'D', kind: 'infoRequest', targetId: 'ir-d1' },
+        [`publicLinks/${L('irE')}`]: { tenantId: 'E', kind: 'infoRequest', targetId: 'ir-e1' },
     };
     const batch = db.batch();
     for (const [p, d] of Object.entries(docs)) batch.set(db.doc(p), d);
@@ -408,6 +437,41 @@ describe('veri yalıtımı', () => {
     });
 });
 
+describe('saklama imhası — CV yolu (PR 6)', () => {
+    it("cvPath'teki dosyayı yalnız şirketin cvs/ klasöründeyse siler (logo ve toplu yükleme dosyası korunur)", async () => {
+        const bucket = admin.storage().bucket(BUCKET);
+        await bucket.file('tenants/A/cvs/eski.pdf').save(Buffer.from('pdf'));
+        await bucket.file('tenants/A/branding/logo.png').save(Buffer.from('png'));
+        await bucket.file('tenants/A/bulk-imports/aRecruiter/t/0.zip').save(Buffer.from('zip'));
+        const eski = { appliedDate: '2020-01-01T00:00:00Z', status: 'rejected' };
+        const batch = db.batch();
+        batch.set(db.doc('tenants/A/candidates/pCv'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/cvs/eski.pdf',
+        });
+        batch.set(db.doc('tenants/A/candidates/pLogo'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/branding/logo.png',
+        });
+        batch.set(db.doc('tenants/A/candidates/pBulk'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/bulk-imports/aRecruiter/t/0.zip',
+        });
+        await batch.commit();
+        const r = await call('POST', '/api/admin/retention/purge', { uid: 'aAdmin', tenant: 'A' });
+        expect(r.status).toBe(200);
+        expect(r.body.files).toBe(1);
+        expect((await bucket.file('tenants/A/cvs/eski.pdf').exists())[0]).toBe(false);
+        expect((await bucket.file('tenants/A/branding/logo.png').exists())[0]).toBe(true);
+        expect((await bucket.file('tenants/A/bulk-imports/aRecruiter/t/0.zip').exists())[0]).toBe(
+            true
+        );
+    });
+});
+
 describe('üyelik kaldırma (auth-user silme yerine)', () => {
     it("A yöneticisi B'nin kullanıcısını kaldıramaz (A'da üyeliği yok → 404); B'deki üyelik değişmez", async () => {
         const r = await call('DELETE', '/api/admin/members/bRecruiter', {
@@ -504,89 +568,428 @@ describe('platform yöneticisi', () => {
     });
 });
 
-describe('herkese açık (aday) uçlar — bağlantıdaki şirket', () => {
-    it("ilan: B'nin ilanı A kimliğiyle 404; B ile 200; kapalı ilan 403", async () => {
-        expect((await call('GET', '/api/positions/pb?tenantId=A')).status).toBe(404);
-        expect((await call('GET', '/api/positions/pb?tenantId=B')).status).toBe(200);
-        expect((await call('GET', '/api/positions/pbClosed?tenantId=B')).status).toBe(403);
-        expect((await call('GET', '/api/positions/pb')).status).toBe(404);
+describe('herkese açık bağlantılar (publicLinks, §2.5)', () => {
+    // Bağlantı testlerinin adayı (imha testleri a1/a2'yi siler; mükerrer
+    // testi A'daki aday sayısını sabitliyor — bu yüzden burada açılıyor).
+    beforeAll(async () => {
+        await db
+            .doc('tenants/A/candidates/aLink')
+            .set({ name: 'Bağlantı', email: 'link@a.test', createdAt: new Date() });
+        await db.doc('tenants/A/candidates/aLink2').set({ name: 'İkinci', createdAt: new Date() });
+        await db.doc('tenants/A/positions/pc2').set({ title: 'Paralel', status: 'open' });
     });
-    it("başvuru: B'nin ilanına A kimliğiyle 404; doğru şirkette yalnız o şirketin ağacına yazılır", async () => {
-        const body = { positionId: 'pb', name: 'Aday', email: 'aday@x.test', phone: '1' };
+    it('çözücü: bilinmeyen, biçimsiz, iptal edilmiş bağlantı ve kapalı şirket 404; geçerli bağlantı şirketi ve hedefi döner', async () => {
+        const ok = await call('GET', `/api/public/resolve/${L('posB')}`);
+        expect(ok.status).toBe(200);
+        expect(ok.body).toEqual({ kind: 'position', targetId: 'pb', tenantId: 'B' });
+        expect((await call('GET', `/api/public/resolve/${L('yok')}`)).status).toBe(404);
+        expect((await call('GET', '/api/public/resolve/kisa')).status).toBe(404);
+        expect((await call('GET', `/api/public/resolve/${L('posBRevoked')}`)).status).toBe(404);
+        // D kapalı, E askıda: bağlantı çalışmaz (K5).
+        expect((await call('GET', `/api/public/resolve/${L('irD')}`)).status).toBe(404);
+        expect((await call('GET', `/api/public/resolve/${L('irE')}`)).status).toBe(404);
+        // C salt okunur: okunur.
+        expect((await call('GET', `/api/public/resolve/${L('irC')}`)).status).toBe(200);
+    });
+    it('bağlantı oluşturma: yalnız şirketin admin/recruiter i, yalnız kendi şirketinin kaydına', async () => {
+        const body = { kind: 'position', targetId: 'pa' };
+        expect((await call('POST', '/api/public-links', { body, tenant: 'A' })).status).toBe(401);
         expect(
-            (await call('POST', '/api/applications', { body: { ...body, tenantId: 'A' } })).status
+            (
+                await call('POST', '/api/public-links', {
+                    body,
+                    tenant: 'A',
+                    uid: 'anonX',
+                    anon: true,
+                })
+            ).status
+        ).toBe(403);
+        expect(
+            (await call('POST', '/api/public-links', { body, tenant: 'A', uid: 'aDept' })).status
+        ).toBe(403);
+        expect(
+            (await call('POST', '/api/public-links', { body, tenant: 'A', uid: 'aSupport' })).status
+        ).toBe(403);
+        expect(
+            (await call('POST', '/api/public-links', { body, tenant: 'A', uid: 'bAdmin' })).status
+        ).toBe(403);
+        // B'nin ilanına A'dan bağlantı açılamaz (A'da yok → 404).
+        expect(
+            (
+                await call('POST', '/api/public-links', {
+                    body: { kind: 'position', targetId: 'pb' },
+                    tenant: 'A',
+                    uid: 'aAdmin',
+                })
+            ).status
+        ).toBe(404);
+        // Bilgi talebi bağlantısını istemci isteyemez.
+        expect(
+            (
+                await call('POST', '/api/public-links', {
+                    body: { kind: 'infoRequest', targetId: 'x' },
+                    tenant: 'A',
+                    uid: 'aAdmin',
+                })
+            ).status
+        ).toBe(400);
+        const r1 = await call('POST', '/api/public-links', {
+            body,
+            tenant: 'A',
+            uid: 'aAdmin',
+        });
+        expect(r1.status).toBe(200);
+        expect(r1.body.linkId).toMatch(/^[A-Za-z0-9_-]{22}$/);
+        expect(r1.body.path).toBe(`/apply/${r1.body.linkId}`);
+        // Eşzamanlı istekler tek bağlantı üretir (dizin + işlem).
+        const paralel = await Promise.all(
+            Array.from({ length: 5 }, () =>
+                call('POST', '/api/public-links', {
+                    body: { kind: 'position', targetId: 'pc2' },
+                    tenant: 'A',
+                    uid: 'aAdmin',
+                })
+            )
+        );
+        expect(new Set(paralel.map((r) => r.body.linkId)).size).toBe(1);
+        expect(
+            (
+                await db
+                    .collection('publicLinks')
+                    .where('tenantId', '==', 'A')
+                    .where('targetId', '==', 'pc2')
+                    .get()
+            ).size
+        ).toBe(1);
+        // Aynı ilan için aynı bağlantı.
+        const r2 = await call('POST', '/api/public-links', { body, tenant: 'A', uid: 'aAdmin' });
+        expect(r2.body.linkId).toBe(r1.body.linkId);
+        const saved = (await get(`publicLinks/${r1.body.linkId}`)).data();
+        expect(saved).toMatchObject({
+            tenantId: 'A',
+            kind: 'position',
+            targetId: 'pa',
+            createdBy: 'aAdmin',
+        });
+    });
+    it('mülakat bağlantısı: aday bu şirkette olmalı; başka adaya ait oturuma bağlanamaz', async () => {
+        const call2 = (body) =>
+            call('POST', '/api/public-links', { body, tenant: 'A', uid: 'aAdmin' });
+        expect(
+            (await call2({ kind: 'interview', targetId: 'iv-yeni-oturum-1', candidateId: 'b1' }))
+                .status
+        ).toBe(404);
+        expect(
+            (await call2({ kind: 'interview', targetId: 'iv-1', candidateId: 'aLink' })).status
+        ).toBe(400);
+        expect((await call2({ kind: 'interview', targetId: 'iv-yeni-oturum-1' })).status).toBe(400);
+        await db.doc('tenants/A/interviews/iv-baskasinin-1').set({ candidateId: 'a2' });
+        expect(
+            (await call2({ kind: 'interview', targetId: 'iv-baskasinin-1', candidateId: 'aLink' }))
+                .status
+        ).toBe(409);
+        const ok = await call2({
+            kind: 'interview',
+            targetId: 'iv-yeni-oturum-1',
+            candidateId: 'aLink',
+        });
+        expect(ok.status).toBe(200);
+        expect(ok.body.path).toBe(`/join/${ok.body.linkId}`);
+        // Aynı oturum başka bir adayla istenirse 409 (bağlantı adaya bağlı).
+        expect(
+            (
+                await call2({
+                    kind: 'interview',
+                    targetId: 'iv-yeni-oturum-1',
+                    candidateId: 'aLink2',
+                })
+            ).status
+        ).toBe(409);
+        const again = await call2({
+            kind: 'interview',
+            targetId: 'iv-yeni-oturum-1',
+            candidateId: 'aLink',
+        });
+        expect(again.body.linkId).toBe(ok.body.linkId);
+        expect((await get(`publicLinks/${ok.body.linkId}`)).data()).toMatchObject({
+            tenantId: 'A',
+            kind: 'interview',
+            targetId: 'iv-yeni-oturum-1',
+            candidateId: 'aLink',
+        });
+    });
+});
+
+describe('herkese açık (aday) uçlar — şirket ve kayıt bağlantıdan', () => {
+    it('ilan: bağlantı şirketin ilanını döner; kapalı ilan 403; yanlış türdeki bağlantı ve eski tenantId yolu 404', async () => {
+        const r = await call('GET', `/api/public/positions/${L('posB')}`);
+        expect(r.status).toBe(200);
+        expect(r.body.title).toBe('B ilanı');
+        expect((await call('GET', `/api/public/positions/${L('posBClosed')}`)).status).toBe(403);
+        expect((await call('GET', `/api/public/positions/${L('ivB')}`)).status).toBe(404);
+        // Geçici (PR 2) yol kaldırıldı.
+        expect((await call('GET', '/api/positions/pb?tenantId=B')).status).toBe(404);
+    });
+    it('başvuru: şirket ve ilan bağlantıdan; gövdedeki tenantId/positionId yok sayılır', async () => {
+        const body = { name: 'Aday', email: 'aday@x.test', phone: '1' };
+        // Bağlantısız (eski gövde) → 400; bilinmeyen bağlantı → 404.
+        expect(
+            (
+                await call('POST', '/api/applications', {
+                    body: { ...body, tenantId: 'B', positionId: 'pb' },
+                })
+            ).status
+        ).toBe(400);
+        expect(
+            (await call('POST', '/api/applications', { body: { ...body, link: L('yok') } })).status
+        ).toBe(404);
+        // Mülakat bağlantısıyla başvuru açılamaz.
+        expect(
+            (await call('POST', '/api/applications', { body: { ...body, link: L('ivB') } })).status
         ).toBe(404);
         const ok = await call('POST', '/api/applications', {
-            body: { ...body, tenantId: 'B', positionTitle: 'Sahte' },
+            body: {
+                ...body,
+                link: L('posB'),
+                tenantId: 'A',
+                positionId: 'pa',
+                positionTitle: 'Sahte',
+            },
         });
         expect(ok.status).toBe(200);
         const saved = (await get(`tenants/B/applications/${ok.body.id}`)).data();
+        expect(saved.positionId).toBe('pb');
         expect(saved.positionTitle).toBe('B ilanı');
-        // createdAt Firestore Timestamp (istemci .seconds / toDate() kullanıyor).
         expect(typeof saved.createdAt?.toMillis).toBe('function');
         expect((await db.collection('tenants/A/applications').get()).size).toBe(0);
+        // Aynı ilana ikinci başvuru 409.
+        expect(
+            (await call('POST', '/api/applications', { body: { ...body, link: L('posB') } })).status
+        ).toBe(409);
     });
     it('salt okunur şirketin açık ilanı okunur ama başvuru yazılamaz (K5)', async () => {
-        expect((await call('GET', '/api/positions/pc?tenantId=C')).status).toBe(200);
-        const body = { positionId: 'pc', name: 'Aday', email: 'aday@x.test', phone: '1' };
-        expect(
-            (await call('POST', '/api/applications', { body: { ...body, tenantId: 'C' } })).status
-        ).toBe(404);
+        expect((await call('GET', `/api/public/positions/${L('posC')}`)).status).toBe(200);
+        const body = { name: 'Aday', email: 'aday@x.test', phone: '1', link: L('posC') };
+        expect((await call('POST', '/api/applications', { body })).status).toBe(404);
         expect((await db.collection('tenants/C/applications').get()).size).toBe(0);
     });
-    it("mülakat oturumu: B'nin oturumu A kimliğiyle bulunmaz", async () => {
-        expect((await call('GET', '/api/session/iv-b1?tenantId=A')).status).toBe(404);
-        expect((await call('GET', '/api/session/iv-b1?tenantId=B')).status).toBe(200);
+    it('mülakat oturumu: bağlantıyla doğrudan aday belgesinden okunur (tarama yok); eski yol 404', async () => {
+        const r = await call('GET', `/api/session/${L('ivB')}`);
+        expect(r.status).toBe(200);
+        expect(r.body.found).toBe(true);
+        expect(r.body.candidateName).toBe('Veli');
+        expect((await call('GET', '/api/session/iv-b1?tenantId=B')).status).toBe(404);
+        expect((await call('GET', `/api/session/${L('posB')}`)).status).toBe(404);
+
+        // Durum güncelleme: oturum ve aday bağlantıdan; gövdedeki kimlikler yok sayılır.
         const upd = await call('POST', '/api/update-candidate-status', {
             body: {
-                tenantId: 'A',
+                link: L('ivB'),
+                sessionId: 'iv-x',
+                candidateId: 'aLink',
+                updates: {
+                    candidateStatus: 'hazir',
+                    questions: [],
+                    candidatePresence: { büyük: 'x'.repeat(1000) },
+                },
+            },
+        });
+        expect(upd.status).toBe(200);
+        const b1 = (await get('tenants/B/candidates/b1')).data();
+        expect(b1.interviewSessions[0].candidateStatus).toBe('hazir');
+        expect(b1.interviewSessions[0].questions).toEqual([]);
+        // İzin listesindeki alana bile nesne yazılamaz (düz değer şartı).
+        expect(b1.interviewSessions[0].candidatePresence).toBeUndefined();
+        expect((await get('tenants/A/candidates/aLink')).data().interviewSessions).toBeUndefined();
+        const eski = await call('POST', '/api/update-candidate-status', {
+            body: {
+                tenantId: 'B',
                 sessionId: 'iv-b1',
                 candidateId: 'b1',
                 updates: { candidateStatus: 'x' },
             },
         });
-        expect(upd.status).toBe(404);
+        expect(eski.status).toBe(400);
     });
-    it("yeni oturum açmak şirketin recruiter/admin'ine özel; anonim ve başka şirketin üyesi açamaz", async () => {
-        const body = { tenantId: 'A', sessionId: 'iv-new1', initialData: { candidateId: 'a1' } };
-        expect((await call('POST', '/api/init-interview-session', { body })).status).toBe(401);
+    it('oturum belgesi: iç kullanıcı başlıktaki şirkette oluşturur; aday bağlantıyla yalnız var olana korumasız alan yazar', async () => {
+        const body = { sessionId: 'iv-yeni-oturum-2', initialData: { candidateId: 'aLink' } };
         expect(
-            (await call('POST', '/api/init-interview-session', { body, uid: 'anonX', anon: true }))
-                .status
+            (await call('POST', '/api/init-interview-session', { body, tenant: 'A' })).status
+        ).toBe(401);
+        expect(
+            (
+                await call('POST', '/api/init-interview-session', {
+                    body,
+                    tenant: 'A',
+                    uid: 'anonX',
+                    anon: true,
+                })
+            ).status
         ).toBe(403);
         expect(
-            (await call('POST', '/api/init-interview-session', { body, uid: 'bAdmin' })).status
+            (
+                await call('POST', '/api/init-interview-session', {
+                    body,
+                    tenant: 'A',
+                    uid: 'bAdmin',
+                })
+            ).status
         ).toBe(403);
-        expect((await get('tenants/A/interviews/iv-new1')).exists).toBe(false);
+        // Eski gövde yolu: tenantId gövdede, başlık yok → şirket seçilmedi.
         expect(
-            (await call('POST', '/api/init-interview-session', { body, uid: 'aAdmin' })).status
+            (
+                await call('POST', '/api/init-interview-session', {
+                    body: { ...body, tenantId: 'A' },
+                    uid: 'aAdmin',
+                })
+            ).status
+        ).toBe(400);
+        expect((await get('tenants/A/interviews/iv-yeni-oturum-2')).exists).toBe(false);
+        expect(
+            (
+                await call('POST', '/api/init-interview-session', {
+                    body,
+                    tenant: 'A',
+                    uid: 'aAdmin',
+                })
+            ).status
         ).toBe(200);
-        expect((await get('tenants/A/interviews/iv-new1')).exists).toBe(true);
-        expect((await get('tenants/B/interviews/iv-new1')).exists).toBe(false);
+        expect((await get('tenants/A/interviews/iv-yeni-oturum-2')).exists).toBe(true);
+        expect((await get('tenants/B/interviews/iv-yeni-oturum-2')).exists).toBe(false);
+
+        // Aday: bağlantıyla var olan oturuma yazar; korumalı alan düşer.
+        const aday = await call('POST', '/api/init-interview-session', {
+            body: {
+                link: L('ivB'),
+                initialData: {
+                    candidateStatus: 'lobi',
+                    aiSummary: 'sahte',
+                    candidateId: 'aLink',
+                    status: 'completed',
+                },
+            },
+        });
+        expect(aday.status).toBe(200);
+        const iv = (await get('tenants/B/interviews/iv-b1')).data();
+        expect(iv.candidateStatus).toBe('lobi');
+        expect(iv.aiSummary).toBeUndefined();
+        expect(iv.candidateId).toBe('b1');
+        // İzin listesi dışı (status) da yazılmaz: aday oturumu "tamamlandı" yapamaz.
+        expect(iv.status).toBeUndefined();
+        // Bağlantının oturumundan başka bir oturum adı verilirse 404.
+        expect(
+            (
+                await call('POST', '/api/init-interview-session', {
+                    body: { link: L('ivB'), sessionId: 'iv-yeni-oturum-2', initialData: { x: 1 } },
+                })
+            ).status
+        ).toBe(404);
+        expect((await get('tenants/A/interviews/iv-yeni-oturum-2')).data().x).toBeUndefined();
+        // Bilgi talebi bağlantısıyla oturuma yazılamaz.
+        expect(
+            (
+                await call('POST', '/api/init-interview-session', {
+                    body: { link: L('irB'), initialData: { x: 1 } },
+                })
+            ).status
+        ).toBe(404);
     });
-    it("aday yanıtı: B'nin talebi A kimliğiyle 404, B'deki kayıt değişmez", async () => {
-        const r = await call('POST', '/api/candidate-respond', {
-            body: { tenantId: 'A', id: 'ir-b1', type: 'info', responseData: 'x' },
+    it('aday bağlantıyla oturum AÇAMAZ (belge yoksa 404)', async () => {
+        await db.doc(`publicLinks/${L('ivBYeni')}`).set({
+            tenantId: 'B',
+            kind: 'interview',
+            targetId: 'iv-b-henuz-yok',
+            candidateId: 'b1',
+        });
+        const r = await call('POST', '/api/init-interview-session', {
+            body: { link: L('ivBYeni'), initialData: { candidateStatus: 'x' } },
         });
         expect(r.status).toBe(404);
-        expect((await get('tenants/B/infoRequests/ir-b1')).data().status).toBe('pending');
-        const inv = await call('POST', '/api/candidate-respond', {
-            body: { tenantId: 'A', id: 'iv-b1', type: 'invite', action: 'confirm' },
-        });
-        expect(inv.status).toBe(404);
-        expect((await get('tenants/A/interviews/iv-b1')).exists).toBe(false);
+        expect((await get('tenants/B/interviews/iv-b-henuz-yok')).exists).toBe(false);
     });
+    it('aday yanıtı: tür bağlantıya bağlı; gövdedeki kimlik yok sayılır', async () => {
+        // Eski gövde (tenantId + id) → 400.
+        expect(
+            (
+                await call('POST', '/api/candidate-respond', {
+                    body: { tenantId: 'B', id: 'ir-b1', type: 'info', responseData: 'x' },
+                })
+            ).status
+        ).toBe(400);
+        // Mülakat bağlantısıyla bilgi yanıtı, bilgi bağlantısıyla davet yanıtı → 404.
+        expect(
+            (
+                await call('POST', '/api/candidate-respond', {
+                    body: { link: L('ivB'), type: 'info', responseData: 'x' },
+                })
+            ).status
+        ).toBe(404);
+        expect(
+            (
+                await call('POST', '/api/candidate-respond', {
+                    body: { link: L('irB'), type: 'invite', action: 'confirm' },
+                })
+            ).status
+        ).toBe(404);
+        expect((await get('tenants/B/infoRequests/ir-b1')).data().status).toBe('pending');
+
+        const ok = await call('POST', '/api/candidate-respond', {
+            body: { link: L('irB2'), id: 'ir-c1', type: 'info', responseData: 'yanıt' },
+        });
+        expect(ok.status).toBe(200);
+        expect((await get('tenants/B/infoRequests/ir-b2')).data().status).toBe('responded');
+        // Tek yanıt: ikinci gönderim reddedilir, mülakat belgesi şişirilemez.
+        expect(
+            (
+                await call('POST', '/api/candidate-respond', {
+                    body: { link: L('irB2'), type: 'info', responseData: 'tekrar' },
+                })
+            ).status
+        ).toBe(409);
+        expect((await get('tenants/B/infoRequests/ir-b1')).data().status).toBe('pending');
+        expect((await get('tenants/C/infoRequests/ir-c1')).data().status).toBe('pending');
+
+        const inv = await call('POST', '/api/candidate-respond', {
+            body: { link: L('ivB'), type: 'invite', action: 'confirm' },
+        });
+        expect(inv.status).toBe(200);
+        expect((await get('tenants/B/interviews/iv-b1')).data().candidateResponse.status).toBe(
+            'confirm'
+        );
+    });
+});
+
+describe('aday yanıtı — tek işlem', () => {
+    it('mülakat belgesine ekleme başarısız olursa talep yanıtlanmış sayılmaz; yeniden deneme geçer', async () => {
+        await db
+            .doc('tenants/B/infoRequests/ir-big')
+            .set({ requestId: 'ir-big', status: 'pending', sessionId: 'iv-big' });
+        // Belge 1 MiB sınırının hemen altında: 10 KB'lık yanıt eklenemez.
+        await db.doc('tenants/B/interviews/iv-big').set({ pad: 'x'.repeat(1_040_000) });
+        await db
+            .doc(`publicLinks/${L('irBig')}`)
+            .set({ tenantId: 'B', kind: 'infoRequest', targetId: 'ir-big' });
+        const body = { link: L('irBig'), type: 'info', responseData: 'y'.repeat(10_000) };
+        const fail = await call('POST', '/api/candidate-respond', { body });
+        expect(fail.status).toBe(500);
+        expect((await get('tenants/B/infoRequests/ir-big')).data().status).toBe('pending');
+        await db.doc('tenants/B/interviews/iv-big').set({ pad: '' });
+        const ok = await call('POST', '/api/candidate-respond', { body });
+        expect(ok.status).toBe(200);
+        expect((await get('tenants/B/infoRequests/ir-big')).data().status).toBe('responded');
+        expect((await get('tenants/B/interviews/iv-big')).data().infoResponses).toHaveLength(1);
+    }, 30_000);
 });
 
 describe('aday yanıtı — K5', () => {
     it('salt okunur / kapalı / askıdaki şirkete aday yanıtı yazılmaz', async () => {
-        for (const [t, id] of [
-            ['C', 'ir-c1'],
-            ['D', 'ir-d1'],
-            ['E', 'ir-e1'],
+        for (const [t, id, link] of [
+            ['C', 'ir-c1', L('irC')],
+            ['D', 'ir-d1', L('irD')],
+            ['E', 'ir-e1', L('irE')],
         ]) {
             const r = await call('POST', '/api/candidate-respond', {
-                body: { tenantId: t, id, type: 'info', responseData: 'x' },
+                body: { link, type: 'info', responseData: 'x' },
             });
             expect(r.status, t).toBe(404);
             expect((await get(`tenants/${t}/infoRequests/${id}`)).data().status).toBe('pending');
@@ -613,6 +1016,13 @@ describe('bilgi talebi kimliği sunucuda', () => {
         const a = await db.collection('tenants/A/infoRequests').get();
         expect(a.size).toBe(1);
         expect(a.docs[0].id).toMatch(/^ir-[0-9a-f-]{36}$/);
+        // Aday bağlantısı sunucuda üretildi ve bu talebe gidiyor.
+        const links = await db
+            .collection('publicLinks')
+            .where('targetId', '==', a.docs[0].id)
+            .get();
+        expect(links.size).toBe(1);
+        expect(links.docs[0].data()).toMatchObject({ tenantId: 'A', kind: 'infoRequest' });
         expect((await get('tenants/B/infoRequests/ir-b1')).data().status).toBe('pending');
     }, 30_000);
 });
@@ -732,5 +1142,97 @@ describe('toplu içe aktarma işçisi (collection group)', () => {
             .collection('artifacts/talent-flow/public/data/bulkImportJobs')
             .get();
         expect(legacy.docs.every((d) => d.data().status === 'queued')).toBe(true);
+    });
+});
+
+describe('CV dosyası (PR 6): jetonlu adres yok, sunucu yetkiyi her istekte denetler', () => {
+    beforeAll(async () => {
+        const bucket = admin.storage().bucket(BUCKET);
+        await bucket.file('tenants/A/cvs/eng.pdf').save(Buffer.from('%PDF-eng'), {
+            contentType: 'application/pdf',
+        });
+        await bucket.file('tenants/A/cvs/sales.pdf').save(Buffer.from('%PDF-sales'));
+        const docs = {
+            'tenants/A/candidates/cvEng': {
+                name: 'Eng',
+                department: 'Eng',
+                cvPath: 'tenants/A/cvs/eng.pdf',
+            },
+            'tenants/A/candidates/cvSales': {
+                name: 'Sales',
+                department: 'Sales',
+                cvPath: 'tenants/A/cvs/sales.pdf',
+            },
+            'tenants/A/candidates/cvShared': {
+                name: 'Paylaşılan',
+                department: 'Sales',
+                visibleToDepartments: ['Eng'],
+                cvPath: 'tenants/A/cvs/sales.pdf',
+            },
+            // Şirketin kendi kullanıcısının yazdığı, B'nin dosyasını gösteren yollar.
+            'tenants/A/candidates/cvEvil': { name: 'Kötü', cvPath: 'tenants/B/cvs/b.pdf' },
+            'tenants/A/candidates/cvTraversal': {
+                name: 'Kötü',
+                cvPath: 'tenants/A/cvs/../../B/cvs/b.pdf',
+            },
+            'tenants/A/candidates/cvOther': {
+                name: 'Kötü',
+                cvPath: 'tenants/A/bulk-imports/aRecruiter/x.pdf',
+            },
+            'tenants/A/candidates/cvNone': { name: 'Dosyasız' },
+            // Rol testleri aDept'in departmanlarını değiştiriyor; burada sabitlenir.
+            'tenants/A/members/aDept': {
+                role: 'department_user',
+                status: 'active',
+                departments: ['Eng'],
+            },
+        };
+        const batch = db.batch();
+        for (const [p, d] of Object.entries(docs)) batch.set(db.doc(p), d);
+        await batch.commit();
+    });
+
+    const cv = async (id, { uid, tenant = 'A', anon } = {}) => {
+        const headers = {};
+        if (uid) {
+            headers.Authorization = `Bearer ${token(uid, anon ? { provider: 'anonymous' } : {})}`;
+        }
+        if (tenant) headers['X-Tenant-Id'] = tenant;
+        const res = await fetch(`${base}/api/candidates/${id}/cv`, { headers });
+        return { status: res.status, headers: res.headers, text: res.ok ? await res.text() : null };
+    };
+
+    it('recruiter ve destek üyesi dosyayı alır; yanıt önbelleğe alınmaz, erişim deftere yazılır', async () => {
+        const r = await cv('cvEng', { uid: 'aAdmin' });
+        expect(r.status).toBe(200);
+        expect(r.text).toBe('%PDF-eng');
+        expect(r.headers.get('content-type')).toContain('application/pdf');
+        expect(r.headers.get('cache-control')).toBe('private, no-store');
+        expect((await cv('cvEng', { uid: 'aSupport' })).status).toBe(200);
+        // Defter yanıttan önce yazılır (bekleme yok).
+        const logs = await db
+            .collection('tenants/A/accessLogs')
+            .where('action', '==', 'cv-download')
+            .where('candidateId', '==', 'cvEng')
+            .get();
+        expect(logs.size).toBeGreaterThanOrEqual(2);
+    });
+    it('department_user yalnız görebildiği adayın dosyasını alır', async () => {
+        expect((await cv('cvEng', { uid: 'aDept' })).status).toBe(200);
+        expect((await cv('cvShared', { uid: 'aDept' })).status).toBe(200);
+        expect((await cv('cvSales', { uid: 'aDept' })).status).toBe(404);
+    });
+    it('başka şirketin üyesi, anonim, kimliksiz ve süresi dolmuş üye alamaz', async () => {
+        expect((await cv('cvEng', { uid: 'bAdmin' })).status).toBe(403);
+        expect((await cv('cvEng', { uid: 'bAdmin', tenant: 'B' })).status).toBe(404);
+        expect((await cv('cvEng', { uid: 'anonX', anon: true })).status).toBe(403);
+        expect((await cv('cvEng', {})).status).toBe(401);
+        expect((await cv('cvEng', { uid: 'aSupportOld' })).status).toBe(403);
+        expect((await cv('cvEng', { uid: 'aRemoved' })).status).toBe(403);
+    });
+    it("aday kaydındaki yol şirketin CV klasörü dışını gösteriyorsa (B'nin dosyası, '..', başka klasör) 404", async () => {
+        for (const id of ['cvEvil', 'cvTraversal', 'cvOther', 'cvNone', 'yok', '..']) {
+            expect((await cv(id, { uid: 'aAdmin' })).status, id).toBe(404);
+        }
     });
 });

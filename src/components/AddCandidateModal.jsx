@@ -12,7 +12,7 @@ import { buildJobDescription, requirementsOf } from '../utils/positionRequiremen
 import { extractTextFromFile } from '../services/cvParser';
 import { getAuthHeaders } from '../services/ai/config';
 import { storage } from '../config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes } from 'firebase/storage';
 import { useNotifications } from '../context/NotificationContext';
 import { IS_DEMO } from '../utils/demoMode';
 import { DEMO_CV_LIMITI, kalanKota, kotaDus, kotayaGoreAyir } from '../utils/demoUpload';
@@ -211,7 +211,10 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             const uniqueName = storagePaths.cv(`${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`);
                             const storageRef = ref(storage, uniqueName);
                             await uploadBytes(storageRef, file);
-                            candidate.cvUrl = await getDownloadURL(storageRef);
+                            // Yalnız Storage yolu (jetonlu kalıcı adres yok):
+                            // dosya GET /api/candidates/:id/cv ile, yetki
+                            // denetlenerek açılır.
+                            candidate.cvPath = uniqueName;
                         } catch (uploadError) {
                             console.error('Firebase Storage Upload Error:', uploadError);
                         }

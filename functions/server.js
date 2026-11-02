@@ -46,6 +46,7 @@ import positionsRoutes from './routes/positions.js';
 import usersRoutes from './routes/users.js';
 import companyIntelRoutes from './routes/companyIntel.js';
 import publicAiRoutes from './routes/publicAi.js';
+import publicLinksRoutes from './routes/publicLinks.js';
 import hubRoutes from './routes/hub.js';
 import { createBulkRouter } from './routes/bulk.js';
 
@@ -116,6 +117,7 @@ app.use(positionsRoutes);
 app.use(usersRoutes);
 app.use(companyIntelRoutes);
 app.use(publicAiRoutes);
+app.use(publicLinksRoutes);
 // bulk needs the on-disk uploads root, so it's a factory not a default export.
 app.use(createBulkRouter(uploadBaseDir));
 

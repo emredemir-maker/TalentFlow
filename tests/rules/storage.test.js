@@ -59,8 +59,8 @@ const put = (key, path, contentType, n = 3) =>
     st(key).ref(path).put(new Uint8Array(n), { contentType });
 
 describe('tenants/{t}/cvs', () => {
-    it('A şirketinin etkin üyeleri okur', async () => {
-        for (const key of ['aAdmin', 'aRecruiter', 'aDept', 'aDeptNone', 'aSupport', 'multi']) {
+    it('A şirketinin bütün adayları gören üyeleri (admin, recruiter, destek) okur', async () => {
+        for (const key of ['aAdmin', 'aRecruiter', 'aSupport']) {
             await allow(meta(key, 'tenants/A/cvs/c-1.pdf'));
         }
         await allow(meta('aRecruiter', 'tenants/A/cvs/c-2/cv.pdf'));
@@ -81,6 +81,13 @@ describe('tenants/{t}/cvs', () => {
         }
         // ve tersi: A üyesi B'nin dosyasını okuyamaz.
         await deny(meta('aAdmin', 'tenants/B/cvs/b-1.pdf'));
+    });
+    it('department_user doğrudan okuyamaz (görünürlüğü sunucu ucu denetler)', async () => {
+        // multi: B'de admin, A'da department_user — A'nın dosyası kapalı, B'ninki açık.
+        for (const key of ['aDept', 'aDeptNone', 'aDeptClaim', 'multi']) {
+            await deny(meta(key, 'tenants/A/cvs/c-1.pdf'));
+        }
+        await allow(meta('multi', 'tenants/B/cvs/b-1.pdf'));
     });
     it('listeleme kapalı', async () => {
         await deny(st('aAdmin').ref('tenants/A/cvs').listAll());

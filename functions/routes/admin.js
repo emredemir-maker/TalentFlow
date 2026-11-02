@@ -583,12 +583,16 @@ router.post('/api/admin/retention/purge', requireTenantAdmin, async (req, res) =
             // ekranda açılmayan bir CV bağlantısı kalır. Tersi durumda yetim
             // bir dosya kalır ve o bir sonraki turda temizlenebilir.
             for (const c of dilim) {
-                const yol = storagePathFromUrl(c.cvUrl);
-                if (!yol) continue;
-                // YALNIZ BU ŞİRKETİN DOSYASI. cvUrl aday kaydında duruyor ve
+                // Yeni kayıtlar Storage yolunu (cvPath) tutar; eski kayıtlar
+                // jetonlu adresi (cvUrl).
+                const yol = typeof c.cvPath === 'string' && c.cvPath ? c.cvPath : storagePathFromUrl(c.cvUrl);
+                if (!yol || yol.includes('..')) continue;
+                // YALNIZ BU ŞİRKETİN DOSYASI. Yol aday kaydında duruyor ve
                 // şirketin kendi kullanıcıları yazabiliyor: başka şirketin
                 // dosyasını gösteren bir adres imhada o dosyayı sildirirdi.
-                if (!yol.startsWith(storagePaths.tenantPrefix(req.tenant.id))) {
+                // Ayrıca yalnız CV klasörü: aday kaydındaki yol logoyu ya da toplu
+                // yükleme dosyasını gösteriyorsa imha onu sildirmemeli.
+                if (!yol.startsWith(`${storagePaths.tenantPrefix(req.tenant.id)}cvs/`)) {
                     log.warn({ yol }, 'şirket dışı CV yolu imhada atlandı');
                     continue;
                 }

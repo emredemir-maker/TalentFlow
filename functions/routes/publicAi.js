@@ -1,6 +1,6 @@
 // Aday tarafının (anonim oturum) amaca özel AI uçları.
 //
-//   POST /api/public/apply/parse-cv  { positionId, cvText }  (+ X-Tenant-Id)
+//   POST /api/public/apply/parse-cv  { cvText }  (+ X-Public-Link: ilan bağlantısı)
 //     — başvuru formunda CV'den ad/e-posta/telefon doldurma ve kayda giden
 //       yapılandırılmış özet.
 //
@@ -77,8 +77,10 @@ export function shapeApplicantProfile(parsed, contact) {
     };
 }
 
-router.post('/api/public/apply/parse-cv', requireAiCaller({ allowAnonymous: true }), aiLimiter, async (req, res) => {
-    const { positionId, cvText } = req.body || {};
+router.post('/api/public/apply/parse-cv', requireAiCaller({ allowAnonymous: true, linkKinds: ['position'] }), aiLimiter, async (req, res) => {
+    const { cvText } = req.body || {};
+    // Aday: ilan bağlantıdan (gövdedeki positionId yok sayılır); iç kullanıcı: gövdeden.
+    const positionId = req.publicLink ? req.publicLink.targetId : req.body?.positionId;
     if (typeof positionId !== 'string' || !isValidDocId(positionId)) {
         return res.status(400).json({ error: 'positionId gereklidir.' });
     }

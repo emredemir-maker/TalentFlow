@@ -81,9 +81,9 @@ Ek gözlemler:
 | `branding/{file}` | 98–105 (yazma `token.role`) | `src/pages/BrandingSettingsPage.jsx:60` | T | `tenants/{t}/branding/**` |
 | `avatars/{uid}/**` | 109–116 | (kullanıcı) | U (kişiye ait, şirketler arası ortak kalabilir) | değişmez |
 
-Not: CV'ye kayıttaki `getDownloadURL` adresiyle ulaşılıyor (`cvUrl`). İndirme jetonlu adresler **kuralları atlar**;
-tenant ayrımı yalnız adresi bilmeyenler için geçerli. Hedefte yeni dosyalar için jetonlu adres yerine kural denetimli
-`getBlob`/kısa süreli imzalı adres (sunucudan) önerilir (PR 6).
+Not: CV'ye kayıttaki `getDownloadURL` adresiyle ulaşılıyordu (`cvUrl`). İndirme jetonlu adresler **kuralları atlar**;
+tenant ayrımı yalnız adresi bilmeyenler için geçerliydi. PR 6'da yeni dosyalar jetonsuz yazılır ve sunucudan, yetki
+denetlenerek akıtılır (bkz. §6.1 "CV dosyası").
 
 ### 1.3 Cloud Functions
 
@@ -499,10 +499,16 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
   OAuth bağlama department_user'a da açık; `support` hiçbir yazma ucunu açamaz.
 - **Platform yöneticisi:** `PLATFORM_ADMIN_EMAILS` (her istekte okunur, e-posta doğrulanmış olmalı) yalnız
   `/api/admin/api-keys`, `/api/admin/integrations`, `/api/platform/usage`; şirket verisi için üyelik şart.
-- **Aday tarafı (geçici, PR 5'e kadar):** `/api/positions/:id`, `/api/applications`, `/api/session/:id`,
-  `/api/init-interview-session`, `/api/update-candidate-status`, `/api/candidate-respond` şirketi sorgu/gövdedeki
-  `tenantId`'den alır; kayıt kimliği yetki anahtarı olarak kalır, şirket kimliği aramayı o şirketin ağacına daraltır.
-  Yeni mülakat belgesini yalnız şirketin admin/recruiter'ı açar. PR 5'te `publicLinks` çözücüsü bunun yerini alır.
+- **Aday tarafı (PR 5, `publicLinks`):** aday bağlantıları yalnız rastgele bir kimlik taşır (`/apply/{linkId}`,
+  `/join/{linkId}`, `/respond/{linkId}`; 16 bayt base64url). `publicLinks/{linkId}` = `{tenantId, kind:
+  position|interview|infoRequest, targetId, candidateId?, createdBy, createdAt, revokedAt?}`; yalnız sunucu yazar/okur.
+  `POST /api/public-links {kind, targetId, candidateId?}` (admin/recruiter, hedef kendi şirketinde; aynı kayıt için
+  aynı bağlantı), `GET /api/public/resolve/:linkId` (hız sınırlı; bilinmeyen/iptal/kapalı şirket → 404).
+  Aday uçları gövdede `link` alır, şirket ve hedefi bağlantıdan çözer; sorgu/gövdedeki `tenantId` yolu **kaldırıldı**:
+  `GET /api/public/positions/:linkId`, `POST /api/applications {link,…}`, `GET /api/session/:linkId` (aday belgesi
+  doğrudan, tarama yok), `POST /api/update-candidate-status {link,…}`, `POST /api/candidate-respond {link, type}`
+  (tür bağlantıya bağlı). `POST /api/init-interview-session`: iç kullanıcı `X-Tenant-Id` + üyelikle oluşturur; aday
+  `{link}` ile yalnız var olan oturuma korumasız alan yazar. Bilgi talebi bağlantısını `send-info-request` üretir.
 - **Kaldırılanlar (K3):** `POST /api/auth/invitation-lookup`, `POST /api/send-invite`. `DELETE /api/admin/auth-user/:uid`
   (ve `DELETE /api/admin/members/:uid`) artık üyeliği kaldırır (`status: removed`, son yönetici kilidi), Firebase
   hesabına dokunmaz.
@@ -512,6 +518,12 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
   Yanıt ham kaynaklı yanıt (`answer`); ayrıştırma istemcide (PR 3).
 - **AI ölçümü:** platform toplamı `platformUsage/{day}`; şirket başına ölçüm PR 7. Storage: CV yüklemesi
   `tenants/{t}/cvs/`, toplu kaynak öneki `tenants/{t}/bulk-imports/{uid}/`.
+- **CV dosyası (PR 6):** jetonlu kalıcı adres (`getDownloadURL`, `firebaseStorageDownloadTokens`) üretilmez; aday
+  kaydı yalnız Storage yolunu tutar (`cvPath`, `tenants/{t}/cvs/…`). Dosya `GET /api/candidates/:id/cv` ile verilir:
+  üyelik (tüm roller) + department_user için aday görünürlüğü, yol yalnız şirketin `cvs/` klasöründe, `Cache-Control:
+  private, no-store`, erişim `accessLogs`'a (`cv-download`). Storage kuralında CV `get` yalnız admin/recruiter/destek
+  (department_user doğrudan okuyamaz). Saklama imhası `cvPath`'i (yoksa eski `cvUrl`'i) şirket önekiyle siler. Şirket
+  logosu bilinçli istisna: herkese açık görsel (e-posta, başvuru sayfası), jetonlu adres kalır.
 
 ### 6.2 PR 7 sonrası AI sözleşmesi
 

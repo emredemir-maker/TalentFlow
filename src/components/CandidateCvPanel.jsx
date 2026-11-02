@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { logAccess, ACCESS_ACTIONS } from '../services/accessLog';
 import { FileText, Download, ExternalLink, User, Briefcase, AlignLeft, AlertCircle } from 'lucide-react';
+import { useCandidateCvUrl } from '../services/candidateCvFile';
 import {
     cvProfileFields,
     cvTextOf,
@@ -45,6 +46,8 @@ export default function CandidateCvPanel({ candidate }) {
     const cvText = cvTextOf(candidate);
     const embeddable = isEmbeddableCv(candidate);
     const hasFile = hasOriginalCvFile(candidate);
+    // Dosya sunucudan, yetki denetimiyle (bellek içi adres); eski kayıtta cvUrl.
+    const { url: cvFileUrl, error: cvFileError } = useCandidateCvUrl(candidate, { enabled: hasFile });
 
     if (hasNoCv(candidate)) {
         return (
@@ -94,10 +97,10 @@ export default function CandidateCvPanel({ candidate }) {
                         </div>
                     )}
 
-                    {hasFile && (
+                    {hasFile && cvFileUrl && (
                         <>
                             <a
-                                href={candidate.cvUrl}
+                                href={cvFileUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={() => cvErisimiKaydet('yeni sekme')}
@@ -106,7 +109,7 @@ export default function CandidateCvPanel({ candidate }) {
                                 <ExternalLink size={10} /> Yeni Sekmede
                             </a>
                             <a
-                                href={candidate.cvUrl}
+                                href={cvFileUrl}
                                 download
                                 onClick={() => cvErisimiKaydet('indirme')}
                                 className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-n50 border border-n200 text-[11px] font-semibold text-n500 hover:border-brand-200 hover:text-brand hover:bg-brand-50 transition-colors"
@@ -130,13 +133,24 @@ export default function CandidateCvPanel({ candidate }) {
                 </div>
             )}
 
-            {mode === 'pdf' && embeddable ? (
+            {hasFile && cvFileError && (
+                <div className="flex items-start gap-2 bg-warn-bg rounded-md px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-warn leading-relaxed">{cvFileError}</p>
+                </div>
+            )}
+
+            {mode === 'pdf' && embeddable && !cvFileError ? (
                 <div className="rounded-md border border-n200 overflow-hidden bg-n50">
+                    {!cvFileUrl ? (
+                        <p className="text-[11px] text-n400 p-4">CV dosyası yükleniyor…</p>
+                    ) : (
                     <iframe
-                        src={candidate.cvUrl}
+                        src={cvFileUrl}
                         title={`${candidate.name || 'Aday'} CV`}
                         className="w-full h-[75vh] min-h-[520px] border-0"
                     />
+                    )}
                 </div>
             ) : (
                 <CvForm candidate={candidate} cvText={cvText} />
