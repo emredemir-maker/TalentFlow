@@ -119,10 +119,10 @@ jobs:
       # (bkz. ayrı PR); orada fark edilmemesinin sebebi Cloud Run'ın eskiden
       # elle girilmiş değişkenleri dağıtımlar arasında koruması.
       #
-      # ── EMAIL_USER / EMAIL_PASS BİLEREK YAZILMIYOR ────────────────────────
-      # middleware/demoMode.js e-posta uçlarını zaten kapatıyor. Kimlik
-      # bilgisini hiç göndermemek İKİNCİ savunma hattı: o kilitte bir hata
-      # olsa bile nodemailer'ın gönderecek hesabı yok. Kurulumu işletenin
+      # ── RESEND_API_KEY BİLEREK YAZILMIYOR ─────────────────────────────────
+      # middleware/demoMode.js e-posta uçlarını zaten kapatıyor. Anahtarı hiç
+      # göndermemek İKİNCİ savunma hattı: o kilitte bir hata olsa bile
+      # services/mailer.js anahtarsız gönderimi kapalı tutar (503). Kurulumu işletenin
       # hesabından mesaj çıkmasının maliyeti, bu iki satırı atlamanın
       # rahatlığından çok daha yüksek.
       # ── TAVANLAR NEDEN DÜŞÜRÜLDÜ (2.000.000 → 400.000, 60 → 20) ──────────

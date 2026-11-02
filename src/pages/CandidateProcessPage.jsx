@@ -20,9 +20,8 @@ import { cleanRoleText, analysisForPosition, fullAnalysisForPosition } from '../
 import { mustHaveGate, gateLabel } from '../utils/mustHaveGate';
 import { formatBytes, totalBytes, oversizedFiles, MAX_SOURCE_BYTES, MAX_SOURCES } from '../utils/bulkUpload';
 import { uploadBulkSources } from '../services/bulkStorageUpload';
-import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
-import { doc, getDoc, getDocs, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { doc, getDocs, onSnapshot, collection, query, where } from 'firebase/firestore';
 import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
@@ -172,14 +171,6 @@ export default function CandidateProcessPage() {
     const [infoSending, setInfoSending]             = useState(false);
     const [candidateInfoReqs, setCandidateInfoReqs] = useState([]);
     const [infoReqsLoading, setInfoReqsLoading]     = useState(false);
-
-    // Branding — loaded once from Firestore for email template generation
-    const [branding, setBranding] = useState({ companyName: 'Clyro Talent', primaryColor: '#0F766E' });
-    useEffect(() => {
-        getDoc(doc(db, tc('settings'), 'branding'))
-            .then(snap => { if (snap.exists()) setBranding(snap.data()); })
-            .catch(() => {});
-    }, []);
 
     // Real-time Firestore subscription for active bulk import job(s).
     // A single upload may enqueue several jobs (size-based batching), so the
@@ -464,19 +455,8 @@ export default function CandidateProcessPage() {
             const position = candidate.position || candidate.bestTitle || '';
             const trimmedText = feedbackText.trim();
 
-            let emailHtml = null;
-            try {
-                const { html } = await getFeedbackEmail(branding, {
-                    candidateName: candidate.name,
-                    recruiterName,
-                    position,
-                    outcome: feedbackOutcome,
-                    feedbackText: trimmedText,
-                    companyEmail: user?.email || null,
-                });
-                emailHtml = html;
-            } catch { /* fallback: let backend build its own HTML */ }
-
+            // E-posta içeriğini sunucu şirketin kayıtlı şablonundan üretir
+            // (noreply@clyrolabs.com, gönderen adı şirket, Reply-To siz).
             const fbAuthTok = await user?.getIdToken?.() || '';
             const res = await fetch('/api/send-feedback', {
                 method: 'POST',
@@ -488,7 +468,6 @@ export default function CandidateProcessPage() {
                     position,
                     outcome: feedbackOutcome,
                     feedbackText: trimmedText,
-                    html: emailHtml,
                 })
             });
             const data = await res.json();
@@ -524,11 +503,11 @@ export default function CandidateProcessPage() {
             const res = await fetch(`${API_BASE}/api/send-info-request`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                // Yanıt adresi (Reply-To) sunucuda oturumdaki hesabın e-postası.
                 body: JSON.stringify({
                     to: candidate.email,
                     candidateName: candidate.name,
                     recruiterName: userProfile?.displayName || userProfile?.name || user?.email || '',
-                    recruiterEmail: user?.email || '',
                     position: candidate.matchedPositionTitle || candidate.position || '',
                     requestMessage: infoMessage,
                     requestedItems: infoItems,

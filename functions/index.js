@@ -3,7 +3,7 @@ import app from "./server.js";
 
 // Environment variables come from functions/.env, written by the deploy
 // workflow (.github/workflows/firebase-deploy.yml) from GitHub secrets.
-// Required vars: EMAIL_USER, EMAIL_PASS, GEMINI_API_KEY, VITE_FIREBASE_API_KEY,
+// Required vars: RESEND_API_KEY (yoksa e-posta kapalı), GEMINI_API_KEY, VITE_FIREBASE_API_KEY,
 // INTEGRATION_ENCRYPTION_KEY. See functions/.env.production.example.
 //
 // ── AD, BÖLGE, HESAP: paylaşılan proje (agentinn-nyqpx) ─────────────────────

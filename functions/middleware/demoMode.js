@@ -7,7 +7,7 @@
 //
 // ── EN ÖNEMLİSİ E-POSTA ─────────────────────────────────────────────────────
 // Uygulama aday davetleri, bilgi talepleri ve geri bildirim mesajları
-// gönderiyor; gönderen adres kurulumu işletenin kendi hesabı (EMAIL_USER).
+// gönderiyor; gönderen adres Clyro'nun alan adı (RESEND_API_KEY, noreply@clyrolabs.com).
 // Demo açıkken bir ziyaretçi istediği adrese o hesaptan mesaj attırabilir.
 // Bu bir maliyet meselesi değil, kötüye kullanım kapısı: hesabın spam
 // göndermek için kullanılması, alan adının itibarını da yakar.

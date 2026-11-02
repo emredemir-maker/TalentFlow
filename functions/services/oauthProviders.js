@@ -4,7 +4,11 @@
 // isteği, onay verilmemiş bir kapsam isterse Microsoft reddediyor.
 import { integrationConfigs } from '../config/integrations.js';
 
-export const MS_SCOPES = 'openid profile email offline_access User.Read Mail.Send Calendars.ReadWrite OnlineMeetings.ReadWrite';
+// Mail.Read (PR 7b): aday yanıtları Reply-To ile işe alımcının kutusuna gidiyor;
+// bilgi talebi yanıt kontrolü (check-info-replies) kutuyu okuyabilmeli. Yeni
+// kapsam eski bağlantıların yenilenmesini reddettirir → kullanıcı bir kez
+// yeniden bağlanır (MAILBOX_REAUTH_REQUIRED).
+export const MS_SCOPES = 'openid profile email offline_access User.Read Mail.Send Mail.Read Calendars.ReadWrite OnlineMeetings.ReadWrite';
 
 export const GOOGLE_SCOPES = [
     'openid', 'profile', 'email',

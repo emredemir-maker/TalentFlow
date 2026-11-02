@@ -533,13 +533,27 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
 - **Atomik sayaç:** `functions/services/aiQuota.js` — ayırma (`reserveAi`) tek Firestore işleminde koşul + artırım
   (`tenants/{t}/usage/{gün}.quota.reserved`, `byUser.{k}`, `tenants/{t}/rate/{dakika}`); kapatma (`settleAi`) gerçek
   tüketimi `increment` ile yazar ve tahmini geri alır. Sıra: platform tavanı → şirket token → aramalı adet → kişi payı
-  (+ dakikalık şirket sınırı). İşlem çakışması geçici 429 (`AI_RATE_LIMITED`), altyapı hatası ölçümle devam.
+  (+ dakikalık şirket sınırı). İşlem çakışması geçici 429 (`AI_RATE_LIMITED`); altyapı hatasında aday reddedilir, iç kullanıcı dakikalık
+  sınırlı biçimde ölçülerek geçer.
 - **Yanıtlar:** 429 `{code: AI_DAILY_BUDGET_EXCEEDED | AI_RATE_LIMITED | PLAN_LIMIT_REACHED, error, reason, resetAt}`.
 - **Serbest istem** (`/api/ai/generate`, `/api/ai/ask`) yalnız üyeye; aday tarafı: `/api/ai/stt`, `/api/gemini-stt`,
   `/api/score-screening-answers` (sorular ilandan), `/api/public/apply/parse-cv` (istem sunucuda).
 - **Sınırlar ve paket:** `tenants/{t}.aiLimits`, `.talentPlan` (Hub'ın `plan` alanından ayrı), `.planLimits` (`functions/services/plans.js`); yazan yalnız
   platform yöneticisi `PUT /api/platform/tenants/:tenantId/limits` (ileride Hub konsolu). Paket birimleri aylık
   `tenants/{t}/usage/month-YYYY-MM.units` (ön analiz: işe alımcının AI ile işlediği her CV — başvuru formu hariç; mülakat değerlendirmesi).
+
+### 6.3 PR 7b sonrası e-posta sözleşmesi
+
+- **Gönderim:** `functions/services/mailer.js` (Resend REST, `RESEND_API_KEY`; yoksa 503 `EMAIL_DISABLED`).
+  `From: "<şirket adı>" <noreply@clyrolabs.com>` (ad: `settings/branding.companyName`, yoksa `tenants/{t}.name`),
+  `Reply-To:` oturumdaki kullanıcının doğrulanmış e-postası. Şirket başına günlük gönderim tavanı
+  (`EMAIL_DAILY_LIMIT_PER_TENANT`, varsayılan 300; `tenants/{t}/usage/{gün}.email.sent`, koşullu artırım).
+- **İçerik:** `functions/services/emailRender.js` — şablon `tenants/{t}/settings/emailTemplates`'ten, yoksa yerleşik;
+  istemciden yalnız değişkenler (`templateKey` + `vars`), HTML'e kaçışlı girer; bağlantılar yalnız `APP_URL` ya da bilinen
+  toplantı hizmeti. İstemcinin `html`, `branding`, `recruiterEmail` alanları yok sayılır.
+- **Yanıtlar:** işe alımcının kutusuna gider; `POST /api/check-info-replies` kişinin bağlı Gmail (gmail.modify) ya da
+  Microsoft 365 (Mail.Read) hesabında `[#ir-…]` konulu mesajları arar; bağlı değilse 409 `MAILBOX_NOT_CONNECTED`.
+  `GET /api/email/status` arayüz uyarısı için. `EMAIL_USER`/`EMAIL_PASS`, nodemailer ve IMAP kaldırıldı.
 
 Toplam kaba efor: **~3–4 hafta** (PR 0–8; davet/kayıt akışlarının kalkması PR 3'ü küçültüyor, e-posta (7b) ve destek
 üyeliği ekleniyor — toplam değişmedi), Hub tarafı ek ~1–1,5 hafta (köprü + admin konsolunda destek erişimi). Kritik yol:
