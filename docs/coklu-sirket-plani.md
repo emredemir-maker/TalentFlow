@@ -534,12 +534,8 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
 - **Atomik sayaç:** `functions/services/aiQuota.js` — ayırma (`reserveAi`) tek Firestore işleminde koşul + artırım
   (`tenants/{t}/usage/{gün}.quota.reserved`, `byUser.{k}`, `tenants/{t}/rate/{dakika}`); kapatma (`settleAi`) gerçek
   tüketimi `increment` ile yazar ve tahmini geri alır. Sıra: platform tavanı → şirket token → aramalı adet → kişi payı
-<<<<<<< HEAD
-  (+ dakikalık şirket sınırı). İşlem çakışması geçici 429 (`AI_RATE_LIMITED`), altyapı hatası ölçümle devam.
-=======
   (+ dakikalık şirket sınırı). İşlem çakışması geçici 429 (`AI_RATE_LIMITED`); altyapı hatasında aday reddedilir, iç kullanıcı dakikalık
   sınırlı biçimde ölçülerek geçer.
->>>>>>> origin/claude/talent-mt-ai-budget
 - **Yanıtlar:** 429 `{code: AI_DAILY_BUDGET_EXCEEDED | AI_RATE_LIMITED | PLAN_LIMIT_REACHED, error, reason, resetAt}`.
 - **Serbest istem** (`/api/ai/generate`, `/api/ai/ask`) yalnız üyeye; aday tarafı: `/api/ai/stt`, `/api/gemini-stt`,
   `/api/score-screening-answers` (sorular ilandan), `/api/public/apply/parse-cv` (istem sunucuda).
