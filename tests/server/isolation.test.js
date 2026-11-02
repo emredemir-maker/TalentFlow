@@ -408,6 +408,41 @@ describe('veri yalıtımı', () => {
     });
 });
 
+describe('saklama imhası — CV yolu (PR 6)', () => {
+    it("cvPath'teki dosyayı yalnız şirketin cvs/ klasöründeyse siler (logo ve toplu yükleme dosyası korunur)", async () => {
+        const bucket = admin.storage().bucket(BUCKET);
+        await bucket.file('tenants/A/cvs/eski.pdf').save(Buffer.from('pdf'));
+        await bucket.file('tenants/A/branding/logo.png').save(Buffer.from('png'));
+        await bucket.file('tenants/A/bulk-imports/aRecruiter/t/0.zip').save(Buffer.from('zip'));
+        const eski = { appliedDate: '2020-01-01T00:00:00Z', status: 'rejected' };
+        const batch = db.batch();
+        batch.set(db.doc('tenants/A/candidates/pCv'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/cvs/eski.pdf',
+        });
+        batch.set(db.doc('tenants/A/candidates/pLogo'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/branding/logo.png',
+        });
+        batch.set(db.doc('tenants/A/candidates/pBulk'), {
+            name: 'x',
+            ...eski,
+            cvPath: 'tenants/A/bulk-imports/aRecruiter/t/0.zip',
+        });
+        await batch.commit();
+        const r = await call('POST', '/api/admin/retention/purge', { uid: 'aAdmin', tenant: 'A' });
+        expect(r.status).toBe(200);
+        expect(r.body.files).toBe(1);
+        expect((await bucket.file('tenants/A/cvs/eski.pdf').exists())[0]).toBe(false);
+        expect((await bucket.file('tenants/A/branding/logo.png').exists())[0]).toBe(true);
+        expect((await bucket.file('tenants/A/bulk-imports/aRecruiter/t/0.zip').exists())[0]).toBe(
+            true
+        );
+    });
+});
+
 describe('üyelik kaldırma (auth-user silme yerine)', () => {
     it("A yöneticisi B'nin kullanıcısını kaldıramaz (A'da üyeliği yok → 404); B'deki üyelik değişmez", async () => {
         const r = await call('DELETE', '/api/admin/members/bRecruiter', {
