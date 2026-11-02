@@ -1,6 +1,6 @@
 // src/pages/ApplyPage.jsx — Public job application page (no auth required)
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc, collection, query, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
@@ -16,7 +16,8 @@ import {
     ChevronRight, Shield, Globe, Layers, Link2, Share2, Users, Zap, Search as SearchIcon,
     ChevronDown
 } from 'lucide-react';
-import { tc, getActiveTenantId } from '../config/tenantPaths';
+import { tc } from '../config/tenantPaths';
+import { usePublicLink } from '../context/PublicLinkContext';
 
 const SOURCES_PATH = () => tc('sources');
 
@@ -61,7 +62,10 @@ function InputField({ label, icon: Icon, required, autoFilled, ...props }) {
 // Main component
 // ──────────────────────────────────────────────
 export default function ApplyPage() {
-    const { positionId } = useParams();
+    // Bağlantı (/apply/:linkId) PublicLinkGate'te çözüldü: şirket etkin, ilan
+    // kimliği bağlantının hedefi.
+    const publicLink = usePublicLink();
+    const positionId = publicLink?.targetId;
     const [searchParams] = useSearchParams();
     const refParam = searchParams.get('ref') || searchParams.get('utm_source') || '';
     const detectedSource = detectSource(refParam);
@@ -384,7 +388,9 @@ export default function ApplyPage() {
             const saveRes = await fetch('/api/applications', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...payload, tenantId: getActiveTenantId() }),
+                // Şirket ve ilan sunucuda bağlantıdan çözülür; gövdedeki
+                // positionId yok sayılır.
+                body: JSON.stringify({ ...payload, link: publicLink.linkId }),
             });
             if (saveRes.status === 409) {
                 setStep('duplicate');
