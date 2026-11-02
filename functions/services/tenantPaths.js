@@ -62,6 +62,8 @@ const TENANT_COLLECTIONS = new Set([
     'bulkImportJobs',
     'accessLogs',
     'usage',
+    // Dakikalık AI çağrı sayacı (aiQuota.js); yalnız sunucu, TTL `expiresAt`.
+    'rate',
     'interviews',
     'integrationSecrets',
     'companyIntelManual',
@@ -104,6 +106,7 @@ export function tenantPaths(t) {
         accessLogs: () => tenantColl(t, 'accessLogs'),
         usage: () => tenantColl(t, 'usage'),
         usageDay: (day) => tenantDoc(t, 'usage', day),
+        rateMinute: (minute) => tenantDoc(t, 'rate', minute),
         interview: (sessionId) => tenantDoc(t, 'interviews', sessionId),
         integrationSecret: (uid) => tenantDoc(t, 'integrationSecrets', uid),
         companyIntelManual: (id) => tenantDoc(t, 'companyIntelManual', id),

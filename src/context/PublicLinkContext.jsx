@@ -53,7 +53,7 @@ export function PublicLinkGate({ kinds, children }) {
             .then((r) => {
                 if (cancelled) return;
                 if (!kinds.includes(r.kind)) throw new Error('Bağlantı geçersiz.');
-                setLinkTenantId(r.tenantId);
+                setLinkTenantId(r.tenantId, linkId);
                 setState({ status: 'ok', link: { linkId, kind: r.kind, targetId: r.targetId, tenantId: r.tenantId } });
             })
             .catch((err) => {

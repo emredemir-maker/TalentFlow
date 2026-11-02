@@ -24,6 +24,7 @@ import { db, admin } from '../config/firebaseAdmin.js';
 import { extractCvText } from '../services/bulkWorker.js';
 import { parseSources } from '../services/bulkSources.js';
 import { chunk } from '../services/bulkExpand.js';
+import { checkBulkBudget } from '../services/aiQuota.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('bulk');
 
@@ -142,6 +143,14 @@ export function createBulkRouter(uploadBaseDir) {
             }
             if (items.length === 0 && sources.length === 0) {
                 return res.status(400).json({ error: 'İşlenecek dosya veya kayıt bulunamadı.' });
+            }
+            // AI bütçesi ön denetimi (plan §5.2). Storage yolunda gerçek sayı
+            // arşivler açılınca bilinir; burada en az kaynak sayısı kadar CV
+            // varsayılır, işçi açtıktan sonra kesin sayıyla yeniden denetler.
+            const budget = await checkBulkBudget(req.aiContext, items.length || sources.length);
+            if (!budget.ok) {
+                for (const it of items) if (it.tempPath) { try { fs.unlinkSync(it.tempPath); } catch { /* temizlik */ } }
+                return res.status(429).json({ error: budget.message, code: budget.code });
             }
             // Pre-extract CV text from uploaded files so Firestore items are durable
             // (worker does not depend on temp files surviving a restart)

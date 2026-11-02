@@ -273,6 +273,9 @@ describe('GRADER_INSTRUCTION', async () => {
             path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../routes/interview.js'),
             'utf8'
         );
-        expect(route).toMatch(/Promise\.allSettled\(\[\s*runManualEvaluation/);
+        // Paket birimi kapısı (evaluateWithinPlan) iki çağrıyı yine
+        // Promise.allSettled ile birlikte başlatır.
+        expect(route).toMatch(/evaluateWithinPlan\(req\.aiContext, \(\) => \[\s*runManualEvaluation/);
+        expect(route).toMatch(/async function evaluateWithinPlan[\s\S]*?await Promise\.allSettled\(start\(\)\);/);
     });
 });

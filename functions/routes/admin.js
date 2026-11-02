@@ -15,14 +15,18 @@
 //                                          clientSecret istemciye dönmez.
 //     GET/POST /api/admin/api-keys         — platformun Gemini anahtarı.
 //     GET    /api/platform/usage           — tüm şirketlerin AI toplamı.
+//     GET/PUT /api/platform/tenants/:tenantId/limits — paket ve AI sınırları
+//                                          (plans.js; ileride Hub konsolu).
 import { Router } from 'express';
 
 import { requireTenant, requirePlatformAdmin } from '../middleware/auth.js';
-import { PLATFORM_PATHS, storagePaths } from '../services/tenantPaths.js';
+import { PLATFORM_PATHS, storagePaths, isValidTenantId, tenantDocPath } from '../services/tenantPaths.js';
 import { admin, db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
 import { summarize } from '../services/usage.js';
 import { budgetLimits, todayUsage } from '../services/aiBudget.js';
+import { tenantUsageToday, tenantUnitsThisMonth, nextResetAt, ANON_KEY } from '../services/aiQuota.js';
+import { resolveAiLimits, resolvePlanLimits, validateLimitsPatch, PLAN_CATALOG } from '../services/plans.js';
 import { splitByRetention, storagePathFromUrl } from '../services/retention.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('admin');
@@ -343,6 +347,29 @@ router.post('/api/admin/api-keys', requirePlatformAdmin, async (req, res) => {
 // (tenants/{t}/usage). Platform toplamı başka şirketlerin hacmini ele verir;
 // o yalnız platform yöneticisine (/api/platform/usage). Şirket başına ölçümün
 // yazımı PR 7'de; o zamana kadar liste boş gelebilir.
+/** Gün belgesindeki kişi kovaları → panel satırları (e-posta üyelikten). */
+async function usersBreakdown(paths, byUser, limits) {
+    const keys = Object.keys(byUser || {}).slice(0, 200);
+    const uids = keys.filter((k) => k !== ANON_KEY);
+    const snaps = uids.length ? await db.getAll(...uids.map((u) => db.doc(paths.member(u)))) : [];
+    const info = new Map(snaps.map((sn) => [sn.id, sn.exists ? sn.data() : {}]));
+    return keys
+        .map((k) => {
+            const v = byUser[k] || {};
+            const anon = k === ANON_KEY;
+            const pct = anon ? limits.anonSharePct : limits.userSharePct;
+            return {
+                key: k,
+                label: anon ? 'Aday tarafı (başvuru formu, mülakat)' : info.get(k)?.email || k,
+                role: anon ? null : info.get(k)?.role || null,
+                calls: Number(v.calls) || 0,
+                tokens: Number(v.totalTokens) || 0,
+                limit: Math.floor((limits.dailyTokens * pct) / 100),
+            };
+        })
+        .sort((a, b) => b.tokens - a.tokens);
+}
+
 function usageDays(req) {
     // 1-90 gün. Üst sınır Firestore okuma maliyetini bağlıyor: ölçümü okumak
     // ölçtüğü şeyden pahalı olmamalı.
@@ -356,15 +383,28 @@ router.get('/api/admin/usage', requireTenantAdmin, async (req, res) => {
             .limit(usageDays(req))
             .get();
         const gunler = snap.docs.map((d) => ({ day: d.id, ...summarize(d.data()) }));
-        const bugunKey = new Date().toISOString().slice(0, 10);
-        const bugunDoc = snap.docs.find((d) => d.id === bugunKey)?.data() || {};
+        // Şirketin FRENİ (K8): bugünkü sayaç, sınırlar, kişi payları, paket.
+        const now = new Date();
+        const limits = req.aiContext?.limits || resolveAiLimits(req.tenant.data);
+        const [bugun, units] = await Promise.all([
+            tenantUsageToday(req.tenant.id, limits, now),
+            tenantUnitsThisMonth(req.tenant.id, now),
+        ]);
         res.json({
             days: gunler,
-            limits: budgetLimits(),
-            today: {
-                tokens: Number(bugunDoc?.totals?.totalTokens) || 0,
-                groundedCalls: Number(bugunDoc?.byLabel?.grounded?.calls) || 0,
+            // Panelin eski alanları — artık ŞİRKETİN sınırı ve sayacı.
+            limits: { tokens: limits.dailyTokens, groundedCalls: limits.dailyGroundedCalls },
+            today: { tokens: bugun.used, groundedCalls: bugun.groundedCalls },
+            quota: {
+                limits,
+                used: bugun.used,
+                reserved: bugun.reserved,
+                remaining: bugun.remaining,
+                rejected: bugun.rejected,
+                resetAt: nextResetAt(now),
+                users: await usersBreakdown(req.paths, bugun.byUser, limits),
             },
+            plan: { ...resolvePlanLimits(req.tenant.data), units },
         });
     } catch (err) {
         log.error({ err }, '[admin/usage]');
@@ -390,6 +430,63 @@ router.get('/api/platform/usage', requirePlatformAdmin, async (req, res) => {
     } catch (err) {
         log.error({ err }, '[platform/usage]');
         res.status(500).json({ error: 'Kullanım kaydı okunamadı.' });
+    }
+});
+
+// ─── Paket ve AI sınırları (platform yöneticisi) ──────────────────────────────
+// Şirket belgesine `plan`, `planLimits`, `aiLimits` yazar (services/plans.js).
+// Şirket verisi DÖNMEZ: yalnız sınırlar ve bugünkü/aylık sayaçlar (adetler).
+// Hub konsolu bağlandığında aynı alanları Hub köprüsü yazar (PR 4 sonrası).
+router.get('/api/platform/tenants/:tenantId/limits', requirePlatformAdmin, async (req, res) => {
+    const { tenantId } = req.params;
+    if (!isValidTenantId(tenantId)) return res.status(400).json({ error: 'Geçersiz şirket kimliği.' });
+    try {
+        const snap = await db.doc(tenantDocPath(tenantId)).get();
+        if (!snap.exists) return res.status(404).json({ error: 'Şirket bulunamadı.' });
+        const t = snap.data();
+        const limits = resolveAiLimits(t);
+        const now = new Date();
+        const [bugun, units] = await Promise.all([
+            tenantUsageToday(tenantId, limits, now),
+            tenantUnitsThisMonth(tenantId, now),
+        ]);
+        res.json({
+            tenantId,
+            plan: resolvePlanLimits(t),
+            aiLimits: limits,
+            overrides: { aiLimits: t.aiLimits || {}, planLimits: t.planLimits || {} },
+            today: { used: bugun.used, reserved: bugun.reserved, remaining: bugun.remaining, rejected: bugun.rejected },
+            units,
+            catalog: PLAN_CATALOG,
+        });
+    } catch (err) {
+        log.error({ err: err.message }, '[platform/limits GET]');
+        res.status(500).json({ error: 'Sınırlar okunamadı.' });
+    }
+});
+
+router.put('/api/platform/tenants/:tenantId/limits', requirePlatformAdmin, async (req, res) => {
+    const { tenantId } = req.params;
+    if (!isValidTenantId(tenantId)) return res.status(400).json({ error: 'Geçersiz şirket kimliği.' });
+    const v = validateLimitsPatch(req.body);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+    try {
+        const ref = db.doc(tenantDocPath(tenantId));
+        // Yalnız VAR OLAN şirket: platform yöneticisi şirket açamaz (Hub açar).
+        const result = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(ref);
+            if (!snap.exists) return null;
+            // İç içe nesneler bütünüyle değiştirilir (birleştirme değil):
+            // istisnadan bir alanı kaldırmak, onu göndermemekle olur.
+            tx.update(ref, { ...v.patch, limitsUpdatedAt: new Date().toISOString(), limitsUpdatedBy: req.user.email });
+            return { ...snap.data(), ...v.patch };
+        });
+        if (!result) return res.status(404).json({ error: 'Şirket bulunamadı.' });
+        log.info({ tenantId, by: req.user.email, keys: Object.keys(v.patch) }, 'şirket sınırları güncellendi');
+        res.json({ tenantId, plan: resolvePlanLimits(result), aiLimits: resolveAiLimits(result) });
+    } catch (err) {
+        log.error({ err: err.message }, '[platform/limits PUT]');
+        res.status(500).json({ error: 'Sınırlar kaydedilemedi.' });
     }
 });
 

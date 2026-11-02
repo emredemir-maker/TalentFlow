@@ -108,3 +108,24 @@ describe('günlük kurulum bütçesi', () => {
         expect(aiErrorHint('429 RESOURCE_EXHAUSTED quota exceeded').kind).toBe('quota');
     });
 });
+
+describe('şirket kotası (PR 7)', () => {
+    it('günlük şirket kotası: yarın 03:00, yeniden deneme yok', () => {
+        const m = 'AI_DAILY_BUDGET_EXCEEDED: Şirketinizin bugünkü AI kotası doldu (10 / 10 token).';
+        expect(aiErrorHint(m).kind).toBe('budget');
+        expect(aiErrorHint(m).hint).toMatch(/03:00/);
+        expect(isRetryable(m)).toBe(false);
+    });
+
+    it('paket hakkı: ay başında yenilenir, yeniden deneme yok', () => {
+        const m = 'PLAN_LIMIT_REACHED: Paketinizin bu ayki ön analiz hakkı doldu (200 / 200).';
+        expect(aiErrorHint(m).kind).toBe('plan');
+        expect(isRetryable(m)).toBe(false);
+    });
+
+    it('şirketin dakikalık sınırı geçicidir', () => {
+        const m = '{"code":"AI_RATE_LIMITED","error":"dakikalık"}';
+        expect(aiErrorHint(m).kind).toBe('rate-limit');
+        expect(isRetryable(m)).toBe(true);
+    });
+});

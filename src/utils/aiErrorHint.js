@@ -13,7 +13,7 @@
 // Ayırt eden şey durum kodu değil, gövdedeki metin.
 
 /**
- * @typedef {'budget'|'spend-cap'|'quota'|'rate-limit'|'auth'|'gateway'|null} AiErrorKind
+ * @typedef {'budget'|'plan'|'spend-cap'|'quota'|'rate-limit'|'auth'|'gateway'|null} AiErrorKind
  */
 
 /**
@@ -25,6 +25,12 @@
  * Sunucu tarafındaki im: functions/services/aiBudget.js BUDGET_MARKER.
  */
 const OWN_BUDGET = /AI_DAILY_BUDGET_EXCEEDED/;
+
+/** Şirket paketinin AYLIK hakkı (ön analiz, mülakat değerlendirmesi) — functions/services/aiQuota.js PLAN_CODE. */
+const PLAN_LIMIT = /PLAN_LIMIT_REACHED/;
+
+/** Şirket genelinde dakikalık AI sınırı — kısa bekleme çözer. */
+const TENANT_RATE = /AI_RATE_LIMITED/;
 
 /** Harcama tavanı — beklemekle geçmez, insan müdahalesi gerekir. */
 const SPEND_CAP = /spending cap|spend cap|billing account has exceeded|harcama (üst )?(sınırı|tavanı)/i;
@@ -58,9 +64,22 @@ export function aiErrorHint(message) {
     if (OWN_BUDGET.test(text)) {
         return {
             kind: 'budget',
-            hint: 'Bu kurulum için belirlenmiş günlük AI bütçesi dolmuş — Google kotanızla '
-                + 'ilgisi yok. Sayaç UTC gece yarısı sıfırlanır; daha yüksek bir sınır '
-                + 'gerekiyorsa kurulumu işleten kişiye söyleyin.',
+            hint: 'Şirketinizin bugünkü AI kotası (ya da kişisel payınız) doldu — Google kotanızla '
+                + "ilgisi yok. Kota yarın 03:00'te (TSİ) kendiliğinden yenilenir; daha yüksek bir "
+                + 'kota gerekiyorsa şirket yöneticinizle görüşün.',
+        };
+    }
+    if (PLAN_LIMIT.test(text)) {
+        return {
+            kind: 'plan',
+            hint: 'Paketinizin bu ayki hakkı doldu. Hak ay başında yenilenir; paketi yükseltmek '
+                + 'için şirket yöneticinizle görüşün.',
+        };
+    }
+    if (TENANT_RATE.test(text)) {
+        return {
+            kind: 'rate-limit',
+            hint: 'Şirketiniz için dakikalık AI istek sınırına ulaşıldı; 1 dakika bekleyip tekrar deneyin.',
         };
     }
     if (SPEND_CAP.test(text)) {
@@ -108,5 +127,5 @@ export function isRetryable(message) {
     const { kind } = aiErrorHint(message);
     // Günlük bütçe de tekrar denemeyle geçmez: sayaç gece yarısına kadar
     // yerinde duruyor ve her deneme aynı yanıtı alır.
-    return kind !== 'spend-cap' && kind !== 'auth' && kind !== 'budget';
+    return kind !== 'spend-cap' && kind !== 'auth' && kind !== 'budget' && kind !== 'plan';
 }

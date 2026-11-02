@@ -1,5 +1,13 @@
 // AI proxy routes — every Gemini call goes through here so the API key
-// never reaches the browser bundle. Rate-limited by aiLimiter (20 req/min/IP).
+// never reaches the browser bundle. Rate-limited by aiLimiter (20 req/min,
+// şirket:kullanıcı anahtarlı) + şirket bütçesi (services/aiQuota.js).
+//
+// SERBEST İSTEM YALNIZ ŞİRKET ÜYESİNE (plan §5.2): /api/ai/generate ve
+// /api/ai/ask anonim (aday) oturuma KAPALI. Eskiden başvuru formunun anonim
+// oturumu buradan istediği istemi gönderebiliyordu: bağlantıyı bulan herkes
+// platformun Gemini anahtarını kendi işi için kullanabilirdi. Aday tarafı
+// yalnız amaca özel uçları açar (STT burada; ön eleme puanı screening.js;
+// CV ile form doldurma publicAi.js) — istemleri sunucuda kurulur.
 //
 //   POST /api/ai/generate   — generic prompt-in, text-out (with retry/backoff
 //                              on 429/503, configurable maxOutputTokens up to 32k,
@@ -12,9 +20,10 @@ import { Router } from 'express';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
-import { verifyFirebaseToken } from '../middleware/auth.js';
+import { requireAiCaller } from '../middleware/aiCaller.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { getApiKeyDetailed, generateText, generateGrounded } from '../services/gemini.js';
+import { sendQuotaError } from '../services/aiQuota.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('ai');
 
@@ -23,10 +32,8 @@ const multer = require('multer');
 
 const router = Router();
 
-// verifyFirebaseToken: anonim oturumlar da geçer (başvuru formu ve canlı
-// mülakat adayı anon Firebase oturumuyla gelir) — ama tokensız dış çağrılar
-// (açık Gemini proxy kötüye kullanımı) 401 alır.
-router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res) => {
+// Yalnız şirket üyesi; bütçe `şirket:kullanıcı` kovasından.
+router.post('/api/ai/generate', requireAiCaller(), aiLimiter, async (req, res) => {
     const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens, label } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
@@ -65,6 +72,7 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
         });
         res.json({ text });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err?.message, modelId, label, anahtarKaynagi: keyInfo.source }, '[ai/generate] başarısız');
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
@@ -76,7 +84,7 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
 // returns the sources it used, so the UI can show where a claim came from.
 // Kept separate because the response shape differs (text + sources) and
 // because grounded calls are slower and cost more: the caller opts in.
-router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/ai/ask', requireAiCaller(), aiLimiter, async (req, res) => {
     const { prompt, modelId = 'gemini-2.5-flash', maxOutputTokens } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
@@ -108,26 +116,71 @@ router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
         const result = await generateGrounded(prompt, { modelId, maxOutputTokens: tokenCap });
         res.json(result);
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err?.message, modelId, anahtarKaynagi: keyInfo.source }, '[ai/ask] başarısız');
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
 });
 
-router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
-    const { audio, mimeType = 'audio/webm' } = req.body || {};
-    if (!audio || typeof audio !== 'string') {
-        return res.status(400).json({ error: 'audio (base64) is required' });
+// ── STT GİRDİSİ YALNIZ SES ──────────────────────────────────────────────────
+// Bu uçlar aday tarafına açık. `mimeType` istemciden geliyordu: metin ya da
+// belge gönderen biri, sabit istemli bu ucu serbest istemli bir AI'ya
+// çeviriyordu (model düz metni okuyup ham yanıtını dönüyordu). Artık yalnız
+// `audio/*`, aday için boyut sınırı (2 MB base64 ≈ 1,5 MB ses), ve yanıt
+// sunucuda ayrıştırılıp YALNIZ beklenen alanlar dönüyor.
+const AUDIO_MIME_RE = /^audio\/[a-z0-9.+-]{1,40}$/i;
+const ANON_AUDIO_B64_MAX = 2 * 1024 * 1024;
+const MEMBER_AUDIO_B64_MAX = 34 * 1024 * 1024;
+
+/** @returns {string|null} hata metni */
+export function audioInputError(base64, mimeType, anonymous) {
+    if (!AUDIO_MIME_RE.test(String(mimeType || ''))) return 'Yalnız ses dosyası kabul edilir.';
+    const max = anonymous ? ANON_AUDIO_B64_MAX : MEMBER_AUDIO_B64_MAX;
+    if (typeof base64 !== 'string' || base64.length === 0) return 'Ses dosyası bulunamadı';
+    if (base64.length > max) return 'Ses parçası çok büyük.';
+    return null;
+}
+
+const STT_CONFIG = { temperature: 0, maxOutputTokens: 1024, responseMimeType: 'application/json' };
+
+/** Model yanıtından yalnız transkript + duygu alanları (serbest metin dönmez). */
+export function parseStt(raw) {
+    const clamp = (v) => Math.min(100, Math.max(0, parseInt(v, 10) || 0));
+    try {
+        const m = String(raw || '').match(/\{[\s\S]*\}/);
+        if (!m) return { text: '', emotion: null };
+        const p = JSON.parse(m[0]);
+        return {
+            text: typeof p.text === 'string' ? p.text.slice(0, 4000) : '',
+            emotion: { stress: clamp(p.stress), excitement: clamp(p.excitement), confidence: clamp(p.confidence), hesitation: clamp(p.hesitation) },
+        };
+    } catch {
+        return { text: '', emotion: null };
     }
+}
+
+// STT: sabit istem + ses. Yüz yüze/canlı mülakat sayfaları aday bağlantısında
+// (anonim oturum) da açıldığı için aday tarafına açık; bütçe şirketin 'anon'
+// kovasından.
+router.post('/api/ai/stt', requireAiCaller({ allowAnonymous: true, linkKinds: ['interview'] }), aiLimiter, async (req, res) => {
+    const { audio } = req.body || {};
+    const mimeType = String(req.body?.mimeType || 'audio/webm').split(';')[0];
+    const bad = audioInputError(audio, mimeType, !!req.aiContext?.anonymous);
+    if (bad) return res.status(400).json({ error: bad });
 
     try {
         // useCache: false — every audio chunk is unique, caching would just
         // grow the cache without ever hitting.
-        const text = await generateText([
+        const raw = await generateText([
             { inlineData: { data: audio, mimeType } },
             `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress/excitement/confidence/hesitation: 0-100 tam sayı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
-        ], { useCache: false });
-        res.json({ text });
+        ], { useCache: false, label: 'interview-eval', generationConfig: STT_CONFIG });
+        // İstemci `text`i JSON olarak ayrıştırıyor; biçim korunur ama yalnız
+        // beklenen alanlarla yeniden kurulur.
+        const p = parseStt(raw);
+        res.json({ text: JSON.stringify({ text: p.text, ...(p.emotion || {}) }) });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, 'STT Error');
         res.status(500).json({ error: err.message });
     }
@@ -136,7 +189,7 @@ router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
 // Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
-router.post('/api/gemini-stt', aiLimiter, verifyFirebaseToken, (req, res, next) => {
+router.post('/api/gemini-stt', requireAiCaller({ allowAnonymous: true, linkKinds: ['interview'] }), aiLimiter, (req, res, next) => {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
         wrapMulter(audioUpload.single('audio'))(req, res, next);
@@ -161,6 +214,8 @@ router.post('/api/gemini-stt', aiLimiter, verifyFirebaseToken, (req, res, next) 
         } else {
             return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
         }
+        const bad = audioInputError(audioBase64, mimeType, !!req.aiContext?.anonymous);
+        if (bad) return res.status(400).json({ error: bad });
 
         // useCache: false — audio inputs are always unique
         const raw = (await generateText([
@@ -175,26 +230,14 @@ Kurallar:
 - hesitation: tereddüt/dolgu sesi seviyesi 0-100
 - Skorlar 0-100 arası tam sayı olmalı.
 - 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
-        ], { useCache: false })).trim();
-        let text = raw;
-        let emotion = null;
-        try {
-            const m = raw.match(/\{[\s\S]*\}/);
-            if (m) {
-                const parsed = JSON.parse(m[0]);
-                text = typeof parsed.text === 'string' ? parsed.text : '';
-                emotion = {
-                    stress: Math.min(100, Math.max(0, parseInt(parsed.stress) || 0)),
-                    excitement: Math.min(100, Math.max(0, parseInt(parsed.excitement) || 0)),
-                    confidence: Math.min(100, Math.max(0, parseInt(parsed.confidence) || 0)),
-                    hesitation: Math.min(100, Math.max(0, parseInt(parsed.hesitation) || 0)),
-                };
-            }
-        } catch { /* fallback: use raw as text */ }
+        ], { useCache: false, label: 'interview-eval', generationConfig: STT_CONFIG })).trim();
+        // Yalnız beklenen alanlar; ayrıştırılamayan ham metin geri dönmez.
+        const { text, emotion } = parseStt(raw);
 
         log.info(`✅ STT: "${text.substring(0, 60)}" | emotion: ${JSON.stringify(emotion)}`);
         res.json({ success: true, text, emotion });
     } catch (err) {
+        if (sendQuotaError(res, err)) return;
         log.error({ err: err.message }, '💥 Gemini STT Error');
         res.status(500).json({ error: err.message });
     }

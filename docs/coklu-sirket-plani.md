@@ -525,6 +525,24 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
   (department_user doğrudan okuyamaz). Saklama imhası `cvPath`'i (yoksa eski `cvUrl`'i) şirket önekiyle siler. Şirket
   logosu bilinçli istisna: herkese açık görsel (e-posta, başvuru sayfası), jetonlu adres kalır.
 
+### 6.2 PR 7 sonrası AI sözleşmesi
+
+- **Bağlam zorunlu:** her Gemini çağrısı bir şirket bağlamında (`functions/services/aiContext.js`, AsyncLocalStorage):
+  `requireTenant` (iç kullanıcı, kova `uid`), `requireAiCaller({allowAnonymous, linkKinds})` (aday, kova `anon`; şirket ve hedef yalnız
+  herkese açık bağlantıdan — `X-Public-Link`/`link`, tür uca bağlı; `X-Tenant-Id`/`tenantId`/`positionId` yok sayılır), toplu iş işçisi
+  (işi açan kişi). Bağlamsız çağrı `AI_TENANT_REQUIRED` ile reddedilir; önbellek anahtarında şirket kimliği var.
+- **Atomik sayaç:** `functions/services/aiQuota.js` — ayırma (`reserveAi`) tek Firestore işleminde koşul + artırım
+  (`tenants/{t}/usage/{gün}.quota.reserved`, `byUser.{k}`, `tenants/{t}/rate/{dakika}`); kapatma (`settleAi`) gerçek
+  tüketimi `increment` ile yazar ve tahmini geri alır. Sıra: platform tavanı → şirket token → aramalı adet → kişi payı
+  (+ dakikalık şirket sınırı). İşlem çakışması geçici 429 (`AI_RATE_LIMITED`); altyapı hatasında aday reddedilir, iç kullanıcı dakikalık
+  sınırlı biçimde ölçülerek geçer.
+- **Yanıtlar:** 429 `{code: AI_DAILY_BUDGET_EXCEEDED | AI_RATE_LIMITED | PLAN_LIMIT_REACHED, error, reason, resetAt}`.
+- **Serbest istem** (`/api/ai/generate`, `/api/ai/ask`) yalnız üyeye; aday tarafı: `/api/ai/stt`, `/api/gemini-stt`,
+  `/api/score-screening-answers` (sorular ilandan), `/api/public/apply/parse-cv` (istem sunucuda).
+- **Sınırlar ve paket:** `tenants/{t}.aiLimits`, `.talentPlan` (Hub'ın `plan` alanından ayrı), `.planLimits` (`functions/services/plans.js`); yazan yalnız
+  platform yöneticisi `PUT /api/platform/tenants/:tenantId/limits` (ileride Hub konsolu). Paket birimleri aylık
+  `tenants/{t}/usage/month-YYYY-MM.units` (ön analiz: işe alımcının AI ile işlediği her CV — başvuru formu hariç; mülakat değerlendirmesi).
+
 ### 6.3 PR 7b sonrası e-posta sözleşmesi
 
 - **Gönderim:** `functions/services/mailer.js` (Resend REST, `RESEND_API_KEY`; yoksa 503 `EMAIL_DISABLED`).

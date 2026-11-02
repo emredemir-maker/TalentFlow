@@ -49,6 +49,90 @@ function LimitBox({ title, used, limit, unit, note }) {
     );
 }
 
+/** "yarın 03:00'te (TSİ)" — sıfırlama UTC gece yarısı. */
+function resetText(iso) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || Number.isNaN(d.getTime())) return "yarın 03:00'te (TSİ)";
+    const saat = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
+    return `yarın ${saat}'te (TSİ)`;
+}
+
+const UNIT_ROWS = [
+    { key: 'prescreen', field: 'monthlyPrescreens', title: 'Ön analiz (bu ay)', note: 'İşe alımcının AI ile işlediği her aday CV’si: tekil yükleme, toplu içe aktarma (başvuru formu sayılmaz).' },
+    { key: 'interviewEval', field: 'monthlyInterviewEvals', title: 'Mülakat değerlendirmesi (bu ay)', note: 'Görüşme sonucunun AI ile değerlendirilmesi ve yeniden değerlendirme.' },
+];
+
+/** Şirket kotası ayrıntısı: kalan, reddedilen, kişi payları, paket hakları. */
+function QuotaDetails({ quota, plan }) {
+    const users = Array.isArray(quota.users) ? quota.users : [];
+    return (
+        <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-n0 border border-n200 rounded-[10px] p-3">
+                    <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.06em] m-0">Bugün kalan</p>
+                    <p className="text-[15px] font-semibold text-n900 mt-1 m-0">{sayi(quota.remaining)} <span className="text-[11px] text-n400 font-normal">token</span></p>
+                </div>
+                <div className="bg-n0 border border-n200 rounded-[10px] p-3">
+                    <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.06em] m-0">Kotaya takılan istek</p>
+                    <p className="text-[15px] font-semibold text-n900 mt-1 m-0">{sayi(quota.rejected)}</p>
+                </div>
+                <div className="bg-n0 border border-n200 rounded-[10px] p-3">
+                    <p className="text-[10px] font-semibold text-n500 uppercase tracking-[0.06em] m-0">Kişi başı pay</p>
+                    <p className="text-[15px] font-semibold text-n900 mt-1 m-0">%{quota.limits?.userSharePct ?? '—'}</p>
+                    <p className="text-[10px] text-n400 mt-1.5 m-0 leading-relaxed">
+                        Tek kullanıcı şirket kotasının en çok bu kadarını kullanır. Aday tarafı (başvuru formu, mülakat bağlantısı) ortak bir kovadır: %{quota.limits?.anonSharePct ?? '—'}.
+                    </p>
+                </div>
+            </div>
+
+            {plan && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {UNIT_ROWS.map((r) => (
+                        <LimitBox
+                            key={r.key}
+                            title={`${r.title} — ${plan.label || 'Paket'}`}
+                            used={plan.units?.[r.key] || 0}
+                            limit={plan[r.field] || 0}
+                            unit="adet"
+                            note={r.note}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {users.length > 0 && (
+                <div className="bg-n0 border border-n200 rounded-[10px] overflow-hidden">
+                    <div className="px-3 py-2 border-b border-n200">
+                        <span className="text-[11px] text-n600">Bugün kim ne kullandı</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-[11px]">
+                            <thead>
+                                <tr className="text-n500 text-left">
+                                    <th className="font-medium px-3 py-1.5">Kullanıcı</th>
+                                    <th className="font-medium px-3 py-1.5 text-right">Çağrı</th>
+                                    <th className="font-medium px-3 py-1.5 text-right">Token</th>
+                                    <th className="font-medium px-3 py-1.5 text-right">Pay sınırı</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {users.map((u) => (
+                                    <tr key={u.key} className="border-t border-n100">
+                                        <td className="px-3 py-1.5 text-n700">{u.label}</td>
+                                        <td className="px-3 py-1.5 text-right text-n600">{sayi(u.calls)}</td>
+                                        <td className="px-3 py-1.5 text-right text-n900 font-semibold">{sayi(u.tokens)}</td>
+                                        <td className="px-3 py-1.5 text-right text-n400">{sayi(u.limit)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function AiUsagePanel() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -116,9 +200,10 @@ export default function AiUsagePanel() {
                     used={data?.today?.tokens || 0}
                     limit={data?.limits?.tokens || 0}
                     unit="token"
-                    note={data?.limits?.tokens > 0
-                        ? 'Sınıra ulaşınca yeni AI çağrısı başlatılmaz. Sayaç UTC gece yarısı sıfırlanır.'
-                        : 'AI_DAILY_TOKEN_LIMIT tanımlı değil — fren kapalı.'}
+                    note={data?.quota
+                        ? `Şirketinizin günlük kotası. Dolunca yeni AI çağrısı başlatılmaz; ${resetText(data.quota.resetAt)} kendiliğinden yenilenir.`
+                          + (data.quota.reserved > 0 ? ` Şu an sürmekte olan çağrılar için ayrılan: ${sayi(data.quota.reserved)} token.` : '')
+                        : 'Sınıra ulaşınca yeni AI çağrısı başlatılmaz.'}
                 />
                 <LimitBox
                     title="Bugün — aramalı çağrı"
@@ -128,6 +213,8 @@ export default function AiUsagePanel() {
                     note="Arama destekli çağrılar token dışında, istek başına ayrıca faturalanır — aşağıdaki tutar bu kalemi İÇERMEZ."
                 />
             </div>
+
+            {data?.quota && <QuotaDetails quota={data.quota} plan={data.plan} />}
 
             <div className="bg-n0 border border-n200 rounded-[10px] overflow-hidden">
                 <div className="px-3 py-2 border-b border-n200 flex items-center gap-3 flex-wrap">

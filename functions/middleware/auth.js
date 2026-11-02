@@ -11,6 +11,7 @@
 // taşırdı (docs/coklu-sirket-plani.md §2.2, K1).
 import { db, admin } from '../config/firebaseAdmin.js';
 import { isValidTenantId, tenantDocPath, tenantPaths } from '../services/tenantPaths.js';
+import { buildAiContext, runWithAiContext } from '../services/aiContext.js';
 
 export async function verifyFirebaseToken(req, res, next) {
     const authHeader = req.headers.authorization || '';
@@ -206,7 +207,11 @@ export const requireTenant = (roles = ALL_ROLES, opts = {}) => async (req, res, 
         const r = await resolveTenantAccess(req, String(req.headers[TENANT_HEADER] || ''), roles, opts);
         if (!r.ok) return res.status(r.status).json(r.body);
         Object.assign(req, r.ctx);
-        return next();
+        // Bu isteğin AI çağrıları bu şirketin ve bu kullanıcının bütçesinden
+        // düşer (services/aiContext.js, aiQuota.js). Bağlam next() zincirinin
+        // tamamında — sonraki await'ler dahil — görünür.
+        req.aiContext = buildAiContext({ tenantId: r.ctx.tenant.id, tenant: r.ctx.tenant.data, uid: r.ctx.user.uid });
+        return runWithAiContext(req.aiContext, next);
     } catch {
         return res.status(500).json({ error: 'Yetki denetlenemedi.' });
     }

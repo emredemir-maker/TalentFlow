@@ -36,7 +36,8 @@ export async function askGrounded(prompt, { maxOutputTokens = 1024 } = {}) {
 
     if (!res.ok) {
         const detail = await res.json().catch(() => ({}));
-        throw new Error(detail?.error || `Kaynak araması başarısız (${res.status})`);
+        const msg = detail?.error || `Kaynak araması başarısız (${res.status})`;
+        throw new Error(detail?.code ? `${detail.code}: ${msg}` : msg);
     }
 
     const data = await res.json();

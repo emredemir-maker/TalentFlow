@@ -79,14 +79,22 @@ export const storagePaths = {
 // bu sayfayı açabilir: şirket listesi yüklenince AuthContext'in kendi seçimi
 // bağlantının şirketini ezmesin diye ayrı tutulur ve önceliklidir.
 let linkTenantId = null;
+let activeLinkId = null;
 
-export function setLinkTenantId(t) {
+/** @param {string|null} t  @param {string|null} [linkId] çözülen bağlantının kimliği */
+export function setLinkTenantId(t, linkId = null) {
     linkTenantId = isValidTenantId(t) ? t : null;
+    activeLinkId = linkTenantId && typeof linkId === 'string' ? linkId : null;
     if (linkTenantId) setActiveTenantId(linkTenantId);
 }
 
 export function getLinkTenantId() {
     return linkTenantId;
+}
+
+/** Aday sayfasında çözülmüş bağlantının kimliği (X-Public-Link başlığı için). */
+export function getActiveLinkId() {
+    return activeLinkId;
 }
 
 /**
