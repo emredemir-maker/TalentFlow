@@ -76,7 +76,7 @@ export function TenantSelector() {
 
 /** Şirket kapısı: içerik açılamıyorsa ilgili ekranı döner, açılabiliyorsa null. */
 export function tenantGateScreen(ctx) {
-    const { tenants, tenantId, userProfile, tenant, tenantReadable, tenantSuspended } = ctx;
+    const { tenants, tenantId, userProfile, tenant, tenantReadable, tenantSuspended, hubVerificationExpired } = ctx;
     if (tenants.length === 0) {
         return (
             <Shell title="Bu hesapla açık bir şirket yok">
@@ -93,6 +93,17 @@ export function tenantGateScreen(ctx) {
         return (
             <Shell title="Şirket hesabı askıya alınmış">
                 <p className="text-sm text-n600">Ayrıntı için Clyro destek ile iletişime geçin.</p>
+                <Actions />
+            </Shell>
+        );
+    }
+    if (!userProfile && hubVerificationExpired) {
+        return (
+            <Shell title="Clyro Hub'dan yeniden açın">
+                <p className="text-sm text-n600">
+                    Güvenlik için Talent erişiminiz Clyro Hub'dan her gün yenilenir. Hub'da Talent'ı açtığınızda
+                    kaldığınız yerden devam edersiniz.
+                </p>
                 <Actions />
             </Shell>
         );

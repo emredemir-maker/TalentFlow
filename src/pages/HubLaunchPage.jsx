@@ -1,31 +1,32 @@
 // src/pages/HubLaunchPage.jsx
-// Hub-Inn'den tek tık geçiş. Hub-Inn bu sayfaya adresin # kısmında tek kullanımlık, 60 saniyelik bir kod koyar
-// (Hub-Inn apps/api/src/routes/apps.ts). Kod okunur okunmaz adres çubuğundan silinir ve Hub-Inn'de bir kez Firebase
-// özel giriş jetonuyla değiştirilir; jeton yalnız bellekte kalır. Girişten sonra yetki TalentFlow rolünden gelir.
+// Clyro Hub'dan tek tık geçiş (docs/coklu-sirket-plani.md §2.3, PR 4).
+//
+// Hub bu sayfaya adresin # kısmında tek kullanımlık, 60 saniyelik bir kod koyar. Kod okunur okunmaz adres
+// çubuğundan silinir ve TALENT SUNUCUSUNA verilir (POST /api/hub/exchange). Kodu Hub'da değiştiren Talent
+// sunucusudur (sunucudan sunucuya, paylaşılan gizli değerle); Hub şirketi, rolü ve deneme durumunu yalnız
+// sunucuya söyler, sunucu şirket + üyelik belgelerini yazar. Tarayıcıya yalnız Firebase giriş jetonu ve
+// şirket kimliği döner; jeton bellekte kalır. Yetki üyelik belgesinden gelir (jeton talebi yok).
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { HUB_TENANT_KEY } from '../context/AuthContext';
+import { HUB_TENANT_KEY, HUB_INN_URL } from '../context/AuthContext';
 import { isValidTenantId } from '../config/tenantPaths';
 
-// Alan adı değişince VITE_HUB_INN_URL ile.
-const HUB_INN_URL = import.meta.env.VITE_HUB_INN_URL || 'https://agentinn-nyqpx.web.app';
+const API_BASE = import.meta.env.VITE_SERVER_URL || '';
 
-async function exchangeCode(code) {
-    const res = await fetch(`${HUB_INN_URL}/api/apps/exchange`, {
+async function exchangeCode(code, { fetchImpl = fetch, storage = sessionStorage } = {}) {
+    const res = await fetchImpl(`${API_BASE}/api/hub/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ app: 'talent', code }),
-    });
-    const body = await res.json().catch(() => null);
-    if (!res.ok || !body?.token) throw new Error(body?.error || "Hub-Inn'e ulaşılamadı.");
-    // Hub hangi şirketten açıldığını dönerse (PR 4) o şirket seçilir.
-    const hubTenant = body?.tenant?.id;
-    if (isValidTenantId(hubTenant)) {
+        body: JSON.stringify({ code }),
+    }).catch(() => null);
+    const body = res ? await res.json().catch(() => null) : null;
+    if (!res || !res.ok || !body?.token) throw new Error(body?.error || 'Giriş tamamlanamadı. Clyro Hub\'dan yeniden açın.');
+    // Hub hangi şirketten açıldıysa o şirket seçilir (AuthContext tek seferlik okur).
+    if (isValidTenantId(body.tenantId)) {
         try {
-            sessionStorage.setItem(HUB_TENANT_KEY, hubTenant);
+            storage.setItem(HUB_TENANT_KEY, body.tenantId);
         } catch {
             /* özel mod */
         }
@@ -34,7 +35,6 @@ async function exchangeCode(code) {
 }
 
 export default function HubLaunchPage() {
-    const navigate = useNavigate();
     const [code] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('code'));
     const [error, setError] = useState(() => {
         if (!code) return 'Giriş bağlantısı eksik ya da kullanılmış.';
@@ -48,9 +48,11 @@ export default function HubLaunchPage() {
         started.current = true;
         exchangeCode(code)
             .then((token) => signInWithCustomToken(auth, token))
-            .then(() => navigate('/', { replace: true }))
+            // Tam sayfa açılış: aynı kişi başka şirketteyken Hub'dan gelirse dinleyiciler ve önbellekler eski
+            // şirketin yollarında kalmasın; AuthContext Hub'ın şirketini sıfırdan seçer.
+            .then(() => window.location.replace('/'))
             .catch((err) => setError(err?.message || 'Giriş yapılamadı.'));
-    }, [code, navigate]);
+    }, [code]);
 
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
@@ -59,7 +61,7 @@ export default function HubLaunchPage() {
                     <>
                         <p className="text-slate-800">{error}</p>
                         <p className="text-sm text-slate-500">Clyro Hub'dan Talent'ı yeniden açın.</p>
-                        <a href="/" className="text-sm text-indigo-600 underline">Giriş ekranına git</a>
+                        <a href={HUB_INN_URL} className="text-sm text-indigo-600 underline">Clyro Hub'a git</a>
                     </>
                 ) : (
                     <p className="text-slate-500">Hub-Inn hesabınızla giriş yapılıyor…</p>
