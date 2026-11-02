@@ -1,17 +1,17 @@
 // Live-interview session lifecycle.
 //
-//   GET  /api/session/:sessionId          — public polling endpoint for the
+//   GET  /api/session/:linkId             — public polling endpoint for the
 //                                            candidate side. Returns visible
 //                                            questions, recruiter presence,
-//                                            and the current question index
-//                                            for the matching session.
-//   POST /api/init-interview-session      — creates tenants/{t}/interviews/{sessionId}
-//                                            via Admin SDK on first recruiter
-//                                            join. Idempotent — re-running with
-//                                            the same id merges initialData.
+//                                            and the current question index.
+//                                            Oturum ve aday bağlantıdan; tarama yok.
+//   POST /api/init-interview-session      — creates tenants/{t}/interviews/{sessionId}.
+//                                            İç kullanıcı (X-Tenant-Id + üyelik)
+//                                            oluşturur; aday ({ link }) yalnız var
+//                                            olan oturuma korumasız alan yazar.
 //   POST /api/update-candidate-status     — candidate-side writes for the
-//                                            heartbeat / consent fields. Only
-//                                            CANDIDATE_ALLOWED_FIELDS pass; any
+//                                            heartbeat / consent fields ({ link }).
+//                                            Only CANDIDATE_ALLOWED_FIELDS pass; any
 //                                            other field is logged and dropped.
 //   POST /api/create-manual-interview     — recruiter-only. Creates an
 //                                            interview record from manually
@@ -26,10 +26,9 @@
 // heartbeat polling.
 //
 // ŞİRKET: kayıtlar tenants/{t}/interviews ve tenants/{t}/candidates altında.
-// Aday tarafındaki (kimliksiz) uçlar şirketi bağlantıdaki `tenantId`'den alır
-// (geçici — PR 5'te publicLinks çözücüsü); oturum kimliği hâlâ yetki anahtarı,
-// şirket kimliği aramayı yalnız o şirketin ağacına daraltır. İç kullanıcı uçları
-// requireTenant arkasında.
+// Aday tarafındaki (kimliksiz) uçlar şirketi, oturumu ve adayı herkese açık
+// bağlantıdan (publicLinks, §2.5) çözer; istemcinin gönderdiği şirket, oturum
+// ya da aday kimliği yok sayılır. İç kullanıcı uçları requireTenant arkasında.
 import { Router } from 'express';
 
 import { sessionLimiter, aiLimiter } from '../middleware/rateLimit.js';
@@ -37,10 +36,11 @@ import { db, admin } from '../config/firebaseAdmin.js';
 import {
     requireTenant,
     resolveTenantAccess,
-    loadPublicTenant,
+    TENANT_HEADER,
     WRITER_ROLES,
 } from '../middleware/auth.js';
 import { isValidDocId } from '../services/tenantPaths.js';
+import { isValidSessionId, resolvePublicLink } from '../services/publicLinks.js';
 import { generateText } from '../services/gemini.js';
 import { sanitizeForPrompt } from '../services/promptGuard.js';
 import {
@@ -56,34 +56,39 @@ const log = childLogger('interview');
 
 const router = Router();
 
-router.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
-    const { sessionId } = req.params;
-    if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
+/**
+ * Mülakat bağlantısının adayı: bağlantıdaki candidateId, yoksa oturum
+ * belgesindeki. Tüm aday havuzu TARANMAZ.
+ */
+async function candidateIdForLink(link) {
+    if (link.candidateId) return link.candidateId;
+    const iv = await db.doc(link.tenant.paths.interview(link.targetId)).get();
+    const id = iv.exists ? iv.data()?.candidateId : null;
+    return isValidDocId(id) ? id : null;
+}
+
+router.get('/api/session/:linkId', sessionLimiter, async (req, res) => {
     try {
-        const tenant = await loadPublicTenant(String(req.query.tenantId || ''));
-        if (!tenant) return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
-        // Yalnız bu şirketin adayları taranıyor (tam tarama PR 5'te kalkıyor).
-        const snapshot = await db.collection(tenant.paths.candidates()).get();
-        for (const docSnap of snapshot.docs) {
-            const data = docSnap.data();
-            const session = (data.interviewSessions || []).find(s => s.id === sessionId);
-            if (session) {
-                const visibleQuestions = (session.questions || []).filter(q => q.visibleToCandidate);
-                log.info(`[GET /api/session] Found session ${sessionId} — ${visibleQuestions.length} visible question(s), status: ${session.candidateStatus}`);
-                return res.json({
-                    found: true,
-                    candidateId: docSnap.id,
-                    candidateName: data.name,
-                    status: session.status,
-                    candidateStatus: session.candidateStatus,
-                    recruiterPresence: session.recruiterPresence,
-                    lastActive: session.lastActive,
-                    questions: visibleQuestions,
-                    currentQuestionIndex: session.currentQuestionIndex,
-                });
-            }
-        }
-        return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
+        const link = await resolvePublicLink(req.params.linkId, { kinds: ['interview'] });
+        if (!link) return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
+        const sessionId = link.targetId;
+        const candidateId = await candidateIdForLink(link);
+        if (!candidateId) return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
+        const snap = await db.doc(link.tenant.paths.candidate(candidateId)).get();
+        const data = snap.exists ? snap.data() : null;
+        const session = (data?.interviewSessions || []).find((s) => s.id === sessionId);
+        if (!session) return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
+        const visibleQuestions = (session.questions || []).filter((q) => q.visibleToCandidate);
+        return res.json({
+            found: true,
+            candidateName: data.name,
+            status: session.status,
+            candidateStatus: session.candidateStatus,
+            recruiterPresence: session.recruiterPresence,
+            lastActive: session.lastActive,
+            questions: visibleQuestions,
+            currentQuestionIndex: session.currentQuestionIndex,
+        });
     } catch (err) {
         log.error({ err: err.message }, 'GET /api/session error');
         res.status(500).json({ error: 'Seans okunamadı.' });
@@ -100,6 +105,25 @@ const CANDIDATE_ALLOWED_FIELDS = new Set([
     'lastActive',
     'hasConsent',
 ]);
+
+/**
+ * Aday tarafının yazabileceği alanlar: izin listesi + düz değer (metin ≤ 500,
+ * sayı, mantıksal, null). Nesne/dizi reddedilir — aday kayıtları (1 MiB
+ * sınırı) dışarıdan şişirilemesin.
+ * @returns {{ safe: Record<string, unknown>, dropped: string[] }}
+ */
+export function filterCandidateUpdates(data) {
+    const safe = {};
+    const dropped = [];
+    for (const [key, value] of Object.entries(data || {})) {
+        const plain = value === null || typeof value === 'boolean'
+            || (typeof value === 'number' && Number.isFinite(value))
+            || (typeof value === 'string' && value.length <= 500);
+        if (CANDIDATE_ALLOWED_FIELDS.has(key) && plain) safe[key] = value;
+        else dropped.push(key);
+    }
+    return { safe, dropped };
+}
 
 // Değerlendirme çıktıları ve mülakat akış kontrolü — MEVCUT bir oturum
 // dokümanına bu uçtan yazılamaz. firestore.rules'taki aynı isimli deny-list'in
@@ -135,36 +159,67 @@ export function filterSessionMerge(data) {
     return { safe, dropped };
 }
 
-// Oturum OLUŞTURMA yalnız şirketin admin/recruiter'ı (kurallardaki create ile
-// aynı): kimliksiz bir çağrı başka şirketin ağacına mülakat belgesi açamaz.
-// Var olan oturuma korumasız alan birleştirme aday tarafına açık kalır.
+// İKİ YOL:
+//   • İç kullanıcı (gövdede `link` YOK): şirket `X-Tenant-Id` başlığından,
+//     yetki üyelikten (admin/recruiter). Oturumu oluşturur ya da var olana
+//     korumasız alanları birleştirir.
+//   • Aday (gövdede `link`): şirket ve oturum bağlantıdan; yalnız VAR OLAN
+//     oturuma korumasız alan birleştirir, oturum açamaz. Gövdedeki sessionId
+//     verilmişse bağlantınınkiyle aynı olmalı.
 router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
-    const { sessionId, initialData, tenantId } = req.body;
-    if (!sessionId || typeof sessionId !== 'string' || !sessionId.startsWith('iv-') || !isValidDocId(sessionId)) {
-        return res.status(400).json({ error: 'Invalid sessionId.' });
-    }
+    const { sessionId: bodySessionId, initialData, link: linkId } = req.body || {};
     if (initialData && (typeof initialData !== 'object' || Array.isArray(initialData))) {
         return res.status(400).json({ error: 'initialData must be an object.' });
     }
     try {
-        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
-        if (!tenant) return res.status(404).json({ error: 'Oturum bulunamadı.' });
-        const sessionRef = db.doc(tenant.paths.interview(sessionId));
+        let paths;
+        let sessionId;
+        let canCreate = false;
+        if (linkId !== undefined && linkId !== null) {
+            const link = await resolvePublicLink(String(linkId), { kinds: ['interview'], write: true });
+            if (!link) return res.status(404).json({ error: 'Oturum bulunamadı.' });
+            if (bodySessionId && bodySessionId !== link.targetId) {
+                return res.status(404).json({ error: 'Oturum bulunamadı.' });
+            }
+            paths = link.tenant.paths;
+            sessionId = link.targetId;
+        } else {
+            if (!isValidSessionId(bodySessionId)) return res.status(400).json({ error: 'Invalid sessionId.' });
+            const access = await resolveTenantAccess(
+                req,
+                String(req.headers[TENANT_HEADER] || ''),
+                WRITER_ROLES,
+                { write: true }
+            );
+            if (!access.ok) return res.status(access.status).json(access.body);
+            paths = access.ctx.paths;
+            sessionId = bodySessionId;
+            canCreate = true;
+        }
+
+        const sessionRef = db.doc(paths.interview(sessionId));
         const snap = await sessionRef.get();
         if (!snap.exists) {
-            const access = await resolveTenantAccess(req, tenant.id, WRITER_ROLES, { write: true });
-            if (!access.ok) return res.status(access.status).json(access.body);
+            if (!canCreate) return res.status(404).json({ error: 'Oturum bulunamadı.' });
             await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...(initialData || {}) });
-            log.info(`[init-interview-session] Created tenants/${tenant.id}/interviews/${sessionId}`);
-        } else {
-            if (initialData && Object.keys(initialData).length > 0) {
-                const { safe, dropped } = filterSessionMerge(initialData);
-                if (dropped.length > 0) {
-                    log.warn(`[init-interview-session] Korumalı alanlar reddedildi (${sessionId}): ${dropped.join(', ')}`);
+            log.info(`[init-interview-session] Created ${paths.interview(sessionId)}`);
+        } else if (initialData && Object.keys(initialData).length > 0) {
+            // Aday yolu: İZİN LİSTESİ (yalnız durum/kalp atışı alanları, düz
+            // değerler) ve tamamlanmış oturuma yazım yok.
+            if (!canCreate) {
+                if (snap.data()?.status === 'completed') return res.status(409).json({ error: 'Oturum tamamlandı.' });
+                const { safe: candidateSafe, dropped: candidateDropped } = filterCandidateUpdates(initialData);
+                if (candidateDropped.length > 0) {
+                    log.warn(`[init-interview-session] Aday alanları reddedildi (${sessionId}): ${candidateDropped.join(', ')}`);
                 }
-                if (Object.keys(safe).length > 0) await sessionRef.set(safe, { merge: true });
+                if (Object.keys(candidateSafe).length > 0) await sessionRef.set(candidateSafe, { merge: true });
+                return res.json({ success: true });
             }
-            log.info(`[init-interview-session] tenants/${tenant.id}/interviews/${sessionId} already exists.`);
+            const { safe, dropped } = filterSessionMerge(initialData);
+            if (dropped.length > 0) {
+                log.warn(`[init-interview-session] Korumalı alanlar reddedildi (${sessionId}): ${dropped.join(', ')}`);
+            }
+            if (Object.keys(safe).length > 0) await sessionRef.set(safe, { merge: true });
         }
         res.json({ success: true });
     } catch (err) {
@@ -174,38 +229,33 @@ router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
 });
 
 router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => {
-    const { sessionId, candidateId, updates, tenantId } = req.body;
-    if (!sessionId || !candidateId || !updates || typeof updates !== 'object') {
-        return res.status(400).json({ error: "Missing required fields." });
+    const { link: linkId, updates } = req.body || {};
+    if (!linkId || !updates || typeof updates !== 'object' || Array.isArray(updates)) {
+        return res.status(400).json({ error: 'Missing required fields.' });
     }
-    if (!isValidDocId(String(candidateId))) return res.status(404).json({ error: 'Seans bulunamadı.' });
 
-    const safeUpdates = {};
-    for (const key of Object.keys(updates)) {
-        if (CANDIDATE_ALLOWED_FIELDS.has(key)) {
-            safeUpdates[key] = updates[key];
-        } else {
-            log.warn(`[update-candidate-status] Blocked field "${key}" from session ${sessionId}`);
-        }
-    }
+    const { safe: safeUpdates, dropped } = filterCandidateUpdates(updates);
+    if (dropped.length > 0) log.warn(`[update-candidate-status] Blocked fields: ${dropped.join(', ')}`);
     if (Object.keys(safeUpdates).length === 0) {
-        return res.status(400).json({ error: "No permitted fields to update." });
+        return res.status(400).json({ error: 'No permitted fields to update.' });
     }
 
     try {
-        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
-        if (!tenant) return res.status(404).json({ error: 'Seans bulunamadı.' });
-        const candidateRef = db.doc(tenant.paths.candidate(candidateId));
+        // Şirket, oturum ve aday bağlantıdan (K5: şirket yazmaya açık olmalı).
+        const link = await resolvePublicLink(String(linkId), { kinds: ['interview'], write: true });
+        if (!link) return res.status(404).json({ error: 'Seans bulunamadı.' });
+        const sessionId = link.targetId;
+        const candidateId = await candidateIdForLink(link);
+        if (!candidateId) return res.status(404).json({ error: 'Seans bulunamadı.' });
+        const candidateRef = db.doc(link.tenant.paths.candidate(candidateId));
         await db.runTransaction(async (t) => {
             const doc = await t.get(candidateRef);
-            if (!doc.exists) throw new Error("Candidate not found.");
+            if (!doc.exists) throw new Error('Candidate not found.');
 
-            const data = doc.data();
-            const sessions = data.interviewSessions || [];
-            const sessionExists = sessions.some(s => s.id === sessionId);
-            if (!sessionExists) throw new Error("Session not found for this candidate.");
+            const sessions = doc.data().interviewSessions || [];
+            if (!sessions.some((s) => s.id === sessionId)) throw new Error('Session not found for this candidate.');
 
-            const newSessions = sessions.map(session =>
+            const newSessions = sessions.map((session) =>
                 session.id === sessionId ? { ...session, ...safeUpdates } : session
             );
             t.update(candidateRef, { interviewSessions: newSessions });
@@ -213,7 +263,6 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
 
         res.json({ success: true });
     } catch (error) {
-        // Aday ya da oturum bu şirkette yoksa 404 (başka şirketin kaydı da böyle görünür).
         if (/not found/i.test(error?.message || '')) return res.status(404).json({ error: 'Seans bulunamadı.' });
         log.error({ err: error.message }, 'Failed to update candidate session via proxy');
         res.status(500).json({ error: 'Seans güncellenemedi.' });

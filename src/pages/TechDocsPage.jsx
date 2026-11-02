@@ -521,9 +521,11 @@ function ApiSection() {
             <Table
                 headers={['Method', 'Endpoint', 'Rate Limit', 'Açıklama']}
                 rows={[
-                    ['GET', '`/api/session/:sessionId`', 'sessionLimiter', 'Oturum verisi + yalnızca adaya görünür sorular'],
-                    ['POST', '`/api/init-interview-session`', 'sessionLimiter', 'Yeni oturum başlatma (permission-denied durumunda)'],
-                    ['POST', '`/api/update-candidate-status`', 'sessionLimiter', 'Alan beyaz listesiyle durum güncelleme'],
+                    ['GET', '`/api/public/resolve/:linkId`', 'sessionLimiter', 'Aday bağlantısını çözer → { kind, targetId, tenantId }'],
+                    ['POST', '`/api/public-links`', '—', 'İlan/mülakat için aday bağlantısı (admin/recruiter)'],
+                    ['GET', '`/api/session/:linkId`', 'sessionLimiter', 'Oturum verisi + yalnızca adaya görünür sorular'],
+                    ['POST', '`/api/init-interview-session`', 'sessionLimiter', 'İç kullanıcı oturum açar; aday ({ link }) yalnız var olana yazar'],
+                    ['POST', '`/api/update-candidate-status`', 'sessionLimiter', 'Alan beyaz listesiyle durum güncelleme ({ link })'],
                 ]}
             />
 
@@ -543,8 +545,8 @@ function ApiSection() {
             <Table
                 headers={['Method', 'Endpoint', 'Açıklama']}
                 rows={[
-                    ['GET', '`/api/positions/:positionId`', 'Pozisyon detayı (genel erişim)'],
-                    ['POST', '`/api/applications`', 'Başvuru formu gönderimi'],
+                    ['GET', '`/api/public/positions/:linkId`', 'Açık ilan (bağlantıdan; genel erişim)'],
+                    ['POST', '`/api/applications`', 'Başvuru formu gönderimi ({ link, … })'],
                     ['POST', '`/api/send-invite`', 'Mülakat davet e-postası gönderimi'],
                 ]}
             />
@@ -632,12 +634,12 @@ function LiveInterviewSection() {
   → Firestore: interviews/{sessionId} belgesi yazılır
   → /live-interview/{sessionId} → Recruiter görünümü
 
-Aday: /join/{sessionId} bağlantısı
+Aday: /join/{linkId} bağlantısı (publicLinks — 128 bit, şirket/oturum kimliği yok)
   → Firebase Anonim Auth → anonim UID
-  → Firestore kuralları anonim okumayı engeller!
-  → GET /api/session/{sessionId} polling (her 3 saniye)
-     Admin SDK kullanır → kuralları atlar
-  → Yalnızca visibleToCandidate: true sorular döner`}</CodeBlock>
+  → GET /api/public/resolve/{linkId} → { tenantId, targetId: sessionId }
+  → Firestore: tenants/{t}/interviews/{sessionId} tekil okuma/yazma
+     (kurallar: korumalı değerlendirme alanlarına yazamaz)
+  → Yalnızca visibleToCandidate: true sorular gösterilir`}</CodeBlock>
 
             <SectionTitle>effectiveSession Paterni</SectionTitle>
             <CodeBlock lang="javascript">{`// Firestore okuma başarısız olursa (anonim kısıtı)

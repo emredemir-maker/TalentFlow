@@ -73,17 +73,38 @@ export const storagePaths = {
     branding: (fileName, t) => `${tenantRoot(t)}/branding/${fileName}`,
 };
 
-/** Aday bağlantılarına eklenen şirket parametresi (PR 5'te publicLinks gelir). */
+// ── Aday bağlantısının şirketi (PR 5, §2.5) ─────────────────────────────────
+// Aday sayfaları (/apply, /join, /respond) şirketi adresten DEĞİL, sunucunun
+// çözdüğü bağlantıdan alır (PublicLinkGate). Oturumu açık bir iç kullanıcı da
+// bu sayfayı açabilir: şirket listesi yüklenince AuthContext'in kendi seçimi
+// bağlantının şirketini ezmesin diye ayrı tutulur ve önceliklidir.
+let linkTenantId = null;
+
+export function setLinkTenantId(t) {
+    linkTenantId = isValidTenantId(t) ? t : null;
+    if (linkTenantId) setActiveTenantId(linkTenantId);
+}
+
+export function getLinkTenantId() {
+    return linkTenantId;
+}
+
+/**
+ * İç ekranlar arası gezinmede şirket ipucu (?tenantId=…): yeni sekmede açılan
+ * /live-interview, /interview-report, /face-interview sayfası doğru şirketi
+ * seçsin. Yetki vermez — okuma/yazma yine üyelikle. ADAYA VERİLEN
+ * BAĞLANTILARDA KULLANILMAZ (aday bağlantısı yalnız publicLinks kimliği).
+ */
 export const TENANT_QUERY_PARAM = 'tenantId';
 
-/** `?tenantId=…` ekli bağlantı. */
+/** `?tenantId=…` ekli iç bağlantı. */
 export function withTenantParam(url, t) {
     const id = requireTenant(t);
     const sep = url.includes('?') ? '&' : '?';
     return `${url}${sep}${TENANT_QUERY_PARAM}=${encodeURIComponent(id)}`;
 }
 
-/** Adresteki şirket parametresi (aday sayfaları). */
+/** Adresteki şirket ipucu (iç ekranlar; aday bağlantı sayfalarında okunmaz). */
 export function tenantFromLocation(search = typeof window !== 'undefined' ? window.location.search : '') {
     const t = new URLSearchParams(search).get(TENANT_QUERY_PARAM);
     return isValidTenantId(t) ? t : null;

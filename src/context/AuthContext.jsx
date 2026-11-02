@@ -28,6 +28,7 @@ import {
     memberPath,
     setActiveTenantId,
     tenantFromLocation,
+    getLinkTenantId,
     tenantRoot,
     userTenantsPath,
 } from '../config/tenantPaths';
@@ -69,6 +70,19 @@ const writeStore = (store, key, value) => {
 const PUBLIC_PREFIXES = ['/join/', '/live-interview/', '/interview-report/', '/apply/', '/respond/', '/face-interview/'];
 export function isPublicPath(path = window.location.pathname) {
     return PUBLIC_PREFIXES.some((p) => path.startsWith(p));
+}
+
+// Adaya verilen bağlantılar: şirket adresten değil, sunucunun çözdüğü
+// publicLinks kaydından (PublicLinkGate) gelir.
+const CANDIDATE_LINK_PREFIXES = ['/join/', '/apply/', '/respond/'];
+export function isCandidateLinkPath(path = window.location.pathname) {
+    return CANDIDATE_LINK_PREFIXES.some((p) => path.startsWith(p));
+}
+
+/** Herkese açık sayfada geçerli şirket: aday bağlantısında çözülen, iç sayfada adresteki ipucu. */
+export function publicPageTenant(path = window.location.pathname, search = window.location.search) {
+    if (isCandidateLinkPath(path)) return getLinkTenantId();
+    return isPublicPath(path) ? tenantFromLocation(search) : null;
 }
 
 /** Firestore Timestamp | Date | ISO → ms. */
@@ -177,11 +191,12 @@ export function AuthProvider({ children }) {
         });
     }, []);
 
-    // Aday sayfaları: anonim oturum + şirket bağlantıdan (?tenantId=…).
+    // Herkese açık sayfalar: anonim oturum. Aday bağlantısında şirketi
+    // PublicLinkGate ayarlar; iç sayfada adresteki ipucu.
     useEffect(() => {
         if (MOCK || !auth) return;
         if (isPublicPath()) {
-            const t = tenantFromLocation();
+            const t = publicPageTenant();
             if (t) setActiveTenantId(t);
             if (!user && !authLoading) {
                 signInAnonymously(auth).catch((err) => console.error('Anonymous Sign-In Error:', err));
@@ -219,7 +234,7 @@ export function AuthProvider({ children }) {
         if (MOCK || !tenants) return;
         const ids = tenants.map((t) => t.id);
         const publicPath = isPublicPath();
-        const urlTenant = publicPath ? tenantFromLocation() : null;
+        const urlTenant = publicPath ? publicPageTenant() : null;
         const hub = readStore(sessionStorage, HUB_TENANT_KEY);
         const last = readStore(localStorage, LAST_TENANT_KEY);
         const { active, member: memberTenant } = resolveActiveTenant({ ids, hub, last, publicPath, urlTenant });

@@ -299,6 +299,11 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
+    match /publicLinkIndex/{key} {
+      // (şirket, tür, hedef) → bağlantı dizini — yalnız sunucu.
+      allow read, write: if false;
+    }
+
     match /publicLinks/{linkId} {
       // Yalnız /api/public/resolve (sunucu) okur.
       allow read, write: if false;
