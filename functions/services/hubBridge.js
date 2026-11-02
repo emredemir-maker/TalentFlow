@@ -74,10 +74,13 @@ export function hubApiBase(env = process.env) {
     }
 }
 
-/** Hub doğrulamasının geçerlik süresi (saat, 1–168); varsayılan 24 (Signals ile aynı). */
+/**
+ * Hub doğrulamasının geçerlik süresi (saat, 1–24); varsayılan ve üst sınır 24 (Signals ile aynı). Üst sınır
+ * bilerek dar: Hub'dan çıkarılan kişinin erişimi, çıkarma olayı gelmezse en çok bu kadar sürer.
+ */
 export function hubVerifyMaxAgeMs(env = process.env) {
     const n = Number(env.HUB_VERIFY_MAX_AGE_HOURS);
-    const hours = Number.isInteger(n) && n >= 1 && n <= 168 ? n : 24;
+    const hours = Number.isInteger(n) && n >= 1 && n <= 24 ? n : 24;
     return hours * 60 * 60 * 1000;
 }
 
@@ -298,14 +301,18 @@ const toMs = (v) => {
 /**
  * SAF: Hub girişinde var olan üyeliğe ne olacağı.
  *   'create'  — üyelik yok: Hub rolüyle açılır.
- *   'refresh' — etkin üye ya da Hub'ın kapattığı üyelik: açılır, Hub doğrulaması yenilenir, rol KORUNUR (K2).
+ *   'refresh' — etkin üye: Hub doğrulaması yenilenir, rol ve departmanlar KORUNUR (K2).
+ *   'rejoin'  — Hub'ın kapattığı üyelik (kişi Hub'dan çıkarılıp yeniden eklendi): eski Talent rolü GERİ
+ *               GELMEZ (ör. eski yönetici sıradan üye olarak yeniden eklendiyse); rol Hub'dan, departman yok.
  *   'convert' — destek üyeliği (süreli, salt okunur) Hub üyeliğine döner: rol Hub'dan.
- *   'blocked' — Talent yöneticisinin kaldırdığı üyelik: Hub girişi yeniden AÇMAZ (Signals 3b-4 ile aynı).
+ *   'blocked' — Talent yöneticisinin kaldırdığı (ya da yolu bilinmeyen eski) üyelik: Hub girişi yeniden
+ *               AÇMAZ (Signals 3b-4 ile aynı). Destek kaydı da bu engeli aşamaz (güvenlik incelemesi).
  */
 export function decideHubLogin(member) {
     if (!member) return 'create';
+    if (member.status === 'removed' && member.removedVia === 'admin') return 'blocked';
     if (member.role === 'support') return 'convert';
-    if (member.status === 'removed' && member.removedVia !== 'hub') return 'blocked';
+    if (member.status === 'removed') return member.removedVia === 'hub' ? 'rejoin' : 'blocked';
     return 'refresh';
 }
 
@@ -320,7 +327,7 @@ const listEntry = (name, role) => ({ name, role });
  * değişmez (yalnız platform kaldırır).
  * @returns {Promise<{ status: 'ok', role: string, created: boolean } | { status: 'blocked' }>}
  */
-export async function applyHubLogin({ db, hub, now = new Date(), env = process.env }) {
+export async function applyHubLogin({ db, hub, now = new Date(), env = process.env, startedAt = now }) {
     const t = hub.tenant;
     const paths = tenantPaths(t.id);
     const tenantRef = db.doc(tenantDocPath(t.id));
@@ -340,7 +347,8 @@ export async function applyHubLogin({ db, hub, now = new Date(), env = process.e
             trialEndsAt: timing.trialEndsAt,
             writeUntil: timing.writeUntil,
             readUntil: timing.readUntil,
-            status: cur?.status === 'suspended' ? 'suspended' : timing.status,
+            // Askı ve elle verilen salt okunur durum yalnız platformdan kalkar; Hub senkronu ezmez.
+            status: ['suspended', 'readonly'].includes(cur?.status) ? cur.status : timing.status,
             hubSyncedAt: now,
         };
         if (cur) tx.update(tenantRef, tenantPatch);
@@ -349,6 +357,10 @@ export async function applyHubLogin({ db, hub, now = new Date(), env = process.e
         const member = memberSnap.exists ? memberSnap.data() : null;
         const action = decideHubLogin(member);
         if (action === 'blocked') return { status: 'blocked' };
+        // Yarış (güvenlik incelemesi): Hub kodu doğruladıktan sonra gelen çıkarma olayı üyeliği kapattıysa,
+        // o eski doğrulama üyeliği yeniden açmaz. Hub doğrulaması `startedAt`'ten sonra yapıldı; kapanış
+        // ondan sonraysa kişi Hub'dan yeniden girmeli.
+        if (action === 'rejoin' && toMs(member.hubRemovedAt) >= startedAt.getTime()) return { status: 'stale' };
 
         const hubFields = {
             status: 'active',
@@ -359,15 +371,20 @@ export async function applyHubLogin({ db, hub, now = new Date(), env = process.e
             source: 'hub',
         };
         let role;
-        if (action === 'create' || action === 'convert') {
+        if (action === 'create' || action === 'convert' || action === 'rejoin') {
             role = talentRoleFromHub(t.role);
             const base = { ...hubFields, role, departments: [], ...(hub.displayName ? { displayName: hub.displayName } : {}) };
+            const del = admin.firestore.FieldValue.delete();
             if (action === 'create') tx.set(memberRef, { ...base, createdAt: now });
             else {
                 tx.update(memberRef, {
                     ...base,
-                    supportReason: admin.firestore.FieldValue.delete(),
-                    supportRequestedBy: admin.firestore.FieldValue.delete(),
+                    supportReason: del,
+                    supportRequestedBy: del,
+                    removedAt: del,
+                    removedBy: del,
+                    removedVia: del,
+                    hubRemovedAt: del,
                 });
             }
         } else {
@@ -377,6 +394,7 @@ export async function applyHubLogin({ db, hub, now = new Date(), env = process.e
                 removedAt: admin.firestore.FieldValue.delete(),
                 removedBy: admin.firestore.FieldValue.delete(),
                 removedVia: admin.firestore.FieldValue.delete(),
+                hubRemovedAt: admin.firestore.FieldValue.delete(),
             });
         }
         tx.set(listRef, { tenants: { [t.id]: listEntry(t.name, role) } }, { merge: true });
@@ -418,6 +436,8 @@ export async function closeMembershipFromHub({ db, tenantId, uid, occurredAt = n
             removedBy: 'hub',
             // Kaldırma yolu ayrı alanda: `removedBy` yöneticinin uid'si de olabilir.
             removedVia: 'hub',
+            // Kapanış anı (Date): uçuştaki bir Hub girişi bundan önce doğrulandıysa üyeliği yeniden açmaz.
+            hubRemovedAt: now,
             hubVerifiedAt: admin.firestore.FieldValue.delete(),
         });
         tx.set(listRef, { tenants: { [tenantId]: admin.firestore.FieldValue.delete() } }, { merge: true });
@@ -433,8 +453,8 @@ export async function closeMembershipFromHub({ db, tenantId, uid, occurredAt = n
 }
 
 /**
- * K11: süreli, salt okunur destek üyeliği. Şirket Talent'ta yoksa 'no_tenant'. Kişi şirketin etkin
- * (destek dışı) üyesiyse 'already_member': destek kaydı gerçek üyeliğin rolünü ezmesin. Açılış
+ * K11: süreli, salt okunur destek üyeliği. Şirket Talent'ta yoksa 'no_tenant'. Kişinin şirkette destek
+ * dışı bir üyelik kaydı varsa (etkin ya da kaldırılmış) 'already_member': destek kaydı onu ezmez. Açılış
  * şirketin denetim defterine (accessLogs) gerekçesiyle yazılır; şirket yöneticisi kendi defterinde görür.
  * @returns {Promise<'granted'|'no_tenant'|'already_member'>}
  */
@@ -448,7 +468,9 @@ export async function grantSupportAccess({ db, ev, now = new Date() }) {
         const [tenantSnap, memberSnap] = await tx.getAll(tenantRef, memberRef);
         if (!tenantSnap.exists) return 'no_tenant';
         const m = memberSnap.exists ? memberSnap.data() : null;
-        if (m && m.role !== 'support' && m.status === 'active') return 'already_member';
+        // Gerçek (destek dışı) üyelik hangi durumda olursa olsun ezilmez: kaldırılmış üyeliğin üzerine destek
+        // kaydı yazılsaydı yöneticinin engeli (removedVia: 'admin') ve rol/departman kaydı kaybolurdu.
+        if (m && m.role !== 'support') return 'already_member';
         tx.set(memberRef, {
             role: 'support',
             departments: [],
@@ -509,4 +531,25 @@ export async function consumeHubNonce(db, nonce, now = new Date()) {
         if (err?.code === 6 || /already exists/i.test(String(err?.message))) return false;
         throw err;
     }
+}
+
+/**
+ * Hub deneme bitişi nedeniyle reddettiyse (K5): şirketin yazma süresi hemen kapanır, okuma 14 gün daha
+ * açık kalır (zaten daha erken kapanıyorsa öne alınmaz). Ücretli plandan düşen şirket de böylece salt
+ * okunur banda girer; açık oturumlar Hub doğrulamasının süresini beklemez.
+ */
+export async function clampTenantForExpiredTrial({ db, tenantId, now = new Date() }) {
+    const ref = db.doc(tenantDocPath(tenantId));
+    return db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return false;
+        const t = snap.data();
+        const readCap = now.getTime() + READ_ONLY_GRACE_MS;
+        const patch = {};
+        if (!(toMs(t.writeUntil) <= now.getTime())) patch.writeUntil = now;
+        if (!(toMs(t.readUntil) <= readCap)) patch.readUntil = new Date(readCap);
+        if (Object.keys(patch).length === 0) return false;
+        tx.update(ref, { ...patch, hubSyncedAt: now });
+        return true;
+    });
 }

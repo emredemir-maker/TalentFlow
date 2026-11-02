@@ -205,19 +205,32 @@ kendi defterinde görür.
 - **Giriş jetonunu Hub basar** (CX/Meet gibi); Talent hesabına `serviceAccountTokenCreator` verilmedi. Jeton yalnız
   Talent sunucusundan tarayıcıya geçer, günlüğe yazılmaz.
 - **Hub doğrulamasının süresi:** Hub üyeliği yalnız kod değişiminde denetlediği için Hub üyeliğinin `expiresAt`'i son
-  Hub girişi + `HUB_VERIFY_MAX_AGE_HOURS` (varsayılan 24) olarak yazılır (Signals'taki `hub_verified_at` kuralının
+  Hub girişi + `HUB_VERIFY_MAX_AGE_HOURS` (1–24, varsayılan 24) olarak yazılır (Signals'taki `hub_verified_at` kuralının
   karşılığı; kurallar ve sunucu bu alanı zaten denetliyordu, kural değişikliği gerekmedi). Süre dolunca kişi Hub'dan
   Talent'ı yeniden açar; ekran bunu söyler. Çıkarma olayı bu süreyi beklemeden kapatır.
 - **Uçlar:** `POST /api/hub/exchange` (tarayıcı → Talent sunucusu), `POST /api/hub/membership-revoked`
   (`{type:'membership.removed', tenantId, uid, email?, occurredAt?}` — Signals'a giden olayla aynı gövde),
   `POST /api/hub/support-access` (`{type:'support.grant', tenantId, uid, email, reason, requestedBy, ttlHours?}` ve
   `{type:'support.revoke', …}`). Ayrıca `POST /api/admin/members/:uid/restore` (yöneticinin kaldırdığı üyeliği açar).
-- **Kaldırma yolu (`removedVia`):** Hub'ın kapattığı üyelik (`hub`) sonraki başarılı Hub girişiyle açılır; Talent
+- **Kaldırma yolu (`removedVia`):** Hub'ın kapattığı üyelik (`hub`) sonraki başarılı Hub girişiyle açılır ve rolü
+  **Hub'dan yeniden alır** (eski Talent rolü, ör. yönetici, geri gelmez; departmanlar sıfırlanır). Kapanıştan önce
+  doğrulanmış (uçuştaki) bir Hub girişi kapanmış üyeliği açmaz (409 `MEMBERSHIP_CHANGED`). Talent
   yöneticisinin kaldırdığı (`admin`) üyeliği Hub girişi açmaz, yönetici yeniden açar (Hub doğrulaması süresi dolmuş
   olarak; kişi Hub'dan yeniden girmeli). Geciken çıkarma olayı, `occurredAt`'ten sonra Hub'dan yeniden girmiş üyeliği
   kapatmaz.
 - **Hub reddi:** Hub kodu reddederse (`workspace_access_denied`) gerekçe `not_member` ya da gerekçesizse (eski Hub)
-  üyelik kapatılır; `trial_expired`, `inactive`, `app_disabled` geri alınabilir olduğu için kapatılmaz.
+  üyelik kapatılır; `trial_expired`, `inactive`, `app_disabled` geri alınabilir olduğu için kapatılmaz. `trial_expired`
+  şirketin yazmasını hemen kapatır (okuma 14 gün daha). Askıdaki ve elle salt okunur yapılmış şirketin durumu Hub
+  senkronunda değişmez.
+- **Destek kaydı gerçek üyeliği ezmez:** kişinin şirkette destek dışı bir üyelik kaydı varsa (kaldırılmış olsa da) 409.
+- **İmza ve Cloud Functions:** çalışma ortamı gövdeyi Express'ten önce okuduğu için imza `req.rawBody` üzerinden
+  doğrulanır (en çok 4 KB).
+- **Bilinen, kabul edilen riskler (izlenecek):** (a) Hub'dan çıkarma bildirimi Hub tarafında henüz yok (Hub-Inn #67'nin
+  olay kuyruğuna bağlı) → çıkarılan kişinin erişimi en çok 24 saat sürer; (b) giriş CSRF'i: saldırgan kendi 60 saniyelik
+  kodunu kurbana açtırırsa kurban saldırganın hesabıyla saldırganın şirketine girer (CX/Signals'ta da aynı; kodu
+  tarayıcıdaki bir durum değerine bağlamak ayrı iş); (c) destek erişimi yöneticinin olağan Hub hesabına açılır — o hesapta
+  iki adımlı doğrulama açık olmalı; (d) `platform/hubNonces/entries` için Firestore TTL politikası (`expireAt`) elle
+  tanımlanmalı.
 - **K5 açık nokta:** Hub, denemesi biten alanda `requireTenant` ile 402 döndürdüğü için kişi Hub'dan Talent'ı
   açamaz; salt okunur bant yalnız Hub doğrulaması geçerli oturumlarda (≤24 saat) görülür. 14 günlük salt okunur
   bandın Hub'dan da açılabilmesi Hub'da bir karar ister (Hub-Inn "Deneme" değişmez kuralı) — Emre'ye soruldu.

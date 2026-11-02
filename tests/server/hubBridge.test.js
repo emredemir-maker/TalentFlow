@@ -326,9 +326,21 @@ describe('üyelikten çıkarılan kişi düşer', () => {
         expect(await userTenants('ayse')).toEqual({});
         expect((await call('GET', '/api/users', { uid: 'ayse', tenant: TA })).status).toBe(403);
     });
-    it('Hub yeniden eklerse sonraki giriş üyeliği açar (rol korunur)', async () => {
+    it("Hub yeniden eklerse sonraki giriş üyeliği açar; eski Talent rolü geri gelmez, rol Hub'dan", async () => {
         expect((await hubLogin({ uid: 'ayse', tenantId: TA, role: 'member' })).status).toBe(200);
-        expect(await member(TA, 'ayse')).toMatchObject({ status: 'active', role: 'recruiter' });
+        expect(await member(TA, 'ayse')).toMatchObject({
+            status: 'active',
+            role: 'department_user',
+            departments: [],
+        });
+        // Sonraki girişte (etkin üye) Talent'taki rol korunur.
+        await call('PATCH', '/api/admin/members/ayse', {
+            uid: 'ali',
+            tenant: TA,
+            body: { role: 'recruiter' },
+        });
+        await hubLogin({ uid: 'ayse', tenantId: TA, role: 'member' });
+        expect((await member(TA, 'ayse')).role).toBe('recruiter');
     });
     it("geciken olay, ondan SONRA Hub'dan yeniden girmiş üyeliği kapatmaz", async () => {
         const r = await hubEvent('/api/hub/membership-revoked', {
@@ -389,6 +401,90 @@ describe('üyelikten çıkarılan kişi düşer', () => {
         expect(r.body.code).toBe('NOT_A_MEMBER');
         await hubLogin({ uid: 'fatih', tenantId: TA, role: 'manager' });
         expect((await call('GET', '/api/users', { uid: 'fatih', tenant: TA })).status).toBe(200);
+    });
+});
+
+describe('güvenlik incelemesi düzeltmeleri', () => {
+    it('yarış: Hub doğrulamasından sonra gelen çıkarma, uçuştaki girişle yeniden açılmaz', async () => {
+        const { applyHubLogin, closeMembershipFromHub } =
+            await import('../../functions/services/hubBridge.js');
+        await hubLogin({ uid: 'deniz', tenantId: TA, role: 'manager' });
+        const startedAt = new Date();
+        await closeMembershipFromHub({ db, tenantId: TA, uid: 'deniz', occurredAt: new Date() });
+        const hub = {
+            uid: 'deniz',
+            email: 'deniz@x.test',
+            tenant: {
+                id: TA,
+                name: 'Firma A',
+                slug: 'firma-a',
+                role: 'manager',
+                plan: 'active',
+                trialEndsAt: null,
+            },
+        };
+        expect(await applyHubLogin({ db, hub, startedAt })).toEqual({ status: 'stale' });
+        expect((await member(TA, 'deniz')).status).toBe('removed');
+        // Kapanıştan SONRA başlayan yeni Hub girişi açar.
+        expect((await hubLogin({ uid: 'deniz', tenantId: TA, role: 'manager' })).status).toBe(200);
+    });
+    it('deneme bitişi reddi şirketin yazmasını hemen kapatır, okuma 14 gün açık kalır', async () => {
+        const TD = 'dddddddd-1111-4111-8111-111111111111';
+        await hubLogin({ uid: 'eski', tenantId: TD, name: 'Firma D', plan: 'active' });
+        expect(
+            (
+                await call('POST', '/api/admin/retention', {
+                    uid: 'eski',
+                    tenant: TD,
+                    body: { months: 6 },
+                })
+            ).status
+        ).toBe(200);
+        const deny = {
+            code: 'workspace_access_denied',
+            uid: 'eski',
+            tenantId: TD,
+            reason: 'trial_expired',
+            error: 'x',
+        };
+        expect((await hubLogin({ uid: 'eski', status: 403, body: deny })).status).toBe(403);
+        expect(
+            (await call('GET', '/api/admin/retention', { uid: 'eski', tenant: TD })).status
+        ).toBe(200);
+        expect(
+            (
+                await call('POST', '/api/admin/retention', {
+                    uid: 'eski',
+                    tenant: TD,
+                    body: { months: 6 },
+                })
+            ).body.code
+        ).toBe('TENANT_READ_ONLY');
+        expect((await member(TD, 'eski')).status).toBe('active');
+    });
+    it('destek kaydı kaldırılmış gerçek üyeliğin üzerine yazılmaz (yönetici engeli korunur)', async () => {
+        await hubLogin({ uid: 'can', tenantId: TB, name: 'Firma B', role: 'member' });
+        expect(
+            (await call('DELETE', '/api/admin/members/can', { uid: 'bora', tenant: TB })).status
+        ).toBe(200);
+        const r = await hubEvent('/api/hub/support-access', {
+            type: 'support.grant',
+            tenantId: TB,
+            uid: 'can',
+            email: 'can@x.test',
+            reason: 'Engeli aşma denemesi — reddedilmeli',
+            requestedBy: 'emre@clyrolabs.com',
+        });
+        expect(r.status).toBe(409);
+        expect(await member(TB, 'can')).toMatchObject({
+            status: 'removed',
+            removedVia: 'admin',
+            role: 'department_user',
+        });
+        expect(
+            (await hubLogin({ uid: 'can', tenantId: TB, name: 'Firma B', role: 'member' })).body
+                .code
+        ).toBe('MEMBER_REMOVED');
     });
 });
 
@@ -580,6 +676,40 @@ describe('imzalı olay ucu korumaları', () => {
             ).status
         ).toBe(413);
         expect((await member(TB, 'bora')).status).toBe('active');
+    });
+    it('Cloud Functions gibi gövde önceden okunmuşsa (req.rawBody) imza ham baytlardan doğrulanır', async () => {
+        const express = (await import('express')).default;
+        const { createHubRouter } = await import('../../functions/routes/hub.js');
+        const app = express();
+        // Functions çalışma ortamının davranışı: akış tüketilir, ham gövde rawBody'de, req.body ayrıştırılmış.
+        app.use(
+            express.json({
+                verify: (req, _res, buf) => {
+                    req.rawBody = buf;
+                },
+            })
+        );
+        app.use(createHubRouter({ env }));
+        const srv = await new Promise((r) => {
+            const x = app.listen(0, '127.0.0.1', () => r(x));
+        });
+        const saved = base;
+        base = `http://127.0.0.1:${srv.address().port}`;
+        try {
+            const r = await hubEvent('/api/hub/membership-revoked', {
+                type: 'membership.removed',
+                tenantId: TB,
+                uid: 'yok-kisi-2',
+            });
+            expect(r.status).toBe(202);
+            expect(
+                (await hubEvent('/api/hub/membership-revoked', ev, { secret: 'y'.repeat(40) }))
+                    .status
+            ).toBe(401);
+        } finally {
+            base = saved;
+            await new Promise((r) => srv.close(r));
+        }
     });
     it('olay gizli değeri tanımsızsa 503', async () => {
         const saved = env.HUB_EVENTS_SECRET;

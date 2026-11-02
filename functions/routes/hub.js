@@ -19,6 +19,7 @@ import rateLimit from 'express-rate-limit';
 import { db } from '../config/firebaseAdmin.js';
 import {
     applyHubLogin,
+    clampTenantForExpiredTrial,
     closeMembershipFromHub,
     consumeHubNonce,
     exchangeHubCode,
@@ -68,6 +69,8 @@ const DENIAL_MESSAGES = {
 async function handleDenial(r) {
     if (r.reason === 'not_member' || r.reason === 'unknown') {
         await closeMembershipFromHub({ db, tenantId: r.tenantId, uid: r.uid, reason: `exchange_denied:${r.reason}` });
+    } else if (r.reason === 'trial_expired') {
+        await clampTenantForExpiredTrial({ db, tenantId: r.tenantId });
     }
 }
 
@@ -92,6 +95,8 @@ export function createHubRouter({ fetchImpl = fetch, env = process.env, exchange
             return res.status(503).json({ error: 'Clyro Hub bağlantısı yapılandırılmamış.' });
         }
         try {
+            // Hub doğrulaması bu andan SONRA yapılır (yarış denetimi, services/hubBridge.js › applyHubLogin).
+            const startedAt = new Date();
             const r = await exchangeHubCode(code, { apiBase, secret, fetch: fetchImpl });
             if (r.kind === 'invalid') {
                 return res.status(401).json({ error: 'Giriş bağlantısının süresi dolmuş ya da kullanılmış. Clyro Hub\'dan yeniden açın.' });
@@ -104,7 +109,13 @@ export function createHubRouter({ fetchImpl = fetch, env = process.env, exchange
                     code: 'WORKSPACE_ACCESS_DENIED',
                 });
             }
-            const out = await applyHubLogin({ db, hub: r, env });
+            const out = await applyHubLogin({ db, hub: r, env, startedAt });
+            if (out.status === 'stale') {
+                return res.status(409).json({
+                    error: 'Üyeliğiniz bu sırada Clyro Hub\'da kaldırıldı. Hub\'dan yeniden açın.',
+                    code: 'MEMBERSHIP_CHANGED',
+                });
+            }
             if (out.status === 'blocked') {
                 return res.status(403).json({
                     error: 'Bu şirketteki üyeliğiniz şirket yöneticisi tarafından kaldırılmış.',
@@ -134,7 +145,18 @@ export function createHubRouter({ fetchImpl = fetch, env = process.env, exchange
             res.status(503).json({ error: 'disabled' });
             return null;
         }
-        const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+        // Cloud Functions çalışma ortamı gövdeyi Express'ten ÖNCE okuyup `req.rawBody`'ye koyar; akış
+        // tükendiği için express.raw hiçbir şey okumaz (req.body ayrıştırılmış nesne kalır). İmza ham
+        // baytlar üzerinden: önce rawBody, yoksa (yerel sunucu, testler) express.raw'ın Buffer'ı.
+        const body = Buffer.isBuffer(req.rawBody) ? req.rawBody : Buffer.isBuffer(req.body) ? req.body : null;
+        if (!body) {
+            res.status(400).json({ error: 'invalid' });
+            return null;
+        }
+        if (body.length > MAX_EVENT_BODY) {
+            res.status(413).json({ error: 'too-large' });
+            return null;
+        }
         const v = verifyHubSignature(secret, { method: req.method, path: req.originalUrl, headers: req.headers, body });
         if (!v.ok) {
             log.warn({ reason: v.reason }, '[hub-olay] imza reddedildi');

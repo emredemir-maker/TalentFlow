@@ -49,6 +49,8 @@ describe('ortam', () => {
         expect(hubVerifyMaxAgeMs({ HUB_VERIFY_MAX_AGE_HOURS: '8' })).toBe(8 * 3_600_000);
         expect(hubVerifyMaxAgeMs({ HUB_VERIFY_MAX_AGE_HOURS: '0' })).toBe(24 * 3_600_000);
         expect(hubVerifyMaxAgeMs({ HUB_VERIFY_MAX_AGE_HOURS: '1000' })).toBe(24 * 3_600_000);
+        // Üst sınır 24 saat: çıkarma olayı gelmezse erişim en çok bu kadar sürer.
+        expect(hubVerifyMaxAgeMs({ HUB_VERIFY_MAX_AGE_HOURS: '168' })).toBe(24 * 3_600_000);
     });
 });
 
@@ -63,11 +65,14 @@ describe('K2 rol eşlemesi', () => {
     it('var olan üyenin rolü Hub girişinde ezilmez; yöneticinin kaldırdığı üyelik açılmaz', () => {
         expect(decideHubLogin(null)).toBe('create');
         expect(decideHubLogin({ role: 'recruiter', status: 'active' })).toBe('refresh');
-        expect(decideHubLogin({ role: 'recruiter', status: 'removed', removedVia: 'hub' })).toBe('refresh');
+        // Hub'dan çıkarılıp yeniden eklenen kişinin eski rolü (ör. yönetici) geri gelmez.
+        expect(decideHubLogin({ role: 'admin', status: 'removed', removedVia: 'hub' })).toBe('rejoin');
         expect(decideHubLogin({ role: 'recruiter', status: 'removed', removedVia: 'admin' })).toBe('blocked');
         // PR 2'de yolu yazılmamış eski kaldırma da kapalı kalır.
         expect(decideHubLogin({ role: 'recruiter', status: 'removed', removedBy: 'u1' })).toBe('blocked');
         expect(decideHubLogin({ role: 'support', status: 'active' })).toBe('convert');
+        // Yöneticinin kaldırdığı destek kaydı da Hub girişiyle açılmaz.
+        expect(decideHubLogin({ role: 'support', status: 'removed', removedVia: 'admin' })).toBe('blocked');
     });
 });
 

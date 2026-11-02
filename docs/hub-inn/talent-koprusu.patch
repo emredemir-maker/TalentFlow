@@ -1,4 +1,4 @@
-From 7e208f40da4f6f1435889462dd4c5cdacc37c9ad Mon Sep 17 00:00:00 2001
+From 9d9e6c8d8072720ea2f07381dbff4a896bce0714 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 2 Nov 2026 13:34:39 +0000
 Subject: [PATCH] feat: Talent server exchange and admin support access
@@ -28,9 +28,9 @@ Claude-Session: https://claude.ai/code/session_01Um6htWoisDhc2rfeHcJGfK
  apps/api/src/talent-bridge.test.ts          | 223 ++++++++++++++++++++
  apps/api/src/test-support.ts                |   5 +-
  docs/DECISIONS.md                           |   1 +
- docs/OPERATIONS.md                          |  34 +++
+ docs/OPERATIONS.md                          |  36 ++++
  docs/STATUS.md                              |   7 +
- 17 files changed, 557 insertions(+), 29 deletions(-)
+ 17 files changed, 559 insertions(+), 29 deletions(-)
  create mode 100644 apps/api/src/routes/admin/talent-support.ts
  create mode 100644 apps/api/src/services/talent-m2m.ts
  create mode 100644 apps/api/src/talent-bridge.test.ts
@@ -883,10 +883,10 @@ index b40c01e..81b0bc3 100644
  | 2026-11-01 | **Talent mülakat yapay zekâ sınırının bilinen iki boşluğu şimdilik kalır (Emre).** TalentFlow #327: canlı analiz 20/saat ve takip sorusu 10/saat sunucuda sayılır; (1) sayaç (Firestore) hata verirse süren mülakat kesilmesin diye sınır o an uygulanmaz, (2) etiketini değiştiren değiştirilmiş bir istemci bu sınırı atlayıp genel frenlere (IP başı dakika sınırı, bütçe freni) düşer. | Çok şirketli geçişte sıkılaştırılacak: şirket başı kota, mülakat kimliğine bağlı sayım, sayaç hatasında güvenli tarafta kalma. |
  | 2026-11-01 | **Talent fiyat ve analiz kuralları (Emre).** Aşım: 100 ön analiz 500 TL, 10 detaylı analiz 400 TL, 10 aday istihbarat 500 TL, 10 mülakat değerlendirmesi 500 TL. Uygulama içi mülakat ek paketi: 10 saat 1.990 TL, 40 saat 6.900 TL. Paket fiyatları ve kotalar aynı. Detaylı analiz kotası aday–pozisyon karşılaştırması başına; varsayılan yalnız atandığı pozisyon, diğer pozisyonlar ayrı seçim (kota önceden gösterilir). Elle ekleme / başvuru formu kendiliğinden detaylı analiz çalıştırmaz; ön analiz her yolda tek çağrı. "Otonom" ifadesi kalkar. Pahalı ses yedeği kapalı; yalnız uygulama içi mülakat ek paketi olan müşteride açık, diğerlerine "Bu özellik için Chrome kullanın". | Maliyet raporu (tahmin): Büyüme en kötü detaylı analiz 13.200 → ~2.300 TL. |
 diff --git a/docs/OPERATIONS.md b/docs/OPERATIONS.md
-index 14336ed..353bf90 100644
+index 14336ed..2f04e9a 100644
 --- a/docs/OPERATIONS.md
 +++ b/docs/OPERATIONS.md
-@@ -167,6 +167,40 @@ eski Platform sayfası ve `/api/platform/*` uçları kaldırıldı. Kim yönetic
+@@ -167,6 +167,42 @@ eski Platform sayfası ve `/api/platform/*` uçları kaldırıldı. Kim yönetic
  8. **Kontrol:** konsolda Şirketler açılıyor; hub.clyrolabs.com'da normal Google girişi kod sormuyor; hub.clyrolabs.com'dan
     `/api/admin/me` → 401/403. Sonucu STATUS.md'ye yaz; ROADMAP "Admin ekranı" kutusu canlıda doğrulanınca işaretlenir.
  
@@ -900,7 +900,9 @@ index 14336ed..353bf90 100644
 +Konsolda şirket sayfasındaki **Talent destek erişimi**: gerekçe (≥10 karakter) + süre (1–24 saat) → Hub, Talent'a imzalı
 +(CLYRO-M2M-V1, gönderen `hub`) istek gönderir; Talent o şirkette salt okunur, süreli `support` üyeliği açar. Kritik işlem
 +(taze kimlik); açma/kapatma işlem kaydına `talent.support_granted` / `talent.support_revoked` (`source = 'admin'`) düşer.
-+Erişim yöneticinin **aynı e-postalı Hub hesabına** açılır (konsol hesabı Talent'a giremez): hesap yoksa 409.
++Erişim yöneticinin **aynı e-postalı Hub hesabına** açılır (konsol hesabı Talent'a giremez): hesap yoksa 409. O Hub
++hesabı konsol kadar korunmadığı için (TOTP konsolda zorunlu, Hub'da değil) **Google hesabında iki adımlı doğrulama açık
++olmalı**; erişim penceresi en çok 24 saat ve şirketin Talent denetim defterinde gerekçesiyle görünür.
 +
 +Gizli değerler (değerler sohbete/günlüğe yazılmaz; Emre girer):
 +
