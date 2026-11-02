@@ -199,7 +199,7 @@ kendi defterinde görür.
 - **Kimlik OIDC değil, paylaşılan gizli değer.** Hub'daki mevcut ve CX/Meet/Signals'ın kullandığı desen izlendi:
   Talent → Hub kod değişimi `POST {HUB}/api/apps/server-exchange`, `Authorization: Bearer <HUB_EXCHANGE_SECRET>`
   (Hub'da `APP_EXCHANGE_SECRETS` içindeki `talent=`), Origin yok, yönlendirme izlenmez. Hub → Talent olayları
-  CLYRO-M2M-V1 HMAC imzasıyla (gönderen `hub`, ±120 sn, tek kullanımlık nonce `platform/hubNonces/entries/{nonce}`),
+  CLYRO-M2M-V1 HMAC imzasıyla (gönderen `hub`, ±120 sn, tek kullanımlık nonce `platform/hub/hubNonces/{nonce}`),
   gizli değer `HUB_EVENTS_SECRET` (Hub'da `TALENT_EVENTS_SECRET`; değişim değerinden farklı olmalı). OIDC'ye geçiş
   ileride tüm uygulamalar için birlikte yapılır.
 - **Giriş jetonunu Hub basar** (CX/Meet gibi); Talent hesabına `serviceAccountTokenCreator` verilmedi. Jeton yalnız
@@ -229,7 +229,7 @@ kendi defterinde görür.
   olay kuyruğuna bağlı) → çıkarılan kişinin erişimi en çok 24 saat sürer; (b) giriş CSRF'i: saldırgan kendi 60 saniyelik
   kodunu kurbana açtırırsa kurban saldırganın hesabıyla saldırganın şirketine girer (CX/Signals'ta da aynı; kodu
   tarayıcıdaki bir durum değerine bağlamak ayrı iş); (c) destek erişimi yöneticinin olağan Hub hesabına açılır — o hesapta
-  iki adımlı doğrulama açık olmalı; (d) `platform/hubNonces/entries` için Firestore TTL politikası (`expireAt`) elle
+  iki adımlı doğrulama açık olmalı; (d) `platform/hub/hubNonces` için Firestore TTL politikası (`expireAt`) elle
   tanımlanmalı.
 - **K5 açık nokta:** Hub, denemesi biten alanda `requireTenant` ile 402 döndürdüğü için kişi Hub'dan Talent'ı
   açamaz; salt okunur bant yalnız Hub doğrulaması geçerli oturumlarda (≤24 saat) görülür. 14 günlük salt okunur

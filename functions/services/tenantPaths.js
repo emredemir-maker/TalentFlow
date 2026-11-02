@@ -124,7 +124,7 @@ export const PLATFORM_PATHS = {
     /** Kişinin şirket listesi (şirket seçici). */
     userTenants: (uid) => `userTenants/${did(uid)}`,
     /** Hub → Talent imzalı olayların tek kullanımlık nonce'u (routes/hub.js). */
-    hubNonce: (nonce) => `platform/hubNonces/entries/${did(nonce)}`,
+    hubNonce: (nonce) => `platform/hub/hubNonces/${did(nonce)}`,
 };
 
 // ── Storage ────────────────────────────────────────────────────────────────
