@@ -638,7 +638,12 @@ export default function EmailTemplateEditorPage() {
                     </div>
                     <div>
                         <h2 className="text-base font-700 text-n900 font-semibold">E-posta Şablon Editörü</h2>
-                        <p className="text-xs text-n400">Aday e-postalarınızı özelleştirin</p>
+                        <p className="text-xs text-n400">
+                            Aday e-postalarınızı özelleştirin. Kaydedilen şablon gönderimde sunucuda kullanılır:
+                            e-posta <strong>noreply@clyrolabs.com</strong> adresinden şirket adınızla gider, aday
+                            yanıtlarsa yanıt gönderen işe alımcının kutusuna düşer. Değişkenler ({'{{candidateName}}'} vb.)
+                            güvenli biçimde metin olarak yerleştirilir.
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">

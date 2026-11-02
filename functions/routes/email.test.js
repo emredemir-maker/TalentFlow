@@ -39,3 +39,41 @@ describe('replyPatch (ortak gelen kutusu)', () => {
         expect(replyPatch({ ...req, status: 'responded', replyBody: 'eski' }, { from: 'aday@x.test' })).toBeNull();
     });
 });
+
+describe('yanıt kutusu okuma (PR 7b — işe alımcının kutusu)', async () => {
+    const { fetchGmailReplies, fetchGraphReplies, stripPlainReply, validIcs } = await import('./email.js');
+    const ID = 'ir-123e4567-e89b-12d3-a456-426614174000';
+    const b64u = (s) => Buffer.from(s).toString('base64url');
+    const jsonRes = (data) => ({ ok: true, status: 200, json: async () => data });
+
+    it('Gmail: konuda talep kimliği olan mesajın gönderenini ve yeni metnini çıkarır', async () => {
+        const fetchImpl = async (url) => {
+            if (url.includes('/messages?')) return jsonRes({ messages: [{ id: 'm1' }, { id: 'm2' }] });
+            if (url.includes('/m1')) {
+                return jsonRes({
+                    payload: {
+                        headers: [{ name: 'Subject', value: `Re: Bilgi Talebi [#${ID}]` }, { name: 'From', value: 'Aday <Aday@X.test>' }],
+                        mimeType: 'multipart/alternative',
+                        parts: [{ mimeType: 'text/plain', body: { data: b64u('Belgeler ekte.\n\nOn Mon, X wrote:\n> eski') } }],
+                    },
+                });
+            }
+            return jsonRes({ payload: { headers: [{ name: 'Subject', value: 'Başka bir konu ir' }] } });
+        };
+        const out = await fetchGmailReplies('tok', fetchImpl);
+        expect(out).toEqual([{ requestId: ID, from: 'aday@x.test', subject: `Re: Bilgi Talebi [#${ID}]`, replyBody: 'Belgeler ekte.' }]);
+    });
+
+    it('Microsoft Graph: HTML gövdeden alıntı atılır', async () => {
+        const fetchImpl = async () =>
+            jsonRes({ value: [{ subject: `YNT: Talep [#${ID}]`, from: { emailAddress: { address: 'Aday@X.test' } }, body: { contentType: 'html', content: '<p>Tamam</p><blockquote>eski</blockquote>' } }] });
+        const out = await fetchGraphReplies('tok', fetchImpl);
+        expect(out[0]).toMatchObject({ requestId: ID, from: 'aday@x.test', replyBody: 'Tamam' });
+    });
+
+    it('Türkçe alıntı satırı da kesilir; .ics doğrulaması', () => {
+        expect(stripPlainReply('Evet\n\n2 Kas 2026 tarihinde İK şunu yazdı:\n> soru')).toBe('Evet');
+        expect(validIcs('BEGIN:VCALENDAR\r\nEND:VCALENDAR')).toBe(true);
+        expect(validIcs('<script>')).toBe(false);
+    });
+});

@@ -828,7 +828,7 @@ function EmailSection() {
             <Table
                 headers={['Kanal', 'Kullanım', 'Kimlik Doğrulama']}
                 rows={[
-                    ['Nodemailer / Gmail SMTP', 'Kullanıcı davet e-postası (sistem → yeni kullanıcı)', 'EMAIL_USER + EMAIL_PASS secret'],
+                    ['Resend (noreply@clyrolabs.com)', 'Aday e-postaları — gönderen adı şirket, yanıt adresi işe alımcı', 'RESEND_API_KEY secret (yoksa gönderim kapalı)'],
                     ['Gmail API (OAuth 2.0)', 'Mülakat daveti (recruiter → aday/katılımcı)', 'googleAccessToken / googleRefreshToken (Firestore\'da saklı)'],
                 ]}
             />
@@ -950,8 +950,8 @@ function DeploySection() {
                     ['`VITE_FIREBASE_APP_ID`', 'Firebase app ID', 'Frontend'],
                     ['`GEMINI_API_KEY`', 'Gemini API anahtarı (yalnızca backend okur)', 'Backend'],
                     ['`INTEGRATION_ENCRYPTION_KEY`', 'OAuth jeton şifreleme anahtarı (base64, 32 bayt)', 'Backend'],
-                    ['`EMAIL_USER`', 'Gmail hesabı (Nodemailer)', 'Backend'],
-                    ['`EMAIL_PASS`', 'Gmail uygulama şifresi', 'Backend'],
+                    ['`RESEND_API_KEY`', 'Aday e-postaları (Resend); boşsa gönderim kapalı', 'Backend'],
+                    ['`MAIL_FROM_ADDRESS`', 'Gönderen adres (varsayılan noreply@clyrolabs.com)', 'Backend'],
                     ['`GITHUB_PERSONAL_ACCESS_TOKEN_NEW`', 'GitHub push tokeni', 'CI/CD'],
                 ]}
             />
