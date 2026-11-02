@@ -39,7 +39,8 @@ import RequirementReviewPanel from '../components/RequirementReviewPanel';
 import RequirementListEditor from '../components/RequirementListEditor';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
-import { tc, withTenantParam } from '../config/tenantPaths';
+import { tc } from '../config/tenantPaths';
+import { usePublicLinkUrl } from '../context/PublicLinkContext';
 
 const STATUS_CONFIG = {
     open:             { label: 'Aktif',        pill: 'bg-ok-bg text-ok-text border-transparent', dot: 'bg-ok' },
@@ -90,11 +91,12 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
             .slice(0, 10);
     }, [pos, candidates]);
 
-    // Build the apply URL
-    // Şirket bağlantıda (?tenantId=…; PR 5'te publicLinks gelir).
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const baseUrl = withTenantParam(`${origin}/apply/${pos.id}`);
-    const applyUrl = `${baseUrl}&ref=${encodeURIComponent(linkSource.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`;
+    // Başvuru bağlantısı: sunucudan alınan rastgele bağlantı kimliği
+    // (/apply/{linkId}); şirket ve ilan kimliği adreste yer almaz (§2.5).
+    const baseUrl = usePublicLinkUrl('position', pos.id);
+    const applyUrl = baseUrl
+        ? `${baseUrl}?ref=${encodeURIComponent(linkSource.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`
+        : null;
 
     // Load applications when tab opens
     useEffect(() => {
@@ -118,6 +120,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     }, []);
 
     function copyLink() {
+        if (!applyUrl) return;
         navigator.clipboard.writeText(applyUrl).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -638,7 +641,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             <div className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] mb-2">OLUŞTURULAN LİNK</div>
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 bg-n0 border border-n200 rounded-md px-3 py-2.5 text-[12px] font-mono text-n600 break-all leading-relaxed">
-                                    {applyUrl}
+                                    {applyUrl || 'Bağlantı hazırlanıyor…'}
                                 </div>
                                 <button
                                     onClick={copyLink}
@@ -651,7 +654,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 
                         {/* Preview button */}
                         <a
-                            href={applyUrl}
+                            href={applyUrl || undefined}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center justify-center gap-2 w-full py-3 rounded-md border border-brand-100 text-brand font-semibold text-xs hover:bg-brand-50 transition-colors"

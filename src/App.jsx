@@ -18,6 +18,7 @@ import DemoBanner from './components/DemoBanner';
 // shipping a separate chunk just to wait for it on cold start hurts TTI.
 import LoginPage from './pages/LoginPage';
 import { ReadOnlyBanner, tenantGateScreen } from './components/TenantGate';
+import { PublicLinkGate } from './context/PublicLinkContext';
 
 /**
  * Deploy sırasında AÇIK kalan sekmeler için sayfa yükleyici.
@@ -111,12 +112,14 @@ export default function App() {
                 <Routes>
                   <Route path="/live-interview/:sessionId" element={<LiveInterviewPage />} />
                   <Route path="/face-interview/:sessionId" element={<FaceToFacePage />} />
-                  <Route path="/join/:sessionId" element={<LiveInterviewPage />} />
+                  {/* Aday bağlantıları: yalnız rastgele bağlantı kimliği; şirket ve
+                      hedef kayıt sunucuda çözülür (PublicLinkGate, §2.5). */}
+                  <Route path="/join/:linkId" element={<PublicLinkGate kinds={['interview']}><LiveInterviewPage /></PublicLinkGate>} />
                   <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
                   <Route path="/nasil-calisir" element={<TanitimPage />} />
                   <Route path="/exit" element={<CandidateExitPage />} />
-                  <Route path="/apply/:positionId" element={<ApplyPage />} />
-                  <Route path="/respond/:id" element={<CandidateRespondPage />} />
+                  <Route path="/apply/:linkId" element={<PublicLinkGate kinds={['position']}><ApplyPage /></PublicLinkGate>} />
+                  <Route path="/respond/:linkId" element={<PublicLinkGate kinds={['infoRequest', 'interview']}><CandidateRespondPage /></PublicLinkGate>} />
                   <Route path="/auth/microsoft/callback" element={<MicrosoftCallbackPage />} />
                   <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                   <Route path="/hub-giris" element={<HubLaunchPage />} />

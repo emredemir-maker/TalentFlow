@@ -37,8 +37,9 @@ import path from 'path';
 import { generalLimiter } from '../middleware/rateLimit.js';
 import { randomUUID } from 'crypto';
 
-import { requireTenant, loadPublicTenant, WRITER_ROLES } from '../middleware/auth.js';
+import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
 import { isValidDocId } from '../services/tenantPaths.js';
+import { ensurePublicLink, resolvePublicLink } from '../services/publicLinks.js';
 import { db, admin } from '../config/firebaseAdmin.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('email');
@@ -216,8 +217,7 @@ router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES
     try {
         const requestId = `ir-${randomUUID()}`;
         const APP_URL = resolveAppUrl();
-        // Şirket kimliği bağlantıda (geçici — PR 5'te publicLinks).
-        const respondUrl = `${APP_URL}/respond/${requestId}?type=info&tenantId=${encodeURIComponent(req.tenant.id)}`;
+        let respondUrl = '';
         try {
             // Rol ve şirket requireTenant'ta denetlendi; kayıt şirketin yolunda.
             await db.doc(req.paths.infoRequest(requestId)).set(
@@ -240,6 +240,15 @@ router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES
         } catch (dbErr) {
             log.warn({ err: dbErr.message }, '⚠️ infoRequests Firestore write failed (non-fatal)');
         }
+        // Aday bağlantısı yalnız rastgele bir kimlik taşır (publicLinks, §2.5):
+        // şirket ve talep sunucuda bağlantıdan çözülür.
+        const link = await ensurePublicLink({
+            tenantId: req.tenant.id,
+            kind: 'infoRequest',
+            targetId: requestId,
+            createdBy: req.user.uid,
+        });
+        respondUrl = `${APP_URL}${link.path}`;
         const items = Array.isArray(requestedItems) && requestedItems.length
             ? requestedItems.map(i => `<li style="margin:6px 0;">📎 ${i}</li>`).join('') : '';
         const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;color:#334155;max-width:600px;margin:0 auto;padding:32px;">
@@ -275,31 +284,35 @@ router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES
 });
 
 // ─── Candidate Respond (public — no auth required) ────────────────────────────
-// Şirket: bağlantıdaki `tenantId` (geçici — PR 5'te publicLinks çözücüsü
-// gelir ve bağlantı yalnız rastgele bir kimlik taşır). Kimlik hâlâ yetki
-// anahtarı; şirket kimliği yalnız aramayı o şirketin ağacına daraltır.
+// Şirket ve kayıt herkese açık bağlantıdan (publicLinks, §2.5): `type: 'info'`
+// yalnız bilgi talebi bağlantısıyla, `type: 'invite'` yalnız mülakat
+// bağlantısıyla. Gövdedeki şirket/kayıt kimliği yok sayılır.
 router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
-    const { id, type, action, responseData, tenantId } = req.body;
-    if (!id || !type) return res.status(400).json({ error: 'id ve type gereklidir.' });
-    if (!isValidDocId(id)) return res.status(404).json({ error: 'Talep bulunamadı.' });
+    const { link: linkId, type, action, responseData } = req.body || {};
+    if (!linkId || !type) return res.status(400).json({ error: 'link ve type gereklidir.' });
+    if (type !== 'info' && type !== 'invite') return res.status(400).json({ error: 'Geçersiz type.' });
     try {
         // Kapalı/salt okunur/askıdaki şirkete aday yazımı yok (K5).
-        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
-        if (!tenant) return res.status(404).json({ error: 'Talep bulunamadı.' });
-        const paths = tenant.paths;
+        const link = await resolvePublicLink(String(linkId), {
+            kinds: [type === 'info' ? 'infoRequest' : 'interview'],
+            write: true,
+        });
+        if (!link) return res.status(404).json({ error: 'Talep bulunamadı.' });
+        const paths = link.tenant.paths;
+        const id = link.targetId;
         const now = admin.firestore.FieldValue.serverTimestamp();
         if (type === 'info') {
             const ref = db.doc(paths.infoRequest(id));
             const snap = await ref.get();
             if (!snap.exists) return res.status(404).json({ error: 'Talep bulunamadı.' });
-            await ref.update({ status: 'responded', responseData: responseData || '', respondedAt: now });
+            await ref.update({ status: 'responded', responseData: String(responseData ?? '').slice(0, 10000), respondedAt: now });
             const data = snap.data();
             if (data.sessionId && isValidDocId(data.sessionId)) {
                 await db.doc(paths.interview(data.sessionId)).set({
                     infoResponses: admin.firestore.FieldValue.arrayUnion({
                         requestId: id,
                         candidateName: data.candidateName,
-                        responseData: responseData || '',
+                        responseData: String(responseData ?? '').slice(0, 10000),
                         respondedAt: new Date().toISOString(),
                     }),
                 }, { merge: true });

@@ -6,15 +6,17 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 import { installTenantFetch } from './services/tenantFetch';
-import { setActiveTenantId, tenantFromLocation } from './config/tenantPaths';
-import { isPublicPath } from './context/AuthContext';
+import { setActiveTenantId } from './config/tenantPaths';
+import { publicPageTenant } from './context/AuthContext';
 
 // Kendi API'mize giden isteklere etkin şirket başlığı (X-Tenant-Id).
 installTenantFetch();
 
-// Aday sayfaları şirketi bağlantıdan alır (?tenantId=…, PR 5'e kadar). İlk
-// çizimden ÖNCE: sayfanın ilk okuması şirket yolunu kullanıyor.
-if (isPublicPath()) setActiveTenantId(tenantFromLocation());
+// Herkese açık iç sayfalar (/live-interview, /interview-report, /face-interview)
+// şirketi adresteki ipucundan alır; ilk çizimden ÖNCE. Aday bağlantılarında
+// (/apply, /join, /respond) şirketi PublicLinkGate sunucudan çözer.
+const initialTenant = publicPageTenant();
+if (initialTenant) setActiveTenantId(initialTenant);
 
 const container = document.getElementById('root');
 if (!container) {

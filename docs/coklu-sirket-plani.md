@@ -454,10 +454,16 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
   OAuth bağlama department_user'a da açık; `support` hiçbir yazma ucunu açamaz.
 - **Platform yöneticisi:** `PLATFORM_ADMIN_EMAILS` (her istekte okunur, e-posta doğrulanmış olmalı) yalnız
   `/api/admin/api-keys`, `/api/admin/integrations`, `/api/platform/usage`; şirket verisi için üyelik şart.
-- **Aday tarafı (geçici, PR 5'e kadar):** `/api/positions/:id`, `/api/applications`, `/api/session/:id`,
-  `/api/init-interview-session`, `/api/update-candidate-status`, `/api/candidate-respond` şirketi sorgu/gövdedeki
-  `tenantId`'den alır; kayıt kimliği yetki anahtarı olarak kalır, şirket kimliği aramayı o şirketin ağacına daraltır.
-  Yeni mülakat belgesini yalnız şirketin admin/recruiter'ı açar. PR 5'te `publicLinks` çözücüsü bunun yerini alır.
+- **Aday tarafı (PR 5, `publicLinks`):** aday bağlantıları yalnız rastgele bir kimlik taşır (`/apply/{linkId}`,
+  `/join/{linkId}`, `/respond/{linkId}`; 16 bayt base64url). `publicLinks/{linkId}` = `{tenantId, kind:
+  position|interview|infoRequest, targetId, candidateId?, createdBy, createdAt, revokedAt?}`; yalnız sunucu yazar/okur.
+  `POST /api/public-links {kind, targetId, candidateId?}` (admin/recruiter, hedef kendi şirketinde; aynı kayıt için
+  aynı bağlantı), `GET /api/public/resolve/:linkId` (hız sınırlı; bilinmeyen/iptal/kapalı şirket → 404).
+  Aday uçları gövdede `link` alır, şirket ve hedefi bağlantıdan çözer; sorgu/gövdedeki `tenantId` yolu **kaldırıldı**:
+  `GET /api/public/positions/:linkId`, `POST /api/applications {link,…}`, `GET /api/session/:linkId` (aday belgesi
+  doğrudan, tarama yok), `POST /api/update-candidate-status {link,…}`, `POST /api/candidate-respond {link, type}`
+  (tür bağlantıya bağlı). `POST /api/init-interview-session`: iç kullanıcı `X-Tenant-Id` + üyelikle oluşturur; aday
+  `{link}` ile yalnız var olan oturuma korumasız alan yazar. Bilgi talebi bağlantısını `send-info-request` üretir.
 - **Kaldırılanlar (K3):** `POST /api/auth/invitation-lookup`, `POST /api/send-invite`. `DELETE /api/admin/auth-user/:uid`
   (ve `DELETE /api/admin/members/:uid`) artık üyeliği kaldırır (`status: removed`, son yönetici kilidi), Firebase
   hesabına dokunmaz.

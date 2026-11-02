@@ -123,6 +123,9 @@ export const PLATFORM_PATHS = {
     usage: 'platformUsage',
     /** Kişinin şirket listesi (şirket seçici). */
     userTenants: (uid) => `userTenants/${did(uid)}`,
+    /** Herkese açık bağlantılar (aday sayfaları, §2.5) — yalnız sunucu okur/yazar. */
+    publicLinks: 'publicLinks',
+    publicLink: (id) => `publicLinks/${did(id)}`,
 };
 
 // ── Storage ────────────────────────────────────────────────────────────────

@@ -2,22 +2,27 @@
 // Public page — no auth required.
 // Handles candidate responses to interview invitations and info requests.
 import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
     CheckCircle2, XCircle, Loader2, AlertCircle, Send,
     FileText, Calendar, Clock, Paperclip, Sparkles
 } from 'lucide-react';
-import { tc, getActiveTenantId } from '../config/tenantPaths';
+import { tc } from '../config/tenantPaths';
+import { usePublicLink } from '../context/PublicLinkContext';
 import { publicApiHeaders } from '../services/publicApi';
 
 const API_BASE = import.meta.env.VITE_SERVER_URL || '';
 
 export default function CandidateRespondPage() {
-    const { id } = useParams();
+    // Bağlantı (/respond/:linkId) PublicLinkGate'te çözüldü. Tür bağlantıdan:
+    // bilgi talebi → 'info', mülakat → 'invite'. Adresteki ?type yok sayılır.
+    const publicLink = usePublicLink();
+    const id = publicLink?.targetId;
+    const linkId = publicLink?.linkId;
+    const type = publicLink?.kind === 'infoRequest' ? 'info' : 'invite';
     const [searchParams] = useSearchParams();
-    const type = searchParams.get('type') || 'invite'; // 'invite' | 'info'
     const actionParam = searchParams.get('action');     // 'confirm' | 'decline' (for invite)
 
     const [loading, setLoading]           = useState(true);
@@ -72,7 +77,7 @@ export default function CandidateRespondPage() {
             const res = await fetch(`${API_BASE}/api/candidate-respond`, {
                 method: 'POST',
                 headers: await publicApiHeaders(),
-                body: JSON.stringify({ tenantId: getActiveTenantId(), id, type: 'invite', action }),
+                body: JSON.stringify({ link: linkId, type: 'invite', action }),
             });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Yanıt kaydedilemedi.'); }
             setDone(true);
@@ -91,7 +96,7 @@ export default function CandidateRespondPage() {
             const res = await fetch(`${API_BASE}/api/candidate-respond`, {
                 method: 'POST',
                 headers: await publicApiHeaders(),
-                body: JSON.stringify({ tenantId: getActiveTenantId(), id, type: 'info', responseData: responseText }),
+                body: JSON.stringify({ link: linkId, type: 'info', responseData: responseText }),
             });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Yanıt gönderilemedi.'); }
             setDone(true);

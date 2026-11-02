@@ -3,7 +3,7 @@
 // Aday sayfası anonim oturumla açılır; iç kullanıcı (recruiter) aynı uçları
 // kendi oturumuyla çağırır — yeni mülakat belgesini sunucu yalnız şirketin
 // admin/recruiter'ına açtırır, bu yüzden oturum varsa jeton eklenir. Şirket
-// kimliği gövdede `tenantId` (PR 5'e kadar; sonra publicLinks).
+// kimliği istemciden gitmez: aday uçları gövdede `link` (publicLinks) alır.
 import { auth } from '../config/firebase';
 
 export async function publicApiHeaders() {
