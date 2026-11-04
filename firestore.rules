@@ -131,9 +131,8 @@ service cloud.firestore {
     // ── Candidates ────────────────────────────────────────────────────────────
     // • create: anonymous candidates submitting public forms
     // • get:    document-level read —
-    //     - Anonymous users (live interview candidates): can read any candidate
-    //       document by ID. The session ID (128-bit UUID capability token) is
-    //       the access gate; without the link they can't know the candidate ID.
+    //     - Anonim oturum okuyamaz: anonim oturumu herkes alabiliyor. Canlı mülakat
+    //       adayı aday kaydına değil /interviews/{sessionId} belgesine bakar.
     //     - Authenticated recruiter: sees all candidates
     //     - Authenticated dept_user: only candidates in their departments array
     // • list:   query-level — recruiter or dept_user (client code sends a
@@ -141,9 +140,7 @@ service cloud.firestore {
     // • update/delete: recruiter or super_admin only
     match /artifacts/talent-flow/public/data/candidates/{candidateId} {
       allow create:        if isAuthenticatedIncAnon();
-      allow get:           if (isAuthenticatedIncAnon() &&
-                                request.auth.token.firebase.sign_in_provider == 'anonymous') ||
-                              canAccessCandidate(resource.data);
+      allow get:           if canAccessCandidate(resource.data);
       // LİSTELEME KISITI KURALDA, İSTEMCİDE DEĞİL.
       //
       // Eskiden burada yalnızca `isDepartmentUser()` vardı ve hangi belgelerin
@@ -378,9 +375,29 @@ service cloud.firestore {
     //           /api/init-interview-session kimlik istemediği için orada
     //           süzülmezse bu kural atlatılabilirdi.
     // • delete: denied
+    // • get:    iç kullanıcı hepsini okur. Bağlantıyla gelen aday yalnız süren görüşmeyi
+    //           okur: görüşme bitince ya da değerlendirme yazılınca dinleyicisi izin hatası
+    //           alır, aday ekranı bunu görüşmenin bitişi sayar (LiveInterviewPage).
+    // • list:   yalnız profili olan iç kullanıcı; şifreyle açılmış profilsiz hesap değil.
+    function isInternalUser() {
+      return isRecruiter() || isDepartmentUser();
+    }
+
+    function isClosedInterview(data) {
+      return data.get('status', '') == 'completed' ||
+        data.get('mode', '') == 'manual' ||
+        data.get('aiAnalysis', null) != null ||
+        data.get('aggregateScore', null) != null ||
+        data.get('recommendedOutcome', null) != null ||
+        data.get('interviewScore', null) != null ||
+        data.get('aiOverallScore', null) != null ||
+        data.get('aiSummary', null) != null ||
+        data.get('starScores', null) != null;
+    }
+
     match /interviews/{sessionId} {
-      allow get:    if true;
-      allow list:   if isStrictAuthenticated();
+      allow get:    if resource == null || !isClosedInterview(resource.data) || isInternalUser();
+      allow list:   if isInternalUser();
       allow create: if isStrictAuthenticated();
       allow update: if isRecruiter() ||
                        (isAuthenticatedIncAnon() &&

@@ -449,6 +449,11 @@ export default function LiveInterviewPage() {
             }
         }, (err) => {
             console.error('[Candidate Listener] Firestore error:', err.message);
+            // Kurallar biten görüşmeyi adaya kapatır; izin hatası görüşmenin bittiği demektir.
+            if (err.code === 'permission-denied') {
+                setApiSessionLoading(false);
+                setApiSession(prev => ({ ...(prev || { sessionId }), status: 'completed' }));
+            }
         });
 
         return () => unsub();

@@ -80,6 +80,10 @@ beforeAll(async () => {
         [`${D}/accessLogs/l-1`]: { uid: U.recruiter },
         [`${D}/usage/2026-10-29`]: { tokens: 1 },
         [`interviews/s-1`]: { candidateId: 'c-eng', transcript: [], aiAnalysis: null },
+        [`interviews/s-done`]: { candidateId: 'c-eng', status: 'completed', transcript: [] },
+        [`interviews/s-scored`]: { candidateId: 'c-eng', aiAnalysis: { score: 80 } },
+        [`interviews/s-zero`]: { candidateId: 'c-eng', aiOverallScore: 0 },
+        [`interviews/s-manual`]: { candidateId: 'c-eng', mode: 'manual', transcript: 'not' },
         [`elsewhere/x`]: { a: 1 },
     });
 });
@@ -128,9 +132,9 @@ describe('applications', () => {
 });
 
 describe('candidates', () => {
-    it('anonim oturum aday oluşturur ve herhangi bir adayı tekil okur (BUGÜN — PR 1 kapatır)', async () => {
+    it('anonim oturum aday oluşturur ama hiçbir adayı okuyamaz', async () => {
         await allow(anon().collection(`${D}/candidates`).add({ name: 'x' }));
-        await allow(anon().doc(`${D}/candidates/c-sales`).get());
+        await deny(anon().doc(`${D}/candidates/c-sales`).get());
     });
     it('anonim liste ve kimliksiz okuma reddedilir', async () => {
         await deny(anon().collection(`${D}/candidates`).get());
@@ -413,11 +417,23 @@ describe('usage', () => {
 });
 
 describe('interviews (kök koleksiyon)', () => {
-    it('kimliksiz tekil okur, listeleyemez; iç oturum listeler', async () => {
+    it('kimliksiz süren görüşmeyi tekil okur, listeleyemez; yalnız profilli iç kullanıcı listeler', async () => {
         await allow(unauth().doc('interviews/s-1').get());
+        await allow(unauth().doc('interviews/henuz-yok').get());
         await deny(unauth().collection('interviews').get());
         await deny(anon().collection('interviews').get());
-        await allow(as(U.noProfile).collection('interviews').get());
+        await deny(as(U.noProfile).collection('interviews').get());
+        await allow(as(U.recruiter).collection('interviews').get());
+        await allow(as(U.dept).collection('interviews').get());
+    });
+    it('biten, değerlendirilen ya da elle girilen görüşmeyi yalnız iç kullanıcı okur', async () => {
+        for (const id of ['s-done', 's-scored', 's-zero', 's-manual']) {
+            await deny(unauth().doc(`interviews/${id}`).get());
+            await deny(anon().doc(`interviews/${id}`).get());
+            await deny(as(U.noProfile).doc(`interviews/${id}`).get());
+            await allow(as(U.recruiter).doc(`interviews/${id}`).get());
+            await allow(as(U.dept).doc(`interviews/${id}`).get());
+        }
     });
     it('yalnız iç oturum oluşturur; silme kapalı', async () => {
         await allow(as(U.noProfile).doc('interviews/s-2').set({ candidateId: 'c-eng' }));

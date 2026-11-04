@@ -90,7 +90,11 @@ app.use(generalLimiter);
 app.use(demoBlock);
 
 // Serve static files from uploads directory (CV downloads, etc.)
-app.use('/uploads', express.static(path.join(uploadBaseDir, 'uploads')));
+// Yalnız yerelde: bu rota oturum istemez. Sunucuda geçici yüklemeler /tmp altında
+// durur ve CV'ler Storage'dan indirme adresiyle açılır (bkz. routes/cv.js).
+if (!isServerless) {
+    app.use('/uploads', express.static(path.join(uploadBaseDir, 'uploads')));
+}
 
 // ── Mount all route modules ───────────────────────────────────────────────
 // Every router declares absolute /api/... paths inside, so app.use(router)
