@@ -384,7 +384,7 @@ service cloud.firestore {
     }
 
     function isClosedInterview(data) {
-      return data.get('status', '') == 'completed' ||
+      return data.get('status', '') in ['completed', 'superseded'] ||
         data.get('mode', '') == 'manual' ||
         data.get('aiAnalysis', null) != null ||
         data.get('aggregateScore', null) != null ||
@@ -401,8 +401,9 @@ service cloud.firestore {
       allow create: if isStrictAuthenticated();
       allow update: if isRecruiter() ||
                        (isAuthenticatedIncAnon() &&
+                        !isClosedInterview(resource.data) &&
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-                          'aiAnalysis', 'aggregateScore', 'recommendedOutcome',
+                          'mode', 'aiAnalysis', 'aggregateScore', 'recommendedOutcome',
                           'interviewScore', 'aiOverallScore', 'aiSummary',
                           'starScores', 'questions', 'currentQuestionIndex',
                           'candidateResponse', 'candidateId'

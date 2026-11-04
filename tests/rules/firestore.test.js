@@ -81,6 +81,7 @@ beforeAll(async () => {
         [`${D}/usage/2026-10-29`]: { tokens: 1 },
         [`interviews/s-1`]: { candidateId: 'c-eng', transcript: [], aiAnalysis: null },
         [`interviews/s-done`]: { candidateId: 'c-eng', status: 'completed', transcript: [] },
+        [`interviews/s-superseded`]: { candidateId: 'c-eng', status: 'superseded' },
         [`interviews/s-scored`]: { candidateId: 'c-eng', aiAnalysis: { score: 80 } },
         [`interviews/s-zero`]: { candidateId: 'c-eng', aiOverallScore: 0 },
         [`interviews/s-manual`]: { candidateId: 'c-eng', mode: 'manual', transcript: 'not' },
@@ -426,8 +427,14 @@ describe('interviews (kök koleksiyon)', () => {
         await allow(as(U.recruiter).collection('interviews').get());
         await allow(as(U.dept).collection('interviews').get());
     });
+    it('kapanan görüşmeyi bağlantıyla gelen yeniden açamaz', async () => {
+        await deny(anon().doc('interviews/s-done').update({ status: 'live' }));
+        await deny(anon().doc('interviews/s-superseded').update({ status: 'live' }));
+        await deny(anon().doc('interviews/s-1').update({ mode: 'manual' }));
+        await allow(as(U.recruiter).doc('interviews/s-done').update({ note: 'x' }));
+    });
     it('biten, değerlendirilen ya da elle girilen görüşmeyi yalnız iç kullanıcı okur', async () => {
-        for (const id of ['s-done', 's-scored', 's-zero', 's-manual']) {
+        for (const id of ['s-done', 's-superseded', 's-scored', 's-zero', 's-manual']) {
             await deny(unauth().doc(`interviews/${id}`).get());
             await deny(anon().doc(`interviews/${id}`).get());
             await deny(as(U.noProfile).doc(`interviews/${id}`).get());

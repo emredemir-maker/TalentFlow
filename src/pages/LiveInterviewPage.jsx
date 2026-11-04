@@ -2100,7 +2100,7 @@ export default function LiveInterviewPage() {
                         <div>
                             <h1 className="text-[13px] font-semibold tracking-[-0.01em] m-0">Canlı Mülakat</h1>
                             <span className="text-[10px] text-n400">
-                                {candidateData?.name}
+                                {candidateData?.name || apiSession?.candidateName}
                                 {candidateData?.position ? ` · ${candidateData.position}` : ''}
                             </span>
                         </div>
@@ -2823,7 +2823,7 @@ export default function LiveInterviewPage() {
                         <div className="w-6 h-6 rounded-md bg-white/5 overflow-hidden border border-white/10">
                             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidateData?.name}`} alt="C" className="w-full h-full object-cover" />
                         </div>
-                        <span className="text-[10px] font-bold text-white/90 italic">{candidateData?.name}</span>
+                        <span className="text-[10px] font-bold text-white/90 italic">{candidateData?.name || apiSession?.candidateName}</span>
                     </div>
                 </div>
                 {sttUnsupported && (

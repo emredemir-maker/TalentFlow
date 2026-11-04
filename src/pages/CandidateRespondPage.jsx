@@ -48,7 +48,7 @@ export default function CandidateRespondPage() {
                     if (actionParam && !d.candidateResponse?.status) setSelectedAction(actionParam);
                 }
             } catch (err) {
-                setError(err.message);
+                setError(err.code === 'permission-denied' ? 'Bu görüşme kapandı.' : err.message);
             } finally {
                 setLoading(false);
             }
