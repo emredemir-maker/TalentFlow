@@ -17,9 +17,12 @@ export const HUB_ONLY_ERROR = { error: 'Clyro Talent\'e Clyro Hub üzerinden gir
 export const MAX_IDENTITY_AGE_SECONDS = 14 * 24 * 60 * 60;
 
 export function hubOnlyMode(env = process.env) {
-    const v = (env.HUB_ONLY_LOGIN || '').trim();
+    const v = (env.HUB_ONLY_LOGIN || '').trim().toLowerCase();
     if (!v || v === 'off') return 'off';
-    return v === 'enforce' ? 'enforce' : 'report';
+    if (v === 'enforce' || v === 'report') return v;
+    // Yanlış yazım kapıyı kapatmaz: günlükte görünsün.
+    console.error('[hub-only] HUB_ONLY_LOGIN tanınmıyor; report sayıldı');
+    return 'report';
 }
 
 /**

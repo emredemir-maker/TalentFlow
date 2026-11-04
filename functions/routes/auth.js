@@ -37,6 +37,22 @@ const router = Router();
 
 // ─── Microsoft 365 ────────────────────────────────────────────────────────────
 
+/**
+ * Erişim jetonunun Google'daki sahibi; jeton geçersizse ya da e-posta doğrulanmamışsa null.
+ * @param {string} accessToken
+ * @returns {Promise<string | null>}
+ */
+export async function googleTokenEmail(accessToken, fetchFn = fetch) {
+    const res = await fetchFn('https://openidconnect.googleapis.com/v1/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const info = await res.json();
+    return info.email_verified === true && typeof info.email === 'string' ? info.email : null;
+}
+
+export const sameAccount = (a, b) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+
 // Giriş ekranı: doğrudan giriş düğmeleri gösterilsin mi. Yalnız ekranı ayarlar; asıl kapı middleware/auth.js.
 router.get('/api/auth/login-options', (req, res) => {
     res.json({ hubOnly: hubOnlyMode() === 'enforce' });
@@ -225,13 +241,18 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, a
 const FIREBASE_TOKEN_TTL_MS = 55 * 60 * 1000;
 
 router.post('/api/auth/google/firebase-token', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
-    const { accessToken, email } = req.body || {};
+    const { accessToken } = req.body || {};
     if (typeof accessToken !== 'string' || accessToken.length < 10 || accessToken.length > 4096) {
         return res.status(400).json({ error: 'Geçersiz erişim jetonu.' });
     }
     try {
+        // Hesap istemcinin söylediğinden değil Google'dan okunur: başka hesabın Gmail ve takvim jetonu bu profile bağlanmasın.
+        const owner = await googleTokenEmail(accessToken);
+        if (!sameAccount(owner, req.authUser.email)) {
+            return res.status(403).json({ error: 'Google\'da Clyro hesabınızla aynı hesabı seçin.', code: 'wrong_google_account' });
+        }
         await tokenStore.connect(req.authUser.uid, 'google', {
-            email: typeof email === 'string' ? email : '',
+            email: owner,
             accessToken,
             tokenExpiresAt: Date.now() + FIREBASE_TOKEN_TTL_MS,
             authMode: 'firebase',

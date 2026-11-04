@@ -6,7 +6,7 @@
 // karşılığıyla aynı şekle geldiğini sabitlemek.
 import { describe, expect, it } from 'vitest';
 
-import { invitationPayload } from './auth.js';
+import { googleTokenEmail, invitationPayload, sameAccount } from './auth.js';
 
 /** Firestore doküman görünümü — test için asgari şekil. */
 const belge = (id, data) => ({ id, data: () => data });
@@ -52,5 +52,24 @@ describe('invitationPayload', () => {
     it('bozuk belge çökertmiyor', () => {
         expect(invitationPayload({ id: 'i' }).role).toBe('recruiter');
         expect(invitationPayload({ id: 'i', data: () => null }).departments).toEqual([]);
+    });
+});
+
+describe('Google jetonunun sahibi', () => {
+    const yanit = (status, body) => async () => ({ ok: status === 200, status, json: async () => body });
+
+    it('e-postayı Google yanıtından okur', async () => {
+        expect(await googleTokenEmail('j', yanit(200, { email: 'a@ornek.com', email_verified: true }))).toBe('a@ornek.com');
+    });
+    it('geçersiz jeton ya da doğrulanmamış e-posta sahip sayılmaz', async () => {
+        expect(await googleTokenEmail('j', yanit(401, {}))).toBeNull();
+        expect(await googleTokenEmail('j', yanit(200, { email: 'a@ornek.com', email_verified: false }))).toBeNull();
+        expect(await googleTokenEmail('j', yanit(200, { email_verified: true }))).toBeNull();
+    });
+    it('hesap karşılaştırması: büyük/küçük harf fark etmez, boş eşleşmez', () => {
+        expect(sameAccount('A@ornek.com', 'a@ornek.com')).toBe(true);
+        expect(sameAccount('b@ornek.com', 'a@ornek.com')).toBe(false);
+        expect(sameAccount(null, 'a@ornek.com')).toBe(false);
+        expect(sameAccount('', '')).toBe(false);
     });
 });

@@ -10,7 +10,10 @@ describe('hubOnly', () => {
         expect(hubOnlyMode({})).toBe('off');
         expect(hubOnlyMode({ HUB_ONLY_LOGIN: 'off' })).toBe('off');
         expect(hubOnlyMode(enforce)).toBe('enforce');
+        expect(hubOnlyMode({ HUB_ONLY_LOGIN: 'ENFORCE' })).toBe('enforce');
+        const err = vi.spyOn(console, 'error').mockImplementation(() => {});
         expect(hubOnlyMode({ HUB_ONLY_LOGIN: 'enforcee' })).toBe('report');
+        expect(err).toHaveBeenCalledTimes(1);
     });
 
     it('enforce: Google ve şifre jetonu reddedilir; Hub jetonu ve aday oturumu geçer', () => {

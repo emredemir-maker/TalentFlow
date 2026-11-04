@@ -24,6 +24,8 @@ const getIdToken = async () => {
 
 const buildGoogleProvider = (forceConsent = false) => {
     const provider = new GoogleAuthProvider();
+    // Sunucu jetonun sahibini Google'dan okur (functions/routes/auth.js).
+    provider.addScope('email');
     provider.addScope('https://www.googleapis.com/auth/gmail.modify');
     provider.addScope('https://www.googleapis.com/auth/calendar.events');
     provider.setCustomParameters({

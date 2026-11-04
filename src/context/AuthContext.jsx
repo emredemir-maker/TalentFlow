@@ -143,7 +143,8 @@ export function AuthProvider({ children }) {
                 // Doğrudan giriş kapalıysa bu tarayıcıda kalmış eski Google/şifre oturumu kapanır, kişi Hub'dan girer.
                 // Kapı sunucuda ve kurallarda; bu yalnız ekranda takılı kalmasın diye.
                 if (await isStaleDirectSession(currentUser)) {
-                    signOut(auth);
+                    // Beklerken Hub'dan yeni oturum açılmış olabilir: yalnız bu kullanıcı hâlâ etkinse kapatılır.
+                    if (auth.currentUser === currentUser) signOut(auth);
                     return;
                 }
 
@@ -170,6 +171,12 @@ export function AuthProvider({ children }) {
                     }
                     setLoading(false);
                 }, (err) => {
+                    // Kurallar kimliği reddettiyse (doğrudan giriş ya da 14 günü geçen sekme) ekran açık kalmasın, kişi Hub'a yönlensin.
+                    if (err.code === 'permission-denied') {
+                        isStaleDirectSession(currentUser).then((stale) => {
+                            if (stale && auth.currentUser === currentUser) signOut(auth);
+                        });
+                    }
                     console.error("Profile Listener Error:", err);
                     setLoading(false);
                 });
