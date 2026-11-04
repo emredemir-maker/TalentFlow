@@ -461,7 +461,9 @@ describe('üretimde Hub kapısı', () => {
         await deny(doc(prodCtx(env, U.dept, 'password')));
     });
     it('14 günden eski Hub kimliği geçmez', async () => {
-        await deny(doc(prodCtx(env, U.dept, 'custom', Math.floor(Date.now() / 1000) - 15 * 24 * 60 * 60)));
+        await deny(
+            doc(prodCtx(env, U.dept, 'custom', Math.floor(Date.now() / 1000) - 15 * 24 * 60 * 60))
+        );
     });
     it('demo ve emülatör projesi şifreyle çalışmayı sürdürür', async () => {
         await allow(doc(strictCtx(env, U.dept)));
