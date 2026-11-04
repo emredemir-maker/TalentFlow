@@ -156,7 +156,7 @@ jobs:
       # CORS izin listesi (middleware/cors.js).
       - name: Create functions/.env
         run: |
-          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\nAUDIO_FALLBACK_ENABLED=%s\n' \
+          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\nAUDIO_FALLBACK_ENABLED=%s\nHUB_ONLY_LOGIN=%s\n' \
             "$EMAIL_USER" \
             "$EMAIL_PASS" \
             "$VITE_GEMINI_API_KEY" \
@@ -168,6 +168,7 @@ jobs:
             "$STORAGE_BUCKET" \
             "$APP_URL" \
             "$AUDIO_FALLBACK_ENABLED" \
+            "$HUB_ONLY_LOGIN" \
             > functions/.env
           echo "✅ functions/.env oluşturuldu:"
           sed 's/=.*/=***/' functions/.env
@@ -196,6 +197,8 @@ jobs:
           # KAPALI kalır; yalnız "uygulama içi mülakat" ek paketi alan
           # müşteride `true` yapılır. Bkz. functions/services/audioFallback.js.
           AUDIO_FALLBACK_ENABLED: ${{ vars.AUDIO_FALLBACK_ENABLED }}
+          # Hub dışı giriş kapısı (functions/middleware/hubOnly.js): off | report | enforce. Boşsa kapalı.
+          HUB_ONLY_LOGIN: ${{ vars.HUB_ONLY_LOGIN }}
 
       # Anahtar dosyası env üzerinden yazılıyor (önceden `echo '${{ … }}'`):
       # JSON'daki bir tek tırnak kabuğu bozabiliyordu. Ardından anahtarın
