@@ -6,6 +6,7 @@ import {
     strictCtx,
     anonCtx,
     unauthCtx,
+    prodCtx,
     seed,
     seedFiles,
     allow,
@@ -101,5 +102,47 @@ describe('varsayılan red', () => {
     it('kuralı olmayan yol kapalı', async () => {
         await deny(as('u-1').ref('elsewhere/x.txt').getMetadata());
         await deny(put(as('u-1'), 'elsewhere/y.txt', 'text/plain'));
+    });
+});
+
+describe('üretimde Hub kapısı', () => {
+    const OLD = Math.floor(Date.now() / 1000) - 15 * 24 * 60 * 60;
+    const st = (ctx) => ctx.storage(`gs://${BUCKET}`);
+    const png = (ref) => ref.put(new Uint8Array([1, 2, 3]), { contentType: 'image/png' });
+    const direct = (provider) => prodCtx(env, 'u-1', provider);
+
+    it('Hub jetonu okur', async () => {
+        await allow(
+            st(prodCtx(env, 'u-1', 'custom'))
+                .ref('cvs/c-1.pdf')
+                .getMetadata()
+        );
+    });
+    it('Google, şifre ve eski Hub kimliği özgeçmişe ulaşamaz', async () => {
+        await deny(st(direct('google.com')).ref('cvs/c-1.pdf').getMetadata());
+        await deny(st(direct('password')).ref('cvs/c-2/cv.pdf').getMetadata());
+        await deny(
+            st(prodCtx(env, 'u-1', 'custom', OLD))
+                .ref('cvs/c-1.pdf')
+                .getMetadata()
+        );
+    });
+    it('kendi yükleme alanları da kapalı', async () => {
+        await deny(st(direct('google.com')).ref('avatars/u-1/a.png').getMetadata());
+        await deny(png(st(direct('google.com')).ref('avatars/u-1/b.png')));
+        await deny(st(direct('password')).ref('bulk-imports/u-1/a.zip').getMetadata());
+    });
+    it('doğrudan girişle super_admin talebi logo yükleyemez; Hub jetonu yükler', async () => {
+        const claims = { role: 'super_admin' };
+        await deny(
+            png(st(prodCtx(env, 'u-super', 'google.com', undefined, claims)).ref('branding/x.png'))
+        );
+        await deny(
+            png(st(prodCtx(env, 'u-super', 'password', undefined, claims)).ref('branding/x.png'))
+        );
+        await deny(png(st(prodCtx(env, 'u-super', 'custom', OLD, claims)).ref('branding/x.png')));
+        await allow(
+            png(st(prodCtx(env, 'u-super', 'custom', undefined, claims)).ref('branding/x.png'))
+        );
     });
 });

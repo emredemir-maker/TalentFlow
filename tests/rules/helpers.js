@@ -52,6 +52,23 @@ export function strictCtx(env, uid, extraClaims = {}) {
     });
 }
 
+// Üretim projesinin jetonu: Hub kapısı (firestore.rules → hubGateOk) yalnız bunda çalışır.
+export function prodCtx(
+    env,
+    uid,
+    provider,
+    authTime = Math.floor(Date.now() / 1000) - 60,
+    extraClaims = {}
+) {
+    return env.authenticatedContext(uid, {
+        email: `${uid}@example.test`,
+        aud: 'agentinn-nyqpx',
+        auth_time: authTime,
+        firebase: { sign_in_provider: provider },
+        ...extraClaims,
+    });
+}
+
 export function anonCtx(env, uid = 'anon-visitor') {
     return env.authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous' } });
 }
