@@ -6,7 +6,7 @@
 // da sabitliyor (ör. jetondaki `role` talebine güven, anonimin her adayı tekil
 // okuyabilmesi); onlar "BUGÜN" notuyla işaretli ve PR 1'de tersine döner.
 import { describe, it, beforeAll, afterAll } from 'vitest';
-import { createEnv, strictCtx, anonCtx, unauthCtx, seed, allow, deny } from './helpers.js';
+import { createEnv, strictCtx, anonCtx, unauthCtx, prodCtx, seed, allow, deny } from './helpers.js';
 
 const D = 'artifacts/talent-flow/public/data';
 
@@ -448,5 +448,22 @@ describe('varsayılan red', () => {
     it('kuralı olmayan yol super_admin’e de kapalı', async () => {
         await deny(as(U.superAdmin).doc('elsewhere/x').get());
         await deny(as(U.superAdmin).doc('elsewhere/y').set({ a: 1 }));
+    });
+});
+
+describe('üretimde Hub kapısı', () => {
+    const doc = (ctx) => ctx.firestore().doc(`${D}/users/${U.dept}`).get();
+    it('Hub jetonu geçer', async () => {
+        await allow(doc(prodCtx(env, U.dept, 'custom')));
+    });
+    it('Google ve şifre jetonu geçmez', async () => {
+        await deny(doc(prodCtx(env, U.dept, 'google.com')));
+        await deny(doc(prodCtx(env, U.dept, 'password')));
+    });
+    it('14 günden eski Hub kimliği geçmez', async () => {
+        await deny(doc(prodCtx(env, U.dept, 'custom', Math.floor(Date.now() / 1000) - 15 * 24 * 60 * 60)));
+    });
+    it('demo ve emülatör projesi şifreyle çalışmayı sürdürür', async () => {
+        await allow(doc(strictCtx(env, U.dept)));
     });
 });

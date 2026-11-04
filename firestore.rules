@@ -3,10 +3,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ── Auth helpers ──────────────────────────────────────────────────────────
+    // Üretimde iç kullanıcı yalnız Hub'dan girer: iki aşamalı doğrulama orada. Özel jetonu yalnız Hub basar; Firebase oturumu
+    // kendiliğinden bitmediği için kimlik en çok 14 gün geçerli (functions/middleware/hubOnly.js ile aynı). Demo ve emülatör
+    // projeleri şifreyle girer, kapıya tabi değil.
+    function hubGateOk() {
+      return request.auth.token.aud != 'agentinn-nyqpx' ||
+        (request.auth.token.firebase.sign_in_provider == 'custom' &&
+         request.auth.token.auth_time > request.time.toMillis() / 1000 - 1209600);
+    }
     // Strict: excludes anonymous sessions
     function isStrictAuthenticated() {
       return request.auth != null &&
-        request.auth.token.firebase.sign_in_provider != 'anonymous';
+        request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+        hubGateOk();
     }
 
     // Loose: includes anonymous candidates on public routes
