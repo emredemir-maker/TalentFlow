@@ -13,7 +13,8 @@
 // kullanıcı için kendisi çözüyor ve gerekirse yeniliyor. Profilde yalnızca
 // `integrations.google.{connected,email,authMode}` görünür.
 
-import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const getIdToken = async () => {
@@ -23,6 +24,8 @@ const getIdToken = async () => {
 
 const buildGoogleProvider = (forceConsent = false) => {
     const provider = new GoogleAuthProvider();
+    // Sunucu jetonun sahibini Google'dan okur (functions/routes/auth.js).
+    provider.addScope('email');
     provider.addScope('https://www.googleapis.com/auth/gmail.modify');
     provider.addScope('https://www.googleapis.com/auth/calendar.events');
     provider.setCustomParameters({
@@ -98,9 +101,28 @@ const _connectViaServer = (userId, oauthUrl) => {
 // ─── CONNECT VIA FIREBASE (fallback — özel credentials yoksa) ─────────────────
 // Popup'tan gelen kısa ömürlü erişim jetonu sunucuya gidiyor; sunucu onu
 // şifreleyip saklıyor. İstemci jetonu Firestore'a yazmıyor.
+// Ayrı Firebase örneğiyle: ana örnekte signInWithPopup kişinin Hub oturumunu Google oturumuyla değiştirirdi. Yalnız erişim
+// jetonu alınır, bu örneğin oturumu hemen kapatılır.
+const INTEGRATION_APP = 'google-integration';
+const integrationAuth = () => {
+    const app = getApps().some((a) => a.name === INTEGRATION_APP) ? getApp(INTEGRATION_APP) : initializeApp(getApp().options, INTEGRATION_APP);
+    return getAuth(app);
+};
+
 const _connectViaFirebase = async (forceConsent) => {
     const provider = buildGoogleProvider(forceConsent);
-    const result = await signInWithPopup(getAuth(), provider);
+    const popupAuth = integrationAuth();
+    let result;
+    try {
+        result = await signInWithPopup(popupAuth, provider);
+    } finally {
+        await signOut(popupAuth).catch(() => {});
+    }
+    // Yalnız kişinin kendi Google hesabı: başka hesabın Gmail ve takvim jetonu bu profile bağlanmasın.
+    const ownEmail = getAuth().currentUser?.email?.toLowerCase();
+    if (!ownEmail || result.user.email?.toLowerCase() !== ownEmail) {
+        throw new Error(`Google'da ${getAuth().currentUser?.email || 'Clyro hesabınızın'} hesabını seçin.`);
+    }
 
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential?.accessToken;

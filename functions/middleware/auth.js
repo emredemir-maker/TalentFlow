@@ -18,6 +18,7 @@
 //   The no-arg form accepts any of the three default roles (super_admin,
 //   recruiter, department_user).
 import { db, admin } from '../config/firebaseAdmin.js';
+import { blockDirectToken, HUB_ONLY_ERROR } from './hubOnly.js';
 
 export async function verifyFirebaseToken(req, res, next) {
     const authHeader = req.headers.authorization || '';
@@ -29,6 +30,7 @@ export async function verifyFirebaseToken(req, res, next) {
         // uid'yi ÇIKARMIYORDU — bu yüzden /api/auth/* uçları userId'yi
         // istemcinin gönderdiği değerden almak zorunda kalıyordu (IDOR).
         const decoded = await admin.auth().verifyIdToken(token);
+        if (blockDirectToken(decoded)) return res.status(403).json(HUB_ONLY_ERROR);
         req.firebaseToken = token;
         req.authUser = {
             uid: decoded.uid,
@@ -59,6 +61,7 @@ export const requireAuth = (allowedRoles = ALLOWED_ROLES) => async (req, res, ne
     if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
     try {
         const decoded = await admin.auth().verifyIdToken(token);
+        if (blockDirectToken(decoded)) return res.status(403).json(HUB_ONLY_ERROR);
         // Fetch role from Firestore — JWT custom claims may not carry role
         const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
         if (!userDoc.exists) {

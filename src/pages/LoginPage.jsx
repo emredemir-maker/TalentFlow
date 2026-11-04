@@ -1,11 +1,35 @@
 // src/pages/LoginPage.jsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { fetchLoginOptions } from '../services/loginOptions';
 import { IS_DEMO, DEMO_LOGIN, HAS_DEMO_LOGIN } from '../utils/demoMode';
 import { LogIn, AlertCircle, CheckCircle, Loader2, User, Mail, Lock, Sparkles, ArrowRight, Zap, Brain, BarChart3, Clock } from 'lucide-react';
 import TalentInnLogo from '../components/TalentInnLogo';
 
+const HUB_URL = `${(import.meta.env.VITE_HUB_INN_URL || 'https://hub.clyrolabs.com').replace(/\/+$/, '')}/?open=talent`;
+
 export default function LoginPage() {
+    // Yüklenirken boş: giriş formu bir an görünüp kaybolmasın. Sunucuya ulaşılamazsa form kalır, kapı yine sunucuda.
+    const [hubOnly, setHubOnly] = useState(IS_DEMO ? false : null);
+    useEffect(() => {
+        if (IS_DEMO) return;
+        fetchLoginOptions().then((o) => setHubOnly(o.hubOnly === true)).catch(() => setHubOnly(false));
+    }, []);
+    if (hubOnly === null) return null;
+    if (hubOnly) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+                <div className="max-w-sm text-center space-y-4">
+                    <p className="text-slate-800">Clyro Talent'e Clyro Hub üzerinden girilir.</p>
+                    <a href={HUB_URL} className="inline-block rounded-lg bg-slate-900 text-white px-4 py-2 text-sm font-medium">Clyro Hub'a git</a>
+                </div>
+            </div>
+        );
+    }
+    return <DirectLogin />;
+}
+
+function DirectLogin() {
     const { loginWithGoogle, loginWithEmail, registerWithEmail, loading, error } = useAuth();
 
     const [mode, setMode] = useState('login');

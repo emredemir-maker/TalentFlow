@@ -3,6 +3,8 @@
 // Uses onAuthStateChanged to bind user session to global state
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { fetchLoginOptions } from '../services/loginOptions';
+import { IS_DEMO } from '../utils/demoMode';
 import {
     signInWithPopup,
     onAuthStateChanged,
@@ -53,6 +55,21 @@ async function lookupInvitation(emailLower) {
     if (!res.ok) throw new Error(`Davetiye servisi yanıt vermedi (${res.status})`);
     const data = await res.json();
     return data?.found ? data : null;
+}
+
+// Sunucudaki kuralla aynı (functions/middleware/hubOnly.js): Hub kimliği 14 günden eskiyse kişi Hub'dan yeniden girer. Burada
+// denetlenmezse ekran açık kalır, her istek 403 döner.
+const MAX_IDENTITY_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+async function isStaleDirectSession(user) {
+    if (IS_DEMO) return false;
+    try {
+        const [{ hubOnly }, token] = await Promise.all([fetchLoginOptions(), user.getIdTokenResult()]);
+        if (hubOnly !== true) return false;
+        return token.signInProvider !== 'custom' || !(Date.now() - new Date(token.authTime).getTime() <= MAX_IDENTITY_AGE_MS);
+    } catch {
+        return false;
+    }
 }
 
 export function AuthProvider({ children }) {
@@ -123,6 +140,13 @@ export function AuthProvider({ children }) {
                     setLoading(false);
                     return;
                 }
+                // Doğrudan giriş kapalıysa bu tarayıcıda kalmış eski Google/şifre oturumu kapanır, kişi Hub'dan girer.
+                // Kapı sunucuda ve kurallarda; bu yalnız ekranda takılı kalmasın diye.
+                if (await isStaleDirectSession(currentUser)) {
+                    // Beklerken Hub'dan yeni oturum açılmış olabilir: yalnız bu kullanıcı hâlâ etkinse kapatılır.
+                    if (auth.currentUser === currentUser) signOut(auth);
+                    return;
+                }
 
                 setUser(currentUser);
 
@@ -147,6 +171,12 @@ export function AuthProvider({ children }) {
                     }
                     setLoading(false);
                 }, (err) => {
+                    // Kurallar kimliği reddettiyse (doğrudan giriş ya da 14 günü geçen sekme) ekran açık kalmasın, kişi Hub'a yönlensin.
+                    if (err.code === 'permission-denied') {
+                        isStaleDirectSession(currentUser).then((stale) => {
+                            if (stale && auth.currentUser === currentUser) signOut(auth);
+                        });
+                    }
                     console.error("Profile Listener Error:", err);
                     setLoading(false);
                 });
