@@ -3,6 +3,8 @@
 // Uses onAuthStateChanged to bind user session to global state
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { fetchLoginOptions } from '../services/loginOptions';
+import { IS_DEMO } from '../utils/demoMode';
 import {
     signInWithPopup,
     onAuthStateChanged,
@@ -53,6 +55,16 @@ async function lookupInvitation(emailLower) {
     if (!res.ok) throw new Error(`Davetiye servisi yanıt vermedi (${res.status})`);
     const data = await res.json();
     return data?.found ? data : null;
+}
+
+async function isStaleDirectSession(user) {
+    if (IS_DEMO) return false;
+    try {
+        const [{ hubOnly }, token] = await Promise.all([fetchLoginOptions(), user.getIdTokenResult()]);
+        return hubOnly === true && token.signInProvider !== 'custom';
+    } catch {
+        return false;
+    }
 }
 
 export function AuthProvider({ children }) {
@@ -121,6 +133,12 @@ export function AuthProvider({ children }) {
                     setUser(currentUser);
                     setUserProfile({ role: 'candidate', isAnonymous: true });
                     setLoading(false);
+                    return;
+                }
+                // Doğrudan giriş kapalıysa bu tarayıcıda kalmış eski Google/şifre oturumu kapanır, kişi Hub'dan girer.
+                // Kapı sunucuda ve kurallarda; bu yalnız ekranda takılı kalmasın diye.
+                if (await isStaleDirectSession(currentUser)) {
+                    signOut(auth);
                     return;
                 }
 

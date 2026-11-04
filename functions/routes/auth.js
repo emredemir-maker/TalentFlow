@@ -24,6 +24,7 @@
 import { Router } from 'express';
 
 import { verifyFirebaseToken, rejectAnonymous } from '../middleware/auth.js';
+import { hubOnlyMode } from '../middleware/hubOnly.js';
 import { inviteLimiter } from '../middleware/rateLimit.js';
 import { db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
@@ -35,6 +36,11 @@ const log = childLogger('auth');
 const router = Router();
 
 // ─── Microsoft 365 ────────────────────────────────────────────────────────────
+
+// Giriş ekranı: doğrudan giriş düğmeleri gösterilsin mi. Yalnız ekranı ayarlar; asıl kapı middleware/auth.js.
+router.get('/api/auth/login-options', (req, res) => {
+    res.json({ hubOnly: hubOnlyMode() === 'enforce' });
+});
 
 router.get('/api/auth/microsoft/url', async (req, res) => {
     try {
