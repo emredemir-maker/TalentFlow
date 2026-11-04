@@ -244,7 +244,7 @@ export function cleanupOldFiles(uploadBaseDir) {
     if (count > 0) log.info(`🧹 KVKK Veri Minimizasyonu: ${count} adet eski ham CV dosyası diskten silindi. (İletişim kayıtları korunuyor)`);
 }
 // Candidate Feedback Email Endpoint (Task #7)
-router.post('/api/send-feedback', generalLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/send-feedback', generalLimiter, verifyFirebaseToken, requireAuth(), async (req, res) => {
     const { to, candidateName, recruiterName, position, outcome, feedbackText, branding, html: prebuiltHtml } = req.body;
     if (!to || !feedbackText) return res.status(400).json({ error: 'Email ve geri bildirim metni gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
@@ -317,7 +317,7 @@ ${position ? `<p style="margin:8px 0 0;font-size:12px;color:#64748B;">Başvurula
 });
 
 // --- Interview Invite via Nodemailer (Google-bağımsız fallback) ---
-router.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, requireAuth(), async (req, res) => {
     const { to, subject, html, ics, candidateName, branding } = req.body;
     if (!to || !html) return res.status(400).json({ error: 'Email ve HTML içerik gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
@@ -357,7 +357,7 @@ router.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, a
 
 
 // /api/gemini-stt moved to routes/ai.js
-router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, requireAuth(), async (req, res) => {
     const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -643,7 +643,7 @@ function fetchImapInfoReplies() {
     });
 }
 
-router.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, requireAuth(), async (req, res) => {
     try {
         const replies = await fetchImapInfoReplies();
         log.info({ err: replies.map(r => r.requestId) }, `📬 IMAP tarama tamamlandı: ${replies.length} eşleşme`);

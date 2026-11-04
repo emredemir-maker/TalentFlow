@@ -92,6 +92,7 @@ const CANDIDATE_ALLOWED_FIELDS = new Set([
 // çalıştığı ve kimlik doğrulaması istemediği için aksi hâlde kuralları
 // tamamen atlatan bir arka kapı olurdu.
 export const PROTECTED_SESSION_FIELDS = new Set([
+    'mode',
     'aiAnalysis',
     'aggregateScore',
     'recommendedOutcome',
@@ -104,6 +105,42 @@ export const PROTECTED_SESSION_FIELDS = new Set([
     'candidateResponse',
     'candidateId',
 ]);
+
+const EVALUATION_FIELDS = [
+    'aiAnalysis',
+    'aggregateScore',
+    'recommendedOutcome',
+    'interviewScore',
+    'aiOverallScore',
+    'aiSummary',
+    'starScores',
+];
+
+/**
+ * Bu uç kimlik istemez. firestore.rules'taki isClosedInterview'un aynası: kapanan görüşme
+ * buradan yeniden açılamaz.
+ * @param {Record<string, unknown>} data
+ * @returns {boolean}
+ */
+export function isClosedSession(data) {
+    return (
+        ['completed', 'superseded'].includes(data?.status) ||
+        data?.mode === 'manual' ||
+        EVALUATION_FIELDS.some((field) => data?.[field] != null)
+    );
+}
+
+/**
+ * Yeni oturumda yalnız değerlendirme çıktıları düşer: iç ekranlar belgeyi bu uçla soru ve
+ * aday kimliğiyle açar.
+ * @param {Record<string, unknown>} data
+ * @returns {Record<string, unknown>}
+ */
+export function filterNewSession(data) {
+    return Object.fromEntries(
+        Object.entries(data || {}).filter(([key]) => key !== 'mode' && !EVALUATION_FIELDS.includes(key))
+    );
+}
 
 /**
  * Var olan bir oturum dokümanına uygulanacak alanları süzer.
@@ -132,10 +169,10 @@ router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
         const sessionRef = db.doc(`interviews/${sessionId}`);
         const snap = await sessionRef.get();
         if (!snap.exists) {
-            await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...(initialData || {}) });
+            await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...filterNewSession(initialData) });
             log.info(`[init-interview-session] Created /interviews/${sessionId}`);
         } else {
-            if (initialData && Object.keys(initialData).length > 0) {
+            if (initialData && Object.keys(initialData).length > 0 && !isClosedSession(snap.data())) {
                 const { safe, dropped } = filterSessionMerge(initialData);
                 if (dropped.length > 0) {
                     log.warn(`[init-interview-session] Korumalı alanlar reddedildi (${sessionId}): ${dropped.join(', ')}`);
