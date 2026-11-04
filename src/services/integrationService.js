@@ -110,8 +110,17 @@ const integrationAuth = () => {
 const _connectViaFirebase = async (forceConsent) => {
     const provider = buildGoogleProvider(forceConsent);
     const popupAuth = integrationAuth();
-    const result = await signInWithPopup(popupAuth, provider);
-    await signOut(popupAuth);
+    let result;
+    try {
+        result = await signInWithPopup(popupAuth, provider);
+    } finally {
+        await signOut(popupAuth).catch(() => {});
+    }
+    // Yalnız kişinin kendi Google hesabı: başka hesabın Gmail ve takvim jetonu bu profile bağlanmasın.
+    const ownEmail = getAuth().currentUser?.email?.toLowerCase();
+    if (!ownEmail || result.user.email?.toLowerCase() !== ownEmail) {
+        throw new Error(`Google'da ${getAuth().currentUser?.email || 'Clyro hesabınızın'} hesabını seçin.`);
+    }
 
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential?.accessToken;

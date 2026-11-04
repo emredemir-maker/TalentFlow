@@ -57,11 +57,16 @@ async function lookupInvitation(emailLower) {
     return data?.found ? data : null;
 }
 
+// Sunucudaki kuralla aynı (functions/middleware/hubOnly.js): Hub kimliği 14 günden eskiyse kişi Hub'dan yeniden girer. Burada
+// denetlenmezse ekran açık kalır, her istek 403 döner.
+const MAX_IDENTITY_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
 async function isStaleDirectSession(user) {
     if (IS_DEMO) return false;
     try {
         const [{ hubOnly }, token] = await Promise.all([fetchLoginOptions(), user.getIdTokenResult()]);
-        return hubOnly === true && token.signInProvider !== 'custom';
+        if (hubOnly !== true) return false;
+        return token.signInProvider !== 'custom' || !(Date.now() - new Date(token.authTime).getTime() <= MAX_IDENTITY_AGE_MS);
     } catch {
         return false;
     }
