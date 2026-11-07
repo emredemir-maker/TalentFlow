@@ -459,7 +459,11 @@ export default function SystemScanner() {
                                 <Brain className="w-5 h-5 text-electric" />
                             </div>
                             <div>
-                                <h3 className="text-base font-bold text-white">Detaylı Analiz</h3>
+                                {/* Pencere body'ye portal'lanıyor; orada index.css'teki katmansız
+                                    `h1–h4 { color: var(--on-surface) }` kuralı katmanlı `text-white`
+                                    yardımcısını eziyor ve başlık koyu zeminde koyu kalıyordu.
+                                    `!` ile pencerenin geri kalanıyla aynı beyaza dönüyor. */}
+                                <h3 className="text-base font-bold !text-white">Detaylı Analiz</h3>
                                 <p className="text-xs text-navy-400">Yalnızca siz başlattığınızda çalışır</p>
                             </div>
                         </div>
@@ -736,7 +740,7 @@ export default function SystemScanner() {
                         {/* Status Header */}
                         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-navy-800/50">
                             <div>
-                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h2 className="text-lg font-bold !text-white flex items-center gap-2">
                                     {scanning ? (
                                         <>
                                             <span className="relative flex h-3 w-3">
@@ -783,7 +787,7 @@ export default function SystemScanner() {
                                             {activeStage === 'recruiter'  && <Database    className="w-4 h-4 text-emerald-400 animate-pulse" />}
                                         </div>
                                     </div>
-                                    <h3 className="text-xl font-bold text-white mb-1">{currentCandidate.name}</h3>
+                                    <h3 className="text-xl font-bold !text-white mb-1">{currentCandidate.name}</h3>
                                     <p className="text-sm text-navy-400 mb-6">{currentCandidate.position}</p>
                                     <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
                                         <Loader2 className="w-4 h-4 animate-spin text-electric" />
@@ -801,7 +805,7 @@ export default function SystemScanner() {
                                     <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                                         <CheckCircle className="w-8 h-8 text-emerald-400" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-white mb-2">İşlem Tamamlandı</h3>
+                                    <h3 className="text-2xl font-bold !text-white mb-2">İşlem Tamamlandı</h3>
                                     <p className="text-navy-400 mb-8 max-w-sm">
                                         {totalQueued} aday işlendi. {aiCount} detaylı analiz yapıldı ve {updatedCount} profil güncellendi.
                                     </p>

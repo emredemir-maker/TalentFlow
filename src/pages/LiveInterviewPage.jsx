@@ -224,11 +224,15 @@ export default function LiveInterviewPage() {
     const [clock, setClock] = useState(() => Date.now());
     const [lastAnalysisAt, setLastAnalysisAt] = useState(null);
     const [analysisNotice, setAnalysisNotice] = useState('');
-    const [followUpNotice, setFollowUpNotice] = useState('');
+    // Sunucu 429 INTERVIEW_AI_LIMIT dediğinde onun metni; kapı kapalıyken
+    // istemci sınırı metninin yerine gösterilir (bkz. gateMessage).
+    const [analysisServerMsg, setAnalysisServerMsg] = useState('');
+    const [followUpServerMsg, setFollowUpServerMsg] = useState('');
     const analysisState = analysisGate.check(clock);
     const followUpState = followUpGate.check(clock);
-    const analysisBlockedMsg = gateMessage(analysisState, { capLabel: `Saatlik canlı analiz sınırı (${LIVE_ANALYSIS_HOURLY_CAP})`, now: clock });
-    const followUpBlockedMsg = gateMessage(followUpState, { capLabel: `Saatlik takip sorusu sınırı (${FOLLOWUP_HOURLY_CAP})`, now: clock });
+    const analysisBlockedMsg = gateMessage(analysisState, { capLabel: `Saatlik canlı analiz sınırı (${LIVE_ANALYSIS_HOURLY_CAP})`, serverMessage: analysisServerMsg, now: clock });
+    // Takip sorusu: görünen not ve düğme title'ı AYNI metni kullanır.
+    const followUpBlockedMsg = gateMessage(followUpState, { capLabel: `Saatlik takip sorusu sınırı (${FOLLOWUP_HOURLY_CAP})`, serverMessage: followUpServerMsg, now: clock });
 
     // Generate AI Paths based on strategy — fires ONCE per strategy selection.
     // Guards ensure we never overwrite questions that are already loaded locally.
@@ -642,7 +646,6 @@ export default function LiveInterviewPage() {
         if (!followUpGate.check(now).ok) { setClock(now); return; }
         followUpGate.record(now);
         setClock(now);
-        setFollowUpNotice('');
         // Bekleme bitince düğme kendiliğinden açılsın.
         setTimeout(() => setClock(Date.now()), FOLLOWUP_COOLDOWN_MS + 50);
 
@@ -674,7 +677,7 @@ export default function LiveInterviewPage() {
         } catch (err) {
             if (err?.code === 'INTERVIEW_AI_LIMIT') {
                 followUpGate.blockUntilNextHour();
-                setFollowUpNotice(err.message);
+                setFollowUpServerMsg(err.message);
             }
             console.error("AI question generation error:", err);
         } finally {
@@ -1025,7 +1028,7 @@ export default function LiveInterviewPage() {
         } catch (err) {
             if (err?.code === 'INTERVIEW_AI_LIMIT') {
                 analysisGate.blockUntilNextHour();
-                setAnalysisNotice(err.message);
+                setAnalysisServerMsg(err.message);
             }
             console.error('[Canlı analiz]', err.message);
         } finally {
@@ -1787,7 +1790,7 @@ export default function LiveInterviewPage() {
                                                     disabled={!selectedPathId || pathLoading}
                                                     className="w-full h-16 rounded-[1.5rem] bg-[#0F172A] hover:bg-black text-white font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-2 italic group px-5"
                                                 >
-                                                    MÜLAKATИ BAŞLAT <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
+                                                    MÜLAKATI BAŞLAT <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
                                                 </button>
                                             </div>
                                         </div>
@@ -2382,9 +2385,9 @@ export default function LiveInterviewPage() {
                                                 <ChevronRight className="w-3.5 h-3.5" />
                                             </button>
                                         </div>
-                                        {(followUpNotice || (!followUpState.ok && followUpBlockedMsg)) && (
+                                        {followUpBlockedMsg && (
                                             <p className="text-[11px] text-n500 mt-1.5 m-0">
-                                                Takip sorusu: {followUpNotice || followUpBlockedMsg}
+                                                Takip sorusu: {followUpBlockedMsg}
                                             </p>
                                         )}
                                     </div>
